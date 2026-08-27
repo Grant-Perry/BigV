@@ -25,7 +25,22 @@ struct RideRouteMapView: View {
          }
       }
       .frame(height: height)
-      .clipShape(.rect(cornerRadius: 16))
+      .clipShape(.rect(cornerRadius: 16, style: .continuous))
+      .overlay {
+         RoundedRectangle(cornerRadius: 16, style: .continuous)
+            .strokeBorder(
+               LinearGradient(
+                  colors: [
+                     Color.white.opacity(0.24),
+                     RideDashboardTheme.ice.opacity(0.14),
+                     Color.white.opacity(0.04)
+                  ],
+                  startPoint: .topLeading,
+                  endPoint: .bottomTrailing
+               ),
+               lineWidth: 1
+            )
+      }
    }
 
    // MARK: - Map
@@ -33,7 +48,7 @@ struct RideRouteMapView: View {
    private func map(framing region: MKCoordinateRegion) -> some View {
       Map(initialPosition: .region(region), interactionModes: [.pan, .zoom]) {
          MapPolyline(coordinates: route.coordinates)
-            .stroke(.cyan, style: .routeLine)
+            .stroke(Color.gpBreadcrumb, style: .routeLine)
 
          if let start = route.startCoordinate {
             endpoint(at: start, label: "Ride start", tint: .green)

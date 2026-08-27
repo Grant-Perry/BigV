@@ -16,13 +16,11 @@ struct RideStatusBar: View {
    var body: some View {
       VStack(spacing: 6) {
          HStack(spacing: 8) {
-            Image(systemName: hasGPSFix ? .locationFillIcon : .locationSlashIcon)
-               .font(.caption.weight(.bold))
-               .foregroundStyle(hasGPSFix ? .green : .orange)
+            RideMarkView(isLive: hasGPSFix)
 
             Text(statusText)
                .font(.caption.weight(.semibold))
-               .foregroundStyle(.white.opacity(0.8))
+               .foregroundStyle(.white.opacity(0.88))
 
             Spacer()
 
@@ -37,23 +35,16 @@ struct RideStatusBar: View {
          if let issueMessage {
             Text(issueMessage)
                .font(.caption2)
-               .foregroundStyle(.orange)
+               .foregroundStyle(RideDashboardTheme.ember)
                .frame(maxWidth: .infinity, alignment: .leading)
          }
       }
    }
 }
 
-// MARK: - Icons
-
-private extension String {
-   static let locationFillIcon = "location.fill"
-   static let locationSlashIcon = "location.slash"
-}
-
 #Preview {
    ZStack {
-      Color.black
+      RideAtmosphereBackground()
       RideStatusBar(
          statusText: "Recording",
          accuracyText: "8 m",

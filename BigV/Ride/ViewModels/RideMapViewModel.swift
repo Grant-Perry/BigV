@@ -24,6 +24,14 @@ final class RideMapViewModel {
 
    private(set) var isFollowingRider = true
 
+   /// Session-scoped. Recenter keeps whatever the rider last chose.
+   private(set) var isPitched = false
+   private(set) var isSatellite = false
+
+   /// Cheap highlight after a rider jumps to a turn. Cleared on recenter.
+   private(set) var focusedManeuverID: PlannedRouteManeuver.ID?
+   private(set) var focusedManeuverCoordinate: CLLocationCoordinate2D?
+
    /// While following, single-finger drags are left alone so the page swipe still
    /// reaches the pager: a full-bleed pannable map swallows horizontal drags and
    /// strands the rider on this page. Pinch and rotate are multi-touch, so they
@@ -82,6 +90,8 @@ final class RideMapViewModel {
 
    func clearPlannedRoute() {
       plannedRouteManager.clear()
+      focusedManeuverID = nil
+      focusedManeuverCoordinate = nil
       recenter()
    }
 
@@ -127,6 +137,37 @@ final class RideMapViewModel {
       return "\(Int(state.course.rounded()))°"
    }
 
+   // MARK: - Map Presentation
+
+   var mapStyle: MapStyle {
+      let elevation: MapStyle.Elevation = isPitched ? .realistic : .flat
+
+      if isSatellite {
+         return .hybrid(
+            elevation: elevation,
+            pointsOfInterest: .excludingAll
+         )
+      }
+
+      return .standard(
+         elevation: elevation,
+         emphasis: .muted,
+         pointsOfInterest: .excludingAll,
+         showsTraffic: false
+      )
+   }
+
+   func togglePitch() {
+      isPitched.toggle()
+      applyPitchToFrozenCamera()
+      DebugPrint(mode: .navigation, isPitched ? "Map 3D" : "Map 2D")
+   }
+
+   func toggleSatellite() {
+      isSatellite.toggle()
+      DebugPrint(mode: .navigation, isSatellite ? "Map satellite" : "Map road")
+   }
+
    // MARK: - Intent
 
    func toggleCameraMode() {
@@ -138,10 +179,32 @@ final class RideMapViewModel {
    }
 
    func recenter() {
+      focusedManeuverID = nil
+      focusedManeuverCoordinate = nil
       cameraPosition = .followRider
       isFollowingRider = true
 
       DebugPrint(mode: .navigation, "Map following rider")
+   }
+
+   /// Frames one planned step. Keeps the current 2D / 3D pitch.
+   func focusManeuver(id: PlannedRouteManeuver.ID, coordinate: CLLocationCoordinate2D) {
+      guard CLLocationCoordinate2DIsValid(coordinate) else { return }
+
+      focusedManeuverID = id
+      focusedManeuverCoordinate = coordinate
+
+      cameraPosition = .camera(
+         MapCamera(
+            centerCoordinate: coordinate,
+            distance: lastCamera?.distance ?? 420,
+            heading: lastCamera?.heading ?? 0,
+            pitch: isPitched ? 52 : 0
+         )
+      )
+      isFollowingRider = false
+
+      DebugPrint(mode: .navigation, "Map focused on turn \(id)")
    }
 
    func rememberCamera(_ camera: MapCamera) {
@@ -153,10 +216,24 @@ final class RideMapViewModel {
    private func releaseCamera() {
       guard let lastCamera else { return }
 
-      cameraPosition = .camera(lastCamera)
+      cameraPosition = .camera(pitched(lastCamera))
       isFollowingRider = false
 
       DebugPrint(mode: .navigation, "Map released for free pan")
+   }
+
+   private func applyPitchToFrozenCamera() {
+      guard !isFollowingRider, let lastCamera else { return }
+      cameraPosition = .camera(pitched(lastCamera))
+   }
+
+   private func pitched(_ camera: MapCamera) -> MapCamera {
+      MapCamera(
+         centerCoordinate: camera.centerCoordinate,
+         distance: camera.distance,
+         heading: camera.heading,
+         pitch: isPitched ? 52 : 0
+      )
    }
 }
 

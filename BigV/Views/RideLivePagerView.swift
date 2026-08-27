@@ -7,8 +7,7 @@ import SwiftUI
 
 /// Swipeable pages of the live ride screen, dashboard first.
 ///
-/// Adding a page means adding a `RidePage` case and a branch in `page(for:)`;
-/// nothing else in the app needs to know the pager exists.
+/// The dashboard drawer is the primary map. This page is the expanded map.
 struct RideLivePagerView: View {
 
    let rideViewModel: RideViewModel
@@ -32,7 +31,35 @@ struct RideLivePagerView: View {
          RidePageIndicatorView(pages: RidePage.allCases, selectedPage: selectedPage)
             .padding(.vertical, 6)
       }
-      .background(Color.black)
+      .background(Color.clear)
+      .onChange(of: selectedPage) { _, _ in
+         routeGuidanceViewModel.collapseTurnList()
+      }
+   }
+
+   // MARK: - Page Swipe
+
+   /// Drawer tap layers and MapKit pans can eat TabView's own drag. This
+   /// recovers a clear horizontal swipe without disabling map zoom / explore pan.
+   private var swipeToMap: some Gesture {
+      DragGesture(minimumDistance: 40)
+         .onEnded { value in
+            guard RidePageSwipe.isForward(value) else { return }
+            selectedPage = .map
+         }
+   }
+
+   private var swipeToDashboard: some Gesture {
+      DragGesture(minimumDistance: 40)
+         .onEnded { value in
+            guard RidePageSwipe.isBack(value) else { return }
+
+            // Following: no map pan, so the whole page can page back.
+            // Exploring: only a leading-edge swipe, so a map pan stays a pan.
+            if rideMapViewModel.isFollowingRider || RidePageSwipe.startsAtLeadingEdge(value) {
+               selectedPage = .dashboard
+            }
+         }
    }
 
    // MARK: - Pages
@@ -43,9 +70,14 @@ struct RideLivePagerView: View {
          case .dashboard:
             RideDashboardView(
                rideViewModel: rideViewModel,
+               rideMapViewModel: rideMapViewModel,
                routeGuidanceViewModel: routeGuidanceViewModel,
-               onShowHistory: onShowHistory
+               showsDrawerMap: selectedPage == .dashboard,
+               onShowHistory: onShowHistory,
+               onPlanRoute: onPlanRoute,
+               onExpandMap: { selectedPage = .map }
             )
+            .simultaneousGesture(swipeToMap)
 
          case .map:
             RideMapView(
@@ -53,6 +85,7 @@ struct RideLivePagerView: View {
                routeGuidanceViewModel: routeGuidanceViewModel,
                onPlanRoute: onPlanRoute
             )
+            .simultaneousGesture(swipeToDashboard)
       }
    }
 }
@@ -70,12 +103,33 @@ private struct RidePageIndicatorView: View {
       HStack(spacing: 6) {
          ForEach(pages) { page in
             Capsule()
-               .fill(.white.opacity(page == selectedPage ? 0.85 : 0.22))
+               .fill(page == selectedPage ? RideDashboardTheme.ice.opacity(0.9) : .white.opacity(0.22))
                .frame(width: page == selectedPage ? 18 : 6, height: 6)
          }
       }
       .accessibilityElement(children: .ignore)
       .accessibilityLabel("Page \(selectedPage.title)")
+   }
+}
+
+// MARK: - Swipe Test
+
+private enum RidePageSwipe {
+
+   static func isForward(_ value: DragGesture.Value) -> Bool {
+      isHorizontal(value) && value.translation.width < -60
+   }
+
+   static func isBack(_ value: DragGesture.Value) -> Bool {
+      isHorizontal(value) && value.translation.width > 60
+   }
+
+   static func startsAtLeadingEdge(_ value: DragGesture.Value) -> Bool {
+      value.startLocation.x < 36
+   }
+
+   private static func isHorizontal(_ value: DragGesture.Value) -> Bool {
+      abs(value.translation.width) > abs(value.translation.height) * 1.3
    }
 }
 

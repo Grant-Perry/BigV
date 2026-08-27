@@ -1,0 +1,73 @@
+//
+//  RideMapCanvasView.swift
+//  BigV
+//
+
+import MapKit
+import SwiftUI
+
+/// Owns the camera binding, the breadcrumb and the planned route, and nothing
+/// else. Shared by the full map page and the dashboard drawer.
+struct RideMapCanvasView: View {
+
+   @Bindable var rideMapViewModel: RideMapViewModel
+   var showsCompass: Bool = true
+   var allowsInteraction: Bool = true
+
+   var body: some View {
+      Map(
+         position: $rideMapViewModel.cameraPosition,
+         interactionModes: allowsInteraction ? rideMapViewModel.interactionModes : []
+      ) {
+         if rideMapViewModel.hasPlannedRoute {
+            MapPolyline(coordinates: rideMapViewModel.plannedRouteCoordinates)
+               .stroke(PlannedRouteStyle.line, style: PlannedRouteStyle.stroke)
+         }
+
+         if let focused = rideMapViewModel.focusedManeuverCoordinate {
+            Annotation("Selected turn", coordinate: focused, anchor: .center) {
+               Circle()
+                  .fill(RideDashboardTheme.ember)
+                  .stroke(.white, lineWidth: 2)
+                  .frame(width: 12, height: 12)
+            }
+            .annotationTitles(.hidden)
+         }
+
+         if let destination = rideMapViewModel.destinationCoordinate,
+            let name = rideMapViewModel.destinationName {
+            Annotation(name, coordinate: destination, anchor: .center) {
+               Circle()
+                  .fill(PlannedRouteStyle.destinationMarker)
+                  .stroke(.black, lineWidth: 2)
+                  .frame(width: 14, height: 14)
+            }
+            .annotationTitles(.hidden)
+         }
+
+         if rideMapViewModel.hasRoute {
+            MapPolyline(coordinates: rideMapViewModel.routeCoordinates)
+               .stroke(Color.gpBreadcrumb, style: .routeLine)
+         }
+
+         UserAnnotation()
+      }
+      .mapStyle(rideMapViewModel.mapStyle)
+      .mapControls {
+         if showsCompass {
+            MapCompass()
+         }
+      }
+      .onMapCameraChange(frequency: .continuous) { context in
+         rideMapViewModel.rememberCamera(context.camera)
+      }
+      .onChange(of: rideMapViewModel.plannedRouteID) { _, newID in
+         guard newID != nil else { return }
+         rideMapViewModel.framePlannedRoute()
+      }
+      .onChange(of: rideMapViewModel.isIdle) { _, isIdle in
+         guard !isIdle else { return }
+         rideMapViewModel.recenter()
+      }
+   }
+}

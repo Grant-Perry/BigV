@@ -5,11 +5,10 @@
 
 import SwiftUI
 
-/// Live numbers, heading and the re-center control layered over the ride map.
+/// Live numbers, heading and map chrome layered over the ride map.
 ///
-/// Speed and distance get full-size tiles because they are what a rider reads at
-/// a glance; heading is chrome, so it sits small and out of the way opposite the
-/// map compass.
+/// Speed and distance sit at the top, under the destination chip, so they never
+/// fight the legal attribution or the FABs. Route search is a magnifying glass.
 struct RideMapOverlayView: View {
 
    let rideMapViewModel: RideMapViewModel
@@ -19,20 +18,32 @@ struct RideMapOverlayView: View {
    var body: some View {
       VStack(spacing: 10) {
          if routeGuidanceViewModel.isActive {
-            RouteGuidanceBannerView(routeGuidanceViewModel: routeGuidanceViewModel)
+            RouteGuidanceBannerView(
+               routeGuidanceViewModel: routeGuidanceViewModel,
+               rideMapViewModel: rideMapViewModel
+            )
          }
 
          topRow
+         readouts
 
          Spacer(minLength: 0)
+            .allowsHitTesting(false)
 
-         controls
-            .frame(maxWidth: .infinity, alignment: .trailing)
+         HStack {
+            Spacer(minLength: 0)
+               .allowsHitTesting(false)
 
-         readouts
+            RideMapFABStack(
+               rideMapViewModel: rideMapViewModel,
+               onPlanRoute: onPlanRoute
+            )
+            .padding(.trailing, 8)
+         }
       }
-      .padding(.horizontal, 12)
-      .padding(.top, 12)
+      .padding(.horizontal, 16)
+      .safeAreaPadding(.top, 8)
+      .safeAreaPadding(.trailing, 16)
       // Clears the map's legal attribution, which App Review requires stay visible.
       .padding(.bottom, 28)
       .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -65,7 +76,7 @@ struct RideMapOverlayView: View {
       HStack(spacing: 8) {
          Image(systemName: .destinationIcon)
             .font(.caption2.weight(.bold))
-            .foregroundStyle(PlannedRouteStyle.line)
+            .foregroundStyle(RideDashboardTheme.ember)
 
          Text(name)
             .font(.footnote.weight(.semibold))
@@ -86,30 +97,9 @@ struct RideMapOverlayView: View {
       .padding(.leading, 12)
       .padding(.trailing, 2)
       .padding(.vertical, 4)
-      .background(.black.opacity(0.72), in: .capsule)
-      .overlay(Capsule().stroke(PlannedRouteStyle.line.opacity(0.35), lineWidth: 1))
+      .rideGlassChrome(in: .capsule)
       .frame(maxWidth: 210, alignment: .trailing)
       .accessibilityIdentifier("map.label.destination")
-   }
-
-   // MARK: - Controls
-
-   /// Route planning is offered only while idle. A rider under way needs their
-   /// numbers, not a search field.
-   private var controls: some View {
-      VStack(spacing: 10) {
-         if rideMapViewModel.isIdle {
-            circleButton(
-               icon: .planRouteIcon,
-               tint: rideMapViewModel.hasPlannedRoute ? PlannedRouteStyle.line : .white.opacity(0.75),
-               label: "Plan a route",
-               identifier: "map.button.planRoute",
-               action: onPlanRoute
-            )
-         }
-
-         cameraModeButton
-      }
    }
 
    // MARK: - Heading
@@ -130,51 +120,10 @@ struct RideMapOverlayView: View {
       .foregroundStyle(.white.opacity(0.9))
       .padding(.horizontal, 10)
       .padding(.vertical, 6)
-      .background(.black.opacity(0.7), in: .capsule)
-      .overlay(Capsule().stroke(.white.opacity(0.14), lineWidth: 1))
+      .rideGlassChrome(in: .capsule)
       .accessibilityElement(children: .combine)
       .accessibilityLabel("Heading")
       .accessibilityIdentifier("map.label.heading")
-   }
-
-   // MARK: - Camera Mode
-
-   /// One control for both directions: hand off the camera to the rider, then
-   /// give it back. A single 48pt circle is the whole cost of making the mode
-   /// discoverable and reversible.
-   private var cameraModeButton: some View {
-      let isFollowing = rideMapViewModel.isFollowingRider
-
-      return circleButton(
-         icon: isFollowing ? .panIcon : .recenterIcon,
-         tint: isFollowing ? .white.opacity(0.75) : .cyan,
-         label: isFollowing ? "Explore the map" : "Re-center on rider",
-         identifier: "map.button.cameraMode",
-         action: rideMapViewModel.toggleCameraMode
-      )
-   }
-
-   private func circleButton(
-      icon: String,
-      tint: Color,
-      label: String,
-      identifier: String,
-      action: @escaping () -> Void
-   ) -> some View {
-      Button(action: action) {
-         Image(systemName: icon)
-            .font(.body.weight(.semibold))
-            .foregroundStyle(tint)
-            .frame(width: 48, height: 48)
-            .background(.black.opacity(0.72), in: .circle)
-            .overlay(Circle().stroke(.white.opacity(0.14), lineWidth: 1))
-            // The label sits over a live map, so the tap target has to be stated
-            // rather than inferred from a mostly transparent glyph.
-            .contentShape(.circle)
-      }
-      .buttonStyle(.plain)
-      .accessibilityLabel(label)
-      .accessibilityIdentifier(identifier)
    }
 
    // MARK: - Readouts
@@ -185,33 +134,30 @@ struct RideMapOverlayView: View {
             title: "SPEED",
             value: rideMapViewModel.speed,
             unit: rideMapViewModel.speedUnit,
-            identifier: "map.tile.speed"
+            identifier: "map.tile.speed",
+            gutterAlignment: .trailing
          )
 
          RideMetricTile(
             title: "DISTANCE",
             value: rideMapViewModel.distance,
             unit: rideMapViewModel.distanceUnit,
-            identifier: "map.tile.distance"
+            identifier: "map.tile.distance",
+            gutterAlignment: .leading
          )
       }
-      .padding(6)
-      .background(.black.opacity(0.72), in: .rect(cornerRadius: 22))
    }
 }
 
 // MARK: - Icons
 
 private extension String {
-   static let panIcon = "arrow.up.and.down.and.arrow.left.and.right"
-   static let recenterIcon = "location.fill.viewfinder"
-   static let planRouteIcon = "signpost.right.fill"
    static let destinationIcon = "flag.fill"
    static let clearRouteIcon = "xmark"
 }
 
 #Preview {
-   ZStack(alignment: .bottom) {
+   ZStack {
       Color.gray
       RideMapOverlayView(
          rideMapViewModel: RideMapViewModel(),

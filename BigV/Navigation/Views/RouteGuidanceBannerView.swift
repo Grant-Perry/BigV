@@ -14,28 +14,68 @@ import SwiftUI
 struct RouteGuidanceBannerView: View {
 
    let routeGuidanceViewModel: RouteGuidanceViewModel
+   let rideMapViewModel: RideMapViewModel
 
    var body: some View {
+      VStack(alignment: .leading, spacing: 8) {
+         banner
+
+         if routeGuidanceViewModel.isTurnListPresented {
+            RouteGuidanceTurnListView(
+               routeGuidanceViewModel: routeGuidanceViewModel,
+               onSelect: jump(to:)
+            )
+         }
+      }
+   }
+
+   private var banner: some View {
       VStack(alignment: .leading, spacing: 10) {
          HStack(alignment: .top, spacing: 12) {
             headline
+               .frame(maxWidth: .infinity, alignment: .leading)
+               .contentShape(.rect)
+               .onTapGesture(perform: toggleTurnList)
 
-            Spacer(minLength: 0)
+            if routeGuidanceViewModel.canPresentTurnList {
+               Image(systemName: routeGuidanceViewModel.isTurnListPresented ? .collapseIcon : .expandIcon)
+                  .font(.caption.weight(.bold))
+                  .foregroundStyle(.white.opacity(0.45))
+                  .padding(.top, 4)
+                  .onTapGesture(perform: toggleTurnList)
+            }
 
             controls
          }
 
          footer
+            .contentShape(.rect)
+            .onTapGesture(perform: toggleTurnList)
       }
       .padding(.horizontal, 14)
       .padding(.vertical, 12)
-      .background(.black.opacity(0.94), in: .rect(cornerRadius: 20))
+      .rideGlassCard(density: .hud, cornerRadius: 20)
       .overlay(
-         RoundedRectangle(cornerRadius: 20)
+         RoundedRectangle(cornerRadius: 20, style: .continuous)
             .stroke(accent.opacity(0.45), lineWidth: 1)
       )
       .sensoryFeedback(.impact(weight: .medium), trigger: routeGuidanceViewModel.turnPulse)
       .accessibilityIdentifier("guidance.banner")
+      .accessibilityAddTraits(routeGuidanceViewModel.canPresentTurnList ? .isButton : [])
+      .accessibilityHint(
+         routeGuidanceViewModel.canPresentTurnList
+            ? (routeGuidanceViewModel.isTurnListPresented ? "Hides the turn list" : "Shows all turns")
+            : ""
+      )
+   }
+
+   private func toggleTurnList() {
+      routeGuidanceViewModel.toggleTurnList()
+   }
+
+   private func jump(to turn: PlannedRouteManeuver) {
+      routeGuidanceViewModel.selectTurn(turn)
+      rideMapViewModel.focusManeuver(id: turn.id, coordinate: turn.coordinate)
    }
 
    // MARK: - Headline
@@ -201,13 +241,18 @@ private extension String {
    static let voiceOnIcon = "speaker.wave.2.fill"
    static let voiceOffIcon = "speaker.slash.fill"
    static let stopGuidanceIcon = "xmark"
+   static let expandIcon = "chevron.down"
+   static let collapseIcon = "chevron.up"
 }
 
 #Preview {
    ZStack {
       Color.gray
-      RouteGuidanceBannerView(routeGuidanceViewModel: RouteGuidanceViewModel())
-         .padding()
+      RouteGuidanceBannerView(
+         routeGuidanceViewModel: RouteGuidanceViewModel(),
+         rideMapViewModel: RideMapViewModel()
+      )
+      .padding()
    }
    .preferredColorScheme(.dark)
 }

@@ -22,7 +22,8 @@ struct RideRootView: View {
 
    var body: some View {
       ZStack {
-         Color.black.ignoresSafeArea()
+         RideAtmosphereBackground(scene: rideViewModel.isFinished ? .summary : .dashboard)
+            .ignoresSafeArea()
 
          if rideViewModel.isFinished {
             RideSummaryView(

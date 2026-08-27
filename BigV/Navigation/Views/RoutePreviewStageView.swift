@@ -114,7 +114,7 @@ struct RoutePreviewStageView: View {
             onConfirm()
          }
          .buttonStyle(.borderedProminent)
-         .tint(.orange)
+         .tint(RideDashboardTheme.ember)
          .disabled(!routePlannerViewModel.canConfirm)
          .accessibilityIdentifier("planner.button.follow")
       }

@@ -5,143 +5,112 @@
 
 import SwiftUI
 
-/// The primary bike-computer screen.
-///
-/// Deliberately flat and unanimated: high contrast for direct sunlight and no
-/// per-frame work competing with GPS and recording.
+/// The primary bike-computer screen, with a live map drawer on the dashboard.
 struct RideDashboardView: View {
 
    let rideViewModel: RideViewModel
+   let rideMapViewModel: RideMapViewModel
    let routeGuidanceViewModel: RouteGuidanceViewModel
+   var showsDrawerMap: Bool = true
    let onShowHistory: () -> Void
+   let onPlanRoute: () -> Void
+   let onExpandMap: () -> Void
 
-   private let tileColumns = [
-      GridItem(.flexible(), spacing: 10),
-      GridItem(.flexible(), spacing: 10)
-   ]
+   @Environment(\.verticalSizeClass) private var verticalSizeClass
+   @State private var isDrawerOpen = true
 
    var body: some View {
-      VStack(spacing: 14) {
-         statusRow
+      Group {
+         if verticalSizeClass == .compact {
+            RideDashboardLandscapeView(
+               rideViewModel: rideViewModel,
+               rideMapViewModel: rideMapViewModel,
+               routeGuidanceViewModel: routeGuidanceViewModel,
+               showsDrawerMap: showsDrawerMap,
+               onShowHistory: onShowHistory,
+               onPlanRoute: onPlanRoute,
+               onExpandMap: onExpandMap,
+               isDrawerOpen: $isDrawerOpen
+            )
+         } else {
+            portrait
+         }
+      }
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+   }
+
+   // MARK: - Portrait
+
+   private var portrait: some View {
+      VStack(spacing: 10) {
+         RideDashboardStatusRow(
+            rideViewModel: rideViewModel,
+            onShowHistory: onShowHistory,
+            onPlanRoute: onPlanRoute
+         )
 
          if routeGuidanceViewModel.isActive {
-            RouteGuidanceStripView(routeGuidanceViewModel: routeGuidanceViewModel)
+            RouteGuidanceStripView(
+               routeGuidanceViewModel: routeGuidanceViewModel,
+               rideMapViewModel: rideMapViewModel
+            )
          }
 
          RideSpeedHeroView(
             value: rideViewModel.speed,
             unit: rideViewModel.speedUnit,
-            isDimmed: !rideViewModel.hasGPSFix || rideViewModel.isPaused
+            isDimmed: !rideViewModel.hasGPSFix || rideViewModel.isPaused,
+            numeralSize: isDrawerOpen ? 84 : 108
          )
+         .frame(maxHeight: .infinity)
 
-         metricGrid
-
-         Spacer(minLength: 0)
+         RideDashboardMetricsGrid(
+            rideViewModel: rideViewModel,
+            routeGuidanceViewModel: routeGuidanceViewModel
+         )
 
          RideControlBar(rideViewModel: rideViewModel)
+
+         RideMapDrawer(
+            rideMapViewModel: rideMapViewModel,
+            isMapMounted: showsDrawerMap,
+            onExpand: onExpandMap,
+            onPlanRoute: onPlanRoute,
+            isOpen: $isDrawerOpen
+         )
       }
       .padding(.horizontal, 16)
-      .padding(.top, 10)
-      .padding(.bottom, 18)
-      .frame(maxWidth: .infinity, maxHeight: .infinity)
-      .background(Color.black)
-   }
-
-   // MARK: - Status
-
-   private var statusRow: some View {
-      HStack(spacing: 10) {
-         RideStatusBar(
-            statusText: rideViewModel.statusText,
-            accuracyText: rideViewModel.accuracyText,
-            issueMessage: rideViewModel.issueMessage,
-            hasGPSFix: rideViewModel.hasGPSFix
-         )
-
-         if rideViewModel.isIdle {
-            Button(action: onShowHistory) {
-               Image(systemName: .historyIcon)
-                  .font(.footnote.weight(.semibold))
-                  .foregroundStyle(.white.opacity(0.55))
-                  .frame(width: 44, height: 44)
-                  .contentShape(.rect)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Ride history")
-            .accessibilityIdentifier("ride.button.history")
-         }
-      }
-   }
-
-   // MARK: - Metrics
-
-   private var metricGrid: some View {
-      LazyVGrid(columns: tileColumns, spacing: 10) {
-         RideMetricTile(
-            title: "DISTANCE",
-            value: rideViewModel.distance,
-            unit: rideViewModel.distanceUnit,
-            identifier: "ride.tile.distance"
-         )
-
-         RideMetricTile(
-            title: "RIDE TIME",
-            value: rideViewModel.rideTime,
-            identifier: "ride.tile.rideTime"
-         )
-
-         RideMetricTile(
-            title: "ELEV GAIN",
-            value: rideViewModel.elevationGain,
-            unit: rideViewModel.elevationUnit
-         )
-
-         RideMetricTile(
-            title: "GRADE",
-            value: rideViewModel.grade,
-            unit: rideViewModel.gradeUnit
-         )
-
-         RideMetricTile(
-            title: "AVG SPEED",
-            value: rideViewModel.averageSpeed,
-            unit: rideViewModel.speedUnit
-         )
-
-         RideMetricTile(
-            title: "MAX SPEED",
-            value: rideViewModel.maximumSpeed,
-            unit: rideViewModel.speedUnit
-         )
-
-         if routeGuidanceViewModel.isActive {
-            RideMetricTile(
-               title: "TO GO",
-               value: routeGuidanceViewModel.distanceRemaining,
-               unit: routeGuidanceViewModel.distanceRemainingUnit,
-               identifier: "ride.tile.toGo"
-            )
-
-            RideMetricTile(
-               title: "ETA",
-               value: routeGuidanceViewModel.arrivalTime,
-               identifier: "ride.tile.eta"
-            )
-         }
-      }
+      .padding(.top, 8)
+      .padding(.bottom, 6)
    }
 }
 
-// MARK: - Icons
-
-private extension String {
-   static let historyIcon = "clock.arrow.circlepath"
+#Preview("Portrait") {
+   ZStack {
+      RideAtmosphereBackground()
+      RideDashboardView(
+         rideViewModel: RideViewModel(),
+         rideMapViewModel: RideMapViewModel(),
+         routeGuidanceViewModel: RouteGuidanceViewModel(),
+         onShowHistory: {},
+         onPlanRoute: {},
+         onExpandMap: {}
+      )
+   }
+   .preferredColorScheme(.dark)
 }
 
-#Preview {
-   RideDashboardView(
-      rideViewModel: RideViewModel(),
-      routeGuidanceViewModel: RouteGuidanceViewModel()
-   ) {}
-      .preferredColorScheme(.dark)
+#Preview("Landscape", traits: .landscapeLeft) {
+   ZStack {
+      RideAtmosphereBackground()
+      RideDashboardView(
+         rideViewModel: RideViewModel(),
+         rideMapViewModel: RideMapViewModel(),
+         routeGuidanceViewModel: RouteGuidanceViewModel(),
+         onShowHistory: {},
+         onPlanRoute: {},
+         onExpandMap: {}
+      )
+   }
+   .preferredColorScheme(.dark)
 }

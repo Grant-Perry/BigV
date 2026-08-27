@@ -17,28 +17,30 @@ struct RoutePlannerSheet: View {
 
    var body: some View {
       NavigationStack {
-         ZStack {
-            Color.black.ignoresSafeArea()
-
-            stage
-         }
-         .navigationTitle(title)
-         .navigationBarTitleDisplayMode(.inline)
-         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-               Button("Close") { dismiss() }
-                  .accessibilityIdentifier("planner.button.close")
+         stage
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background {
+               RideAtmosphereBackground(scene: .rideTo)
+                  .ignoresSafeArea()
             }
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackgroundVisibility(.visible, for: .navigationBar)
+            .toolbar {
+               ToolbarItem(placement: .topBarLeading) {
+                  Button("Close") { dismiss() }
+                     .accessibilityIdentifier("planner.button.close")
+               }
 
-            ToolbarItem(placement: .topBarTrailing) {
-               if routePlannerViewModel.hasActiveRoute {
-                  Button("Clear Route", role: .destructive) {
-                     routePlannerViewModel.clearActiveRoute()
+               ToolbarItem(placement: .topBarTrailing) {
+                  if routePlannerViewModel.hasActiveRoute {
+                     Button("Clear Route", role: .destructive) {
+                        routePlannerViewModel.clearActiveRoute()
+                     }
+                     .accessibilityIdentifier("planner.button.clearRoute")
                   }
-                  .accessibilityIdentifier("planner.button.clearRoute")
                }
             }
-         }
       }
       .onAppear { routePlannerViewModel.begin() }
       .onDisappear { routePlannerViewModel.end() }

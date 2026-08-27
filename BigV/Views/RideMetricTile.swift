@@ -6,19 +6,23 @@
 import SwiftUI
 
 /// One metric on the ride dashboard.
+///
+/// Left-column tiles trail into the gutter. Right-column tiles lead from it.
 struct RideMetricTile: View {
 
    let title: String
    let value: String
    var unit: String?
    var identifier: String?
+   var gutterAlignment: HorizontalAlignment = .leading
 
    var body: some View {
-      VStack(alignment: .leading, spacing: 2) {
+      VStack(alignment: gutterAlignment, spacing: 2) {
          Text(title)
             .font(.caption2.weight(.semibold))
             .kerning(1)
             .foregroundStyle(.white.opacity(0.55))
+            .frame(maxWidth: .infinity, alignment: frameAlignment)
 
          HStack(alignment: .firstTextBaseline, spacing: 4) {
             Text(value)
@@ -37,24 +41,26 @@ struct RideMetricTile: View {
                   .foregroundStyle(.white.opacity(0.45))
             }
          }
+         .frame(maxWidth: .infinity, alignment: frameAlignment)
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
+      .frame(maxWidth: .infinity, alignment: frameAlignment)
       .padding(.horizontal, 14)
       .padding(.vertical, 12)
-      .background(Self.wash, in: .rect(cornerRadius: 16))
+      .rideGlassCard(density: .hud)
    }
 
-   private static let wash = LinearGradient(
-      colors: [.white.opacity(0.12), .white.opacity(0.04)],
-      startPoint: .topLeading,
-      endPoint: .bottomTrailing
-   )
+   private var frameAlignment: Alignment {
+      gutterAlignment == .trailing ? .trailing : .leading
+   }
 }
 
 #Preview {
    ZStack {
-      Color.black
-      RideMetricTile(title: "DISTANCE", value: "12.84", unit: "MI")
-         .padding()
+      RideAtmosphereBackground()
+      HStack(spacing: 10) {
+         RideMetricTile(title: "DISTANCE", value: "12.84", unit: "MI", gutterAlignment: .trailing)
+         RideMetricTile(title: "RIDE TIME", value: "1:12:04", gutterAlignment: .leading)
+      }
+      .padding()
    }
 }

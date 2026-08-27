@@ -14,7 +14,8 @@ struct RideRouteDetailView: View {
 
    var body: some View {
       ZStack {
-         Color.black.ignoresSafeArea()
+         RideAtmosphereBackground(scene: .summary)
+            .ignoresSafeArea()
 
          ScrollView {
             VStack(spacing: 14) {

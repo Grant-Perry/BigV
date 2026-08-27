@@ -13,9 +13,19 @@ struct RouteSearchStageView: View {
    @FocusState private var isFieldFocused: Bool
 
    var body: some View {
-      VStack(spacing: 12) {
-         searchField
+      resultsColumn
+         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+         .safeAreaBar(edge: .top, spacing: 12) {
+            searchField
+               .padding(.horizontal, 16)
+               .padding(.top, 8)
+         }
+         .onAppear { isFieldFocused = true }
+   }
 
+   @ViewBuilder
+   private var resultsColumn: some View {
+      VStack(spacing: 12) {
          if let planningFailure = routePlannerViewModel.planningFailure {
             RoutePlanningFailureView(failure: planningFailure)
          }
@@ -23,9 +33,6 @@ struct RouteSearchStageView: View {
          results
       }
       .padding(.horizontal, 16)
-      .padding(.top, 12)
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-      .onAppear { isFieldFocused = true }
    }
 
    // MARK: - Field
@@ -59,7 +66,7 @@ struct RouteSearchStageView: View {
       }
       .padding(.horizontal, 14)
       .padding(.vertical, 12)
-      .background(Self.wash, in: .rect(cornerRadius: 16))
+      .rideGlassChrome(in: .rect(cornerRadius: 16, style: .continuous))
    }
 
    // MARK: - Results
@@ -107,11 +114,6 @@ struct RouteSearchStageView: View {
          .padding(.top, 24)
    }
 
-   private static let wash = LinearGradient(
-      colors: [.white.opacity(0.12), .white.opacity(0.04)],
-      startPoint: .topLeading,
-      endPoint: .bottomTrailing
-   )
 }
 
 // MARK: - Row

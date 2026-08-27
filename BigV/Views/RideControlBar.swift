@@ -14,22 +14,22 @@ struct RideControlBar: View {
       HStack(spacing: 10) {
          switch rideViewModel.phase {
             case .idle:
-               control("START", tint: .green, action: rideViewModel.start)
+               control("START", tint: RideDashboardTheme.go, action: rideViewModel.start)
 
             case .acquiringGPS:
                control("ACQUIRING GPS", tint: .gray, isEnabled: false) {}
-               control("CANCEL", tint: .red, action: rideViewModel.end)
+               control("CANCEL", tint: RideDashboardTheme.halt, action: rideViewModel.end)
 
             case .recording:
-               control("PAUSE", tint: .orange, action: rideViewModel.pause)
-               control("END", tint: .red, action: rideViewModel.end)
+               control("PAUSE", tint: RideDashboardTheme.pause, action: rideViewModel.pause)
+               control("END", tint: RideDashboardTheme.halt, action: rideViewModel.end)
 
             case .paused:
-               control("RESUME", tint: .green, action: rideViewModel.resume)
-               control("END", tint: .red, action: rideViewModel.end)
+               control("RESUME", tint: RideDashboardTheme.go, action: rideViewModel.resume)
+               control("END", tint: RideDashboardTheme.halt, action: rideViewModel.end)
 
             case .finished:
-               control("NEW RIDE", tint: .blue, action: rideViewModel.reset)
+               control("NEW RIDE", tint: RideDashboardTheme.ice, action: rideViewModel.reset)
          }
       }
    }

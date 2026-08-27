@@ -6,8 +6,7 @@
 import SwiftData
 import SwiftUI
 
-/// Saved rides, newest first. Reachable only while idle so it never competes
-/// with the live riding screen.
+/// The product landing page: latest ride as a cinematic card, then the rest.
 struct RideHistoryView: View {
 
    let rideHistoryViewModel: RideHistoryViewModel
@@ -20,15 +19,16 @@ struct RideHistoryView: View {
    var body: some View {
       NavigationStack {
          ZStack {
-            Color.black.ignoresSafeArea()
+            RideAtmosphereBackground(scene: .rides)
 
             if rideHistoryViewModel.isEmpty {
-               emptyState
+               RideHistoryEmptyState()
             } else {
                rideList
             }
          }
          .navigationTitle("Rides")
+         .navigationBarTitleDisplayMode(.large)
          .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                Button("Done") { dismiss() }
@@ -36,28 +36,45 @@ struct RideHistoryView: View {
          }
          .navigationDestination(for: PersistentIdentifier.self) { rideID in
             RideRouteDetailView(rideRouteViewModel: rideRouteViewModel, rideID: rideID)
+               .onDisappear { loadHeroRoute() }
          }
       }
-      .onAppear { rideHistoryViewModel.load() }
+      .onAppear {
+         rideHistoryViewModel.load()
+         loadHeroRoute()
+      }
    }
 
    // MARK: - List
 
    private var rideList: some View {
-      List {
-         ForEach(rideHistoryViewModel.rows) { row in
-            NavigationLink(value: row.id) {
-               RideHistoryRowView(row: row, distanceUnit: rideHistoryViewModel.distanceUnit)
+      ScrollView {
+         LazyVStack(spacing: 12) {
+            if let latest = rideHistoryViewModel.latestRow {
+               NavigationLink(value: latest.id) {
+                  RideHistoryHeroCard(
+                     row: latest,
+                     distanceUnit: rideHistoryViewModel.distanceUnit,
+                     route: rideRouteViewModel.route,
+                     isRouteLoaded: rideRouteViewModel.isLoaded
+                  )
+               }
+               .buttonStyle(.plain)
+               .contextMenu { deleteButton(for: latest) }
             }
-            .listRowBackground(Color.clear)
-            .listRowSeparatorTint(.white.opacity(0.12))
+
+            ForEach(rideHistoryViewModel.olderRows) { row in
+               NavigationLink(value: row.id) {
+                  RideHistoryRideCard(row: row, distanceUnit: rideHistoryViewModel.distanceUnit)
+               }
+               .buttonStyle(.plain)
+               .contextMenu { deleteButton(for: row) }
+            }
          }
-         .onDelete { offsets in
-            pendingDeletion = rideHistoryViewModel.rows(at: offsets)
-         }
+         .padding(.horizontal, 16)
+         .padding(.bottom, 24)
       }
-      .listStyle(.plain)
-      .scrollContentBackground(.hidden)
+      .scrollIndicators(.hidden)
       .confirmationDialog(
          deletionTitle,
          isPresented: isConfirmingDeletion,
@@ -66,6 +83,7 @@ struct RideHistoryView: View {
          Button(deletionConfirmLabel, role: .destructive) {
             rideHistoryViewModel.delete(ids: Set(pendingDeletion.map(\.id)))
             pendingDeletion = []
+            loadHeroRoute()
          }
 
          Button("Keep", role: .cancel) {
@@ -76,7 +94,19 @@ struct RideHistoryView: View {
       }
    }
 
-   // MARK: - Deletion Confirmation
+   // MARK: - Hero Route
+
+   private func loadHeroRoute() {
+      rideRouteViewModel.load(rideHistoryViewModel.latestRow?.id)
+   }
+
+   // MARK: - Deletion
+
+   private func deleteButton(for row: RideHistoryViewModel.Row) -> some View {
+      Button("Delete Ride", role: .destructive) {
+         pendingDeletion = [row]
+      }
+   }
 
    private var isConfirmingDeletion: Binding<Bool> {
       Binding(
@@ -97,51 +127,4 @@ struct RideHistoryView: View {
    private var deletionConfirmLabel: String {
       pendingDeletion.count == 1 ? "Delete Ride" : "Delete \(pendingDeletion.count) Rides"
    }
-
-   // MARK: - Empty State
-
-   private var emptyState: some View {
-      ContentUnavailableView(
-         "No Rides Yet",
-         systemImage: .bicycleIcon,
-         description: Text("Finished rides are saved here automatically.")
-      )
-      .foregroundStyle(.white.opacity(0.7))
-   }
-}
-
-// MARK: - Row
-
-private struct RideHistoryRowView: View {
-
-   let row: RideHistoryViewModel.Row
-   let distanceUnit: String
-
-   var body: some View {
-      HStack(alignment: .firstTextBaseline) {
-         Text(row.dateText)
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(.white)
-
-         Spacer(minLength: 12)
-
-         Text("\(row.distanceText) \(distanceUnit)")
-            .font(.subheadline.weight(.semibold))
-            .monospacedDigit()
-            .foregroundStyle(.white.opacity(0.8))
-
-         Text(row.durationText)
-            .font(.caption.weight(.medium))
-            .monospacedDigit()
-            .foregroundStyle(.white.opacity(0.45))
-            .frame(minWidth: 52, alignment: .trailing)
-      }
-      .padding(.vertical, 6)
-   }
-}
-
-// MARK: - Icons
-
-private extension String {
-   static let bicycleIcon = "bicycle"
 }

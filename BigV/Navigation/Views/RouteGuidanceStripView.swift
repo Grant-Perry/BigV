@@ -15,8 +15,29 @@ import SwiftUI
 struct RouteGuidanceStripView: View {
 
    let routeGuidanceViewModel: RouteGuidanceViewModel
+   let rideMapViewModel: RideMapViewModel
 
    var body: some View {
+      VStack(alignment: .leading, spacing: 8) {
+         strip
+            .onTapGesture(perform: routeGuidanceViewModel.toggleTurnList)
+            .accessibilityAddTraits(routeGuidanceViewModel.canPresentTurnList ? .isButton : [])
+            .accessibilityHint(
+               routeGuidanceViewModel.canPresentTurnList
+                  ? (routeGuidanceViewModel.isTurnListPresented ? "Hides the turn list" : "Shows all turns")
+                  : ""
+            )
+
+         if routeGuidanceViewModel.isTurnListPresented {
+            RouteGuidanceTurnListView(
+               routeGuidanceViewModel: routeGuidanceViewModel,
+               onSelect: jump(to:)
+            )
+         }
+      }
+   }
+
+   private var strip: some View {
       HStack(spacing: 12) {
          Image(systemName: .guidanceIcon)
             .font(.footnote.weight(.bold))
@@ -34,15 +55,26 @@ struct RouteGuidanceStripView: View {
                .foregroundStyle(accent)
                .accessibilityIdentifier("dashboard.guidance.turnDistance")
          }
+
+         if routeGuidanceViewModel.canPresentTurnList {
+            Image(systemName: routeGuidanceViewModel.isTurnListPresented ? .collapseIcon : .expandIcon)
+               .font(.caption.weight(.bold))
+               .foregroundStyle(.white.opacity(0.4))
+         }
       }
       .padding(.horizontal, 14)
       .padding(.vertical, 10)
-      .background(.white.opacity(0.06), in: .rect(cornerRadius: 14))
+      .rideGlassCard(density: .hud, cornerRadius: 14)
       .overlay(
-         RoundedRectangle(cornerRadius: 14)
+         RoundedRectangle(cornerRadius: 14, style: .continuous)
             .stroke(accent.opacity(0.35), lineWidth: 1)
       )
       .accessibilityIdentifier("dashboard.guidance")
+   }
+
+   private func jump(to turn: PlannedRouteManeuver) {
+      routeGuidanceViewModel.selectTurn(turn)
+      rideMapViewModel.focusManeuver(id: turn.id, coordinate: turn.coordinate)
    }
 
    // MARK: - Content
@@ -85,13 +117,18 @@ struct RouteGuidanceStripView: View {
 
 private extension String {
    static let guidanceIcon = "arrow.triangle.turn.up.right.diamond.fill"
+   static let expandIcon = "chevron.down"
+   static let collapseIcon = "chevron.up"
 }
 
 #Preview {
    ZStack {
       Color.black
-      RouteGuidanceStripView(routeGuidanceViewModel: RouteGuidanceViewModel())
-         .padding()
+      RouteGuidanceStripView(
+         routeGuidanceViewModel: RouteGuidanceViewModel(),
+         rideMapViewModel: RideMapViewModel()
+      )
+      .padding()
    }
    .preferredColorScheme(.dark)
 }

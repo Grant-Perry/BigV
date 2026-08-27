@@ -126,6 +126,43 @@ final class RouteGuidanceViewModel {
 
    var isWorking: Bool { phase == .rerouting }
 
+   // MARK: - Turn List
+
+   /// Provider steps for the active route. Never synthesized.
+   var turns: [PlannedRouteManeuver] { routeGuidanceManager.maneuvers }
+
+   var upcomingTurnID: PlannedRouteManeuver.ID? { progress.upcomingManeuverID }
+
+   private(set) var selectedTurnID: PlannedRouteManeuver.ID?
+   private(set) var isTurnListPresented = false
+
+   var canPresentTurnList: Bool { isActive && !turns.isEmpty }
+
+   func toggleTurnList() {
+      guard canPresentTurnList else { return }
+      isTurnListPresented.toggle()
+   }
+
+   func collapseTurnList() {
+      isTurnListPresented = false
+   }
+
+   func selectTurn(_ turn: PlannedRouteManeuver) {
+      selectedTurnID = turn.id
+      isTurnListPresented = false
+   }
+
+   func distanceText(for turn: PlannedRouteManeuver) -> String? {
+      if turn.id == upcomingTurnID, let remaining = progress.distanceToUpcomingManeuver {
+         return remaining >= Self.turnDistanceFloor
+            ? RouteGuidanceFormatters.turnDistance(remaining)
+            : nil
+      }
+
+      guard turn.distance >= Self.turnDistanceFloor else { return nil }
+      return RouteGuidanceFormatters.turnDistance(turn.distance)
+   }
+
    // MARK: - Voice
 
    var isVoiceEnabled: Bool {
@@ -140,10 +177,14 @@ final class RouteGuidanceViewModel {
    // MARK: - Intent
 
    func stopGuidance() {
+      collapseTurnList()
+      selectedTurnID = nil
       routeGuidanceManager.stopFollowing()
    }
 
    func dismissArrival() {
+      collapseTurnList()
+      selectedTurnID = nil
       routeGuidanceManager.dismissArrival()
    }
 }

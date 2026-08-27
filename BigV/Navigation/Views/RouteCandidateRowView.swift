@@ -27,10 +27,10 @@ struct RouteCandidateRowView: View {
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(.horizontal, 14)
       .padding(.vertical, 12)
-      .background(wash, in: .rect(cornerRadius: 16))
+      .rideGlassCard(density: isSelected ? .standard : .hud)
       .overlay(
-         RoundedRectangle(cornerRadius: 16)
-            .stroke(isSelected ? PlannedRouteStyle.line : .white.opacity(0.10), lineWidth: 2)
+         RoundedRectangle(cornerRadius: RideDashboardTheme.cardRadius, style: .continuous)
+            .stroke(isSelected ? RideDashboardTheme.ember : .white.opacity(0.10), lineWidth: 2)
       )
       .contentShape(.rect)
       .accessibilityElement(children: .combine)
@@ -88,17 +88,6 @@ struct RouteCandidateRowView: View {
       .foregroundStyle(.yellow.opacity(0.8))
    }
 
-   // MARK: - Wash
-
-   private var wash: LinearGradient {
-      let intensity = isSelected ? 0.18 : 0.10
-
-      return LinearGradient(
-         colors: [.white.opacity(intensity), .white.opacity(intensity / 3)],
-         startPoint: .topLeading,
-         endPoint: .bottomTrailing
-      )
-   }
 }
 
 // MARK: - Icons

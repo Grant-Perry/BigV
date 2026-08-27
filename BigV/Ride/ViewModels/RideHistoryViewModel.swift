@@ -18,6 +18,9 @@ final class RideHistoryViewModel {
       let dateText: String
       let distanceText: String
       let durationText: String
+      let averageSpeedText: String
+      let maximumSpeedText: String
+      let elevationGainText: String
    }
 
    // MARK: - State
@@ -25,6 +28,10 @@ final class RideHistoryViewModel {
    private(set) var rows: [Row] = []
 
    var isEmpty: Bool { rows.isEmpty }
+
+   var latestRow: Row? { rows.first }
+
+   var olderRows: [Row] { Array(rows.dropFirst()) }
 
    var distanceUnit: String { RideFormatters.Unit.distance }
 
@@ -74,7 +81,10 @@ final class RideHistoryViewModel {
          id: ride.persistentModelID,
          dateText: ride.startDate.formatted(date: .abbreviated, time: .shortened),
          distanceText: RideFormatters.distance(ride.distance),
-         durationText: RideFormatters.duration(ride.duration)
+         durationText: RideFormatters.duration(ride.duration),
+         averageSpeedText: RideFormatters.speed(ride.averageSpeed),
+         maximumSpeedText: RideFormatters.speed(ride.maximumSpeed),
+         elevationGainText: RideFormatters.elevationGain(ride.elevationGain)
       )
    }
 }

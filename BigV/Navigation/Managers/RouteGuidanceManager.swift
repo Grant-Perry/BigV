@@ -46,6 +46,11 @@ final class RouteGuidanceManager {
    private(set) var progress: RouteGuidanceProgress = .inactive
    private(set) var destinationName: String?
 
+   /// Real MapKit steps from the active route. Empty when nothing is being followed.
+   var maneuvers: [PlannedRouteManeuver] {
+      plannedRouteManager.activeRoute?.maneuvers ?? []
+   }
+
    /// Bumped when a turn is close enough to be worth feeling rather than reading.
    /// The view triggers a haptic off the change; the manager stays free of UIKit.
    private(set) var turnPulse = 0

@@ -37,7 +37,6 @@ struct RideSummaryView: View {
       .padding(.top, 10)
       .padding(.bottom, 18)
       .frame(maxWidth: .infinity, maxHeight: .infinity)
-      .background(Color.black)
       .task(id: rideViewModel.finishedRideID) {
          rideRouteViewModel.load(rideViewModel.finishedRideID)
       }
@@ -46,10 +45,10 @@ struct RideSummaryView: View {
    // MARK: - Header
 
    private var header: some View {
-      Text("RIDE COMPLETE")
+         Text("RIDE COMPLETE")
          .font(.caption.weight(.bold))
-         .kerning(1.5)
-         .foregroundStyle(.white.opacity(0.55))
+         .kerning(1.6)
+         .foregroundStyle(RideDashboardTheme.ember)
          .frame(maxWidth: .infinity, alignment: .leading)
    }
 
@@ -76,8 +75,8 @@ struct RideSummaryView: View {
 
    private var controls: some View {
       HStack(spacing: 10) {
-         control("DONE", tint: .gray, action: rideViewModel.reset)
-         control("NEW RIDE", tint: .blue, action: rideViewModel.startNewRide)
+         control("DONE", tint: RideDashboardTheme.graphite, action: rideViewModel.reset)
+         control("NEW RIDE", tint: RideDashboardTheme.go, action: rideViewModel.startNewRide)
       }
    }
 
