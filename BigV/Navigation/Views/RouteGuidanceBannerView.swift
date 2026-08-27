@@ -1,0 +1,213 @@
+//
+//  RouteGuidanceBannerView.swift
+//  BigV
+//
+
+import SwiftUI
+
+/// The next turn, sized to be read at a glance on a handlebar in direct sunlight.
+///
+/// Distance leads and the instruction follows, because at speed the rider is
+/// asking "how far" before "which way". Nothing animates: the rerouting state is
+/// stated in words rather than spun, since a spinner would run for seconds at a
+/// time beside active GPS for no information gain.
+struct RouteGuidanceBannerView: View {
+
+   let routeGuidanceViewModel: RouteGuidanceViewModel
+
+   var body: some View {
+      VStack(alignment: .leading, spacing: 10) {
+         HStack(alignment: .top, spacing: 12) {
+            headline
+
+            Spacer(minLength: 0)
+
+            controls
+         }
+
+         footer
+      }
+      .padding(.horizontal, 14)
+      .padding(.vertical, 12)
+      .background(.black.opacity(0.94), in: .rect(cornerRadius: 20))
+      .overlay(
+         RoundedRectangle(cornerRadius: 20)
+            .stroke(accent.opacity(0.45), lineWidth: 1)
+      )
+      .sensoryFeedback(.impact(weight: .medium), trigger: routeGuidanceViewModel.turnPulse)
+      .accessibilityIdentifier("guidance.banner")
+   }
+
+   // MARK: - Headline
+
+   @ViewBuilder
+   private var headline: some View {
+      if let statusTitle = routeGuidanceViewModel.statusTitle {
+         status(title: statusTitle)
+      } else {
+         instruction
+      }
+   }
+
+   private func status(title: String) -> some View {
+      VStack(alignment: .leading, spacing: 3) {
+         Text(title)
+            .font(.title3.weight(.heavy))
+            .kerning(1.5)
+            .foregroundStyle(accent)
+            .accessibilityIdentifier("guidance.status")
+
+         if let detail = routeGuidanceViewModel.statusDetail {
+            Text(detail)
+               .font(.footnote.weight(.medium))
+               .foregroundStyle(.white.opacity(0.7))
+               .lineLimit(2)
+         }
+      }
+   }
+
+   @ViewBuilder
+   private var instruction: some View {
+      VStack(alignment: .leading, spacing: 2) {
+         if let turnDistance = routeGuidanceViewModel.turnDistance {
+            Text(turnDistance)
+               .font(.system(size: 30, weight: .heavy, design: .rounded))
+               .monospacedDigit()
+               .foregroundStyle(accent)
+               .accessibilityIdentifier("guidance.turnDistance")
+         }
+
+         Text(routeGuidanceViewModel.instruction ?? "Following route")
+            .font(.system(size: 19, weight: .semibold))
+            .foregroundStyle(.white)
+            .lineLimit(2)
+            .accessibilityIdentifier("guidance.instruction")
+
+         if let following = routeGuidanceViewModel.followingInstruction {
+            Text(following)
+               .font(.caption.weight(.medium))
+               .foregroundStyle(.white.opacity(0.55))
+               .lineLimit(1)
+         }
+
+         if let notice = routeGuidanceViewModel.notice {
+            Text(notice)
+               .font(.caption2.weight(.semibold))
+               .foregroundStyle(.orange)
+               .lineLimit(2)
+         }
+      }
+   }
+
+   // MARK: - Controls
+
+   @ViewBuilder
+   private var controls: some View {
+      if routeGuidanceViewModel.hasArrived {
+         Button("Done", action: routeGuidanceViewModel.dismissArrival)
+            .font(.subheadline.weight(.bold))
+            .buttonStyle(.borderedProminent)
+            .tint(.green)
+            .accessibilityIdentifier("guidance.button.done")
+      } else {
+         HStack(spacing: 4) {
+            circleButton(
+               icon: routeGuidanceViewModel.isVoiceEnabled ? .voiceOnIcon : .voiceOffIcon,
+               tint: routeGuidanceViewModel.isVoiceEnabled ? .white.opacity(0.85) : .white.opacity(0.35),
+               label: routeGuidanceViewModel.isVoiceEnabled ? "Mute voice guidance" : "Unmute voice guidance",
+               identifier: "guidance.button.voice",
+               action: routeGuidanceViewModel.toggleVoice
+            )
+
+            circleButton(
+               icon: .stopGuidanceIcon,
+               tint: .white.opacity(0.5),
+               label: "Stop guidance",
+               identifier: "guidance.button.stop",
+               action: routeGuidanceViewModel.stopGuidance
+            )
+         }
+      }
+   }
+
+   private func circleButton(
+      icon: String,
+      tint: Color,
+      label: String,
+      identifier: String,
+      action: @escaping () -> Void
+   ) -> some View {
+      Button(action: action) {
+         Image(systemName: icon)
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(tint)
+            .frame(width: 38, height: 38)
+            .contentShape(.circle)
+      }
+      .buttonStyle(.plain)
+      .accessibilityLabel(label)
+      .accessibilityIdentifier(identifier)
+   }
+
+   // MARK: - Footer
+
+   @ViewBuilder
+   private var footer: some View {
+      if !routeGuidanceViewModel.hasArrived {
+         HStack(spacing: 14) {
+            readout(
+               title: "TO GO",
+               value: "\(routeGuidanceViewModel.distanceRemaining) \(routeGuidanceViewModel.distanceRemainingUnit)"
+            )
+
+            readout(title: "ETA", value: routeGuidanceViewModel.arrivalTime)
+
+            readout(title: "LEFT", value: routeGuidanceViewModel.timeRemaining)
+
+            Spacer(minLength: 0)
+         }
+      }
+   }
+
+   private func readout(title: String, value: String) -> some View {
+      HStack(spacing: 5) {
+         Text(title)
+            .font(.caption2.weight(.semibold))
+            .kerning(0.8)
+            .foregroundStyle(.white.opacity(0.45))
+
+         Text(value)
+            .font(.caption.weight(.bold))
+            .monospacedDigit()
+            .foregroundStyle(.white.opacity(0.9))
+      }
+      .accessibilityElement(children: .combine)
+      .accessibilityLabel(title)
+      .accessibilityValue(value)
+   }
+
+   // MARK: - Accent
+
+   private var accent: Color {
+      if routeGuidanceViewModel.hasArrived { return .green }
+      if routeGuidanceViewModel.isAlerting { return .red }
+      return PlannedRouteStyle.line
+   }
+}
+
+// MARK: - Icons
+
+private extension String {
+   static let voiceOnIcon = "speaker.wave.2.fill"
+   static let voiceOffIcon = "speaker.slash.fill"
+   static let stopGuidanceIcon = "xmark"
+}
+
+#Preview {
+   ZStack {
+      Color.gray
+      RouteGuidanceBannerView(routeGuidanceViewModel: RouteGuidanceViewModel())
+         .padding()
+   }
+   .preferredColorScheme(.dark)
+}

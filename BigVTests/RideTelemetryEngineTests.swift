@@ -1,0 +1,269 @@
+//
+//  RideTelemetryEngineTests.swift
+//  BigVTests
+//
+
+import CoreLocation
+import Testing
+@testable import BigV
+
+@MainActor
+struct RideTelemetryEngineTests {
+
+   // MARK: - Fixtures
+
+   private static let origin = CLLocationCoordinate2D(latitude: 37.3349, longitude: -122.0090)
+   private static let metersPerDegreeLatitude: Double = 111_320
+
+   /// Builds a sample north of the origin by `northing` meters.
+   private func sample(
+      northing: Double,
+      altitude: Double = 100,
+      horizontalAccuracy: Double = 5,
+      verticalAccuracy: Double = 5,
+      speed: Double = 10,
+      secondsFromStart: TimeInterval,
+      reference: Date
+   ) -> CLLocation {
+      let latitude = Self.origin.latitude + (northing / Self.metersPerDegreeLatitude)
+
+      return CLLocation(
+         coordinate: CLLocationCoordinate2D(latitude: latitude, longitude: Self.origin.longitude),
+         altitude: altitude,
+         horizontalAccuracy: horizontalAccuracy,
+         verticalAccuracy: verticalAccuracy,
+         course: 0,
+         courseAccuracy: 5,
+         speed: speed,
+         speedAccuracy: 1,
+         timestamp: reference.addingTimeInterval(secondsFromStart)
+      )
+   }
+
+   /// Rides straight north at a steady speed.
+   private func ride(
+      into engine: inout RideTelemetryEngine,
+      steps: Int,
+      metersPerStep: Double = 10,
+      speed: Double = 10,
+      altitudePerStep: Double = 0,
+      reference: Date = Date(timeIntervalSince1970: 1_000_000)
+   ) {
+      for step in 0...steps {
+         let location = sample(
+            northing: Double(step) * metersPerStep,
+            altitude: 100 + Double(step) * altitudePerStep,
+            speed: speed,
+            secondsFromStart: Double(step),
+            reference: reference
+         )
+         _ = engine.ingest(location)
+      }
+   }
+
+   // MARK: - Fix Acquisition
+
+   @Test func rejectsInvalidAccuracy() {
+      var engine = RideTelemetryEngine()
+      let reference = Date()
+
+      let location = sample(
+         northing: 0,
+         horizontalAccuracy: -1,
+         secondsFromStart: 0,
+         reference: reference
+      )
+
+      #expect(engine.ingest(location) == .rejected(.invalidAccuracy))
+      #expect(engine.hasFix == false)
+   }
+
+   @Test func rejectsPoorAccuracyBeforeFix() {
+      var engine = RideTelemetryEngine()
+      let reference = Date()
+
+      let location = sample(
+         northing: 0,
+         horizontalAccuracy: 120,
+         secondsFromStart: 0,
+         reference: reference
+      )
+
+      #expect(engine.ingest(location) == .rejected(.poorAccuracy))
+      #expect(engine.hasFix == false)
+   }
+
+   @Test func acquiresFixOnUsableSample() {
+      var engine = RideTelemetryEngine()
+      let reference = Date()
+
+      let location = sample(northing: 0, secondsFromStart: 0, reference: reference)
+
+      #expect(engine.ingest(location) == .acquiredFix)
+      #expect(engine.hasFix)
+      #expect(engine.distance == 0)
+   }
+
+   // MARK: - Distance
+
+   @Test func accumulatesDistanceOverASteadyRide() {
+      var engine = RideTelemetryEngine()
+      ride(into: &engine, steps: 10)
+
+      // Ten accepted 10 m steps after the seeding sample.
+      #expect(abs(engine.distance - 100) < 5)
+      #expect(engine.isMoving)
+      #expect(engine.movingTime == 10)
+      #expect(engine.stoppedTime == 0)
+   }
+
+   @Test func doesNotAccumulateDistanceWhileStationary() {
+      var engine = RideTelemetryEngine()
+      ride(into: &engine, steps: 10, metersPerStep: 0, speed: 0)
+
+      #expect(engine.distance == 0)
+      #expect(engine.isMoving == false)
+      #expect(engine.stoppedTime == 10)
+      #expect(engine.movingTime == 0)
+   }
+
+   @Test func rejectsGPSJump() {
+      var engine = RideTelemetryEngine()
+      let reference = Date(timeIntervalSince1970: 1_000_000)
+      ride(into: &engine, steps: 5, reference: reference)
+
+      let distanceBeforeJump = engine.distance
+      let teleport = sample(northing: 5_000, speed: 10, secondsFromStart: 6, reference: reference)
+
+      #expect(engine.ingest(teleport) == .rejected(.implausibleJump))
+      #expect(engine.distance == distanceBeforeJump)
+   }
+
+   @Test func reseedsAfterSignalDropoutWithoutPhantomDistance() {
+      var engine = RideTelemetryEngine()
+      let reference = Date(timeIntervalSince1970: 1_000_000)
+      ride(into: &engine, steps: 5, reference: reference)
+
+      let distanceBeforeDropout = engine.distance
+      let movingTimeBeforeDropout = engine.movingTime
+
+      // Reappears 2 km away a minute later, as if leaving a tunnel.
+      let afterDropout = sample(northing: 2_000, speed: 10, secondsFromStart: 65, reference: reference)
+
+      #expect(engine.ingest(afterDropout) == .reseeded)
+      #expect(engine.distance == distanceBeforeDropout)
+      #expect(engine.movingTime == movingTimeBeforeDropout)
+   }
+
+   // MARK: - Speed
+
+   @Test func averageSpeedUsesMovingTime() {
+      var engine = RideTelemetryEngine()
+      ride(into: &engine, steps: 10)
+
+      let expected = engine.distance / engine.movingTime
+      #expect(abs(engine.averageSpeed - expected) < 0.001)
+      #expect(engine.averageSpeed > 0)
+   }
+
+   @Test func maximumSpeedIgnoresASingleSpike() {
+      var engine = RideTelemetryEngine()
+      let reference = Date(timeIntervalSince1970: 1_000_000)
+      ride(into: &engine, steps: 10, reference: reference)
+
+      let steadyMaximum = engine.maximumSpeed
+
+      // One sample claiming 25 m/s while still only covering 10 m of ground.
+      let spike = sample(northing: 110, speed: 25, secondsFromStart: 11, reference: reference)
+      _ = engine.ingest(spike)
+
+      // Smoothing keeps the spike from becoming the headline maximum.
+      #expect(engine.maximumSpeed < 25)
+      #expect(engine.maximumSpeed >= steadyMaximum)
+   }
+
+   @Test func markSpeedStaleZeroesSpeedButKeepsTotals() {
+      var engine = RideTelemetryEngine()
+      ride(into: &engine, steps: 10)
+
+      let distance = engine.distance
+      engine.markSpeedStale()
+
+      #expect(engine.speed == 0)
+      #expect(engine.isMoving == false)
+      #expect(engine.distance == distance)
+   }
+
+   // MARK: - Elevation
+
+   @Test func flatRideReportsNoElevationGain() {
+      var engine = RideTelemetryEngine()
+      ride(into: &engine, steps: 20, altitudePerStep: 0)
+
+      #expect(engine.elevationGain == 0)
+      #expect(engine.elevationLoss == 0)
+   }
+
+   @Test func climbAccumulatesElevationGain() {
+      var engine = RideTelemetryEngine()
+      ride(into: &engine, steps: 20, altitudePerStep: 3)
+
+      #expect(engine.elevationGain > 20)
+      #expect(engine.elevationLoss == 0)
+   }
+
+   @Test func ignoresAltitudeWithPoorVerticalAccuracy() {
+      var engine = RideTelemetryEngine()
+      let reference = Date(timeIntervalSince1970: 1_000_000)
+
+      for step in 0...20 {
+         let location = sample(
+            northing: Double(step) * 10,
+            altitude: 100 + Double(step) * 3,
+            verticalAccuracy: 90,
+            speed: 10,
+            secondsFromStart: Double(step),
+            reference: reference
+         )
+         _ = engine.ingest(location)
+      }
+
+      #expect(engine.elevationGain == 0)
+      #expect(engine.altitude == nil)
+   }
+
+   // MARK: - Grade
+
+   @Test func gradeMatchesASustainedClimb() {
+      var engine = RideTelemetryEngine()
+      // 10 m forward per step, 0.6 m up per step, a 6 percent grade.
+      ride(into: &engine, steps: 40, altitudePerStep: 0.6)
+
+      #expect(engine.grade > 2)
+      #expect(engine.grade < 8)
+   }
+
+   @Test func gradeIsZeroWhileStopped() {
+      var engine = RideTelemetryEngine()
+      ride(into: &engine, steps: 10, metersPerStep: 0, speed: 0)
+
+      #expect(engine.grade == 0)
+   }
+
+   // MARK: - Reset
+
+   @Test func resetClearsEverything() {
+      var engine = RideTelemetryEngine()
+      ride(into: &engine, steps: 10, altitudePerStep: 2)
+
+      engine.reset()
+
+      #expect(engine.distance == 0)
+      #expect(engine.speed == 0)
+      #expect(engine.maximumSpeed == 0)
+      #expect(engine.movingTime == 0)
+      #expect(engine.elevationGain == 0)
+      #expect(engine.hasFix == false)
+      #expect(engine.altitude == nil)
+   }
+}
