@@ -28,18 +28,17 @@ final class RideSessionManager {
 
    private let locationManager: RideLocationManager
    private let rideStorageManager: RideStorageManager?
-   private let rideHealthManager: RideHealthManager?
+   private let rideFinalizer: RideFinalizer
    private let rideRouteRecorder: RideRouteRecorder
    private let routeGuidanceManager: RouteGuidanceManager?
    private var telemetryEngine: RideTelemetryEngine
+   private var rideClock = RideClock()
 
    private var locationTask: Task<Void, Never>?
    private var clockTask: Task<Void, Never>?
    private var finalizeTask: Task<Void, Never>?
    private var authorizationTask: Task<Void, Never>?
 
-   private var pauseStartedAt: Date?
-   private var pausedDuration: TimeInterval = 0
    private var lastSampleAt: Date?
 
    /// Displayed speed drops to zero when samples stop arriving for this long.
@@ -59,7 +58,10 @@ final class RideSessionManager {
    ) {
       self.locationManager = locationManager
       self.rideStorageManager = rideStorageManager
-      self.rideHealthManager = rideHealthManager
+      self.rideFinalizer = RideFinalizer(
+         rideStorageManager: rideStorageManager,
+         rideHealthManager: rideHealthManager
+      )
       self.rideRouteRecorder = rideRouteRecorder
       self.routeGuidanceManager = routeGuidanceManager
       self.telemetryEngine = RideTelemetryEngine(configuration: configuration)
@@ -72,11 +74,10 @@ final class RideSessionManager {
 
       telemetryEngine.reset()
       rideRouteRecorder.reset()
+      rideClock.reset()
       state = RideState()
       finishedRideID = nil
       state.phase = .acquiringGPS
-      pausedDuration = 0
-      pauseStartedAt = nil
       lastSampleAt = nil
 
       ScreenAwakeService.setKeepAwake(true)
@@ -90,7 +91,7 @@ final class RideSessionManager {
    func pause() {
       guard state.phase == .recording else { return }
 
-      pauseStartedAt = .now
+      rideClock.beginPause()
       state.phase = .paused
       telemetryEngine.markSpeedStale()
       publishTelemetry()
@@ -102,10 +103,7 @@ final class RideSessionManager {
    func resume() {
       guard state.phase == .paused else { return }
 
-      if let pauseStartedAt {
-         pausedDuration += Date.now.timeIntervalSince(pauseStartedAt)
-      }
-      pauseStartedAt = nil
+      rideClock.endPause()
       lastSampleAt = nil
       state.phase = .recording
 
@@ -123,10 +121,8 @@ final class RideSessionManager {
          return
       }
 
-      if let pauseStartedAt {
-         pausedDuration += Date.now.timeIntervalSince(pauseStartedAt)
-         self.pauseStartedAt = nil
-      }
+      // Ending mid-pause must not bill that pause as ride time.
+      rideClock.endPause()
 
       stopStreams()
       ScreenAwakeService.setKeepAwake(false)
@@ -172,10 +168,9 @@ final class RideSessionManager {
       ScreenAwakeService.setKeepAwake(false)
       telemetryEngine.reset()
       rideRouteRecorder.reset()
+      rideClock.reset()
       state = RideState()
       finishedRideID = nil
-      pausedDuration = 0
-      pauseStartedAt = nil
       lastSampleAt = nil
    }
 
@@ -209,46 +204,30 @@ final class RideSessionManager {
    // MARK: - Finalization
 
    private func finalizeRide() async {
-      guard let rideStorageManager else { return }
+      guard let commit = rideFinalizer.commit(state) else { return }
 
-      let finishedRide = rideStorageManager.finalizeRide(with: state)
-      state.hasStorageFailure = rideStorageManager.hasFailure
-      finishedRideID = finishedRide?.persistentModelID
+      state.hasStorageFailure = commit.hasStorageFailure
+      finishedRideID = commit.ride?.persistentModelID
 
-      guard let finishedRide, let rideHealthManager else { return }
+      guard let finishedRide = commit.ride, rideFinalizer.exportsToHealth else { return }
 
       state.healthKitExport = .exporting
-      let outcome = await rideHealthManager.export(finishedRide)
-
-      let status: RideHealthExportStatus
-      switch outcome {
-         case .saved(let identifier):
-            rideStorageManager.linkHealthKitWorkout(identifier, to: finishedRide)
-            status = .saved
-
-         case .denied:
-            status = .denied
-
-         case .unavailable:
-            status = .unavailable
-
-         case .failed:
-            status = .failed
-      }
-
-      state.hasStorageFailure = rideStorageManager.hasFailure
+      let export = await rideFinalizer.export(finishedRide)
+      state.hasStorageFailure = export.hasStorageFailure
 
       // The rider may already have started over; never stamp a new ride's state.
       guard state.phase == .finished else { return }
-      state.healthKitExport = status
+      state.healthKitExport = export.status
    }
 
    private func requestHealthAuthorization() {
-      guard let rideHealthManager else { return }
+      guard rideFinalizer.exportsToHealth else { return }
+
+      let finalizer = rideFinalizer
 
       authorizationTask?.cancel()
       authorizationTask = Task {
-         await rideHealthManager.requestAuthorizationIfNeeded()
+         await finalizer.requestHealthAuthorization()
       }
    }
 
@@ -385,14 +364,10 @@ final class RideSessionManager {
    private func refreshElapsedTime() {
       guard let startDate = state.startDate else { return }
 
-      let reference = state.endDate ?? .now
-      var elapsed = reference.timeIntervalSince(startDate) - pausedDuration
-
-      if let pauseStartedAt {
-         elapsed -= reference.timeIntervalSince(pauseStartedAt)
-      }
-
-      state.elapsedTime = max(0, elapsed)
+      state.elapsedTime = rideClock.elapsed(
+         since: startDate,
+         at: state.endDate ?? .now
+      )
    }
 
    /// A stopped rider must not stare at the speed they were doing ten seconds ago.
