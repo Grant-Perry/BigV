@@ -9,7 +9,7 @@ import Foundation
 ///
 /// The ride engine stores everything in meters and meters/second. Imperial
 /// conversion happens here and nowhere else.
-enum RideFormatters {
+nonisolated enum RideFormatters {
 
    // MARK: - Unit Labels
 
@@ -71,6 +71,12 @@ enum RideFormatters {
       return hours > 0
          ? String(format: "%d:%02d:%02d", hours, minutes, seconds)
          : String(format: "%d:%02d", minutes, seconds)
+   }
+
+   // MARK: - Heart Rate
+
+   static func heartRate(_ beatsPerMinute: Double) -> String {
+      beatsPerMinute.rounded().formatted(.number.precision(.fractionLength(0)))
    }
 
    // MARK: - Grade

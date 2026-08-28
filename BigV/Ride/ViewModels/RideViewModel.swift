@@ -70,6 +70,16 @@ final class RideViewModel {
       RideFormatters.cardinal(state.course) ?? RideFormatters.placeholder
    }
 
+   // MARK: - Sensors
+
+   /// `nil` until a Watch is feeding a pulse, which is also the signal the chip
+   /// uses to stay off the dashboard entirely.
+   var heartRate: String? {
+      state.heartRate.map(RideFormatters.heartRate)
+   }
+
+   var heartRateUnit: String { RideFormatters.Unit.heartRate }
+
    // MARK: - Status
 
    var statusText: String {

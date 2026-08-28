@@ -5,30 +5,39 @@
 
 import SwiftUI
 
-/// Shared cockpit tokens: night graphite, ice instrument light, M-division ember.
+/// The phone cockpit: night graphite, ice instrument light, M-division ember.
+///
+/// The palette itself lives in `RideChromeTokens`, which the Watch shares. What
+/// stays here is everything the phone alone needs — shape metrics and the
+/// trail-plate art catalog.
 enum RideDashboardTheme {
 
    // MARK: - Atmosphere
 
-   static let void = Color(red: 0.015, green: 0.016, blue: 0.020)
-   static let graphite = Color(red: 0.075, green: 0.082, blue: 0.098)
-   static let midnight = Color(red: 0.040, green: 0.070, blue: 0.130)
+   static let void = RideChromeTokens.void
+   static let graphite = RideChromeTokens.graphite
+   static let midnight = RideChromeTokens.midnight
 
    // MARK: - Accents
 
    /// Ice-blue instrument light. Used for live speed and locked GPS.
-   static let ice = Color(red: 0.58, green: 0.84, blue: 0.96)
+   static let ice = RideChromeTokens.ice
 
    /// Refined M-division amber. Replaces flat system orange on chrome.
-   static let ember = Color(red: 1.00, green: 0.48, blue: 0.12)
+   static let ember = RideChromeTokens.ember
 
-   static let amber = Color(red: 1.00, green: 0.62, blue: 0.22)
+   static let amber = RideChromeTokens.amber
 
    // MARK: - Controls
 
-   static let go = Color(red: 0.16, green: 0.78, blue: 0.36)
-   static let halt = Color(red: 0.90, green: 0.18, blue: 0.20)
+   static let go = RideChromeTokens.go
+   static let halt = RideChromeTokens.halt
    static let pause = ember
+
+   // MARK: - Vitals
+
+   /// Heart rate, once a Watch or strap is feeding one.
+   static let pulse = RideChromeTokens.pulse
 
    // MARK: - Shape
 

@@ -6,7 +6,18 @@
 	objectVersion = 110;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		9BA0000C304077C40030A6B8 /* BigV Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 9BA00001304077C40030A6B8 /* BigV Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
+		9BA0000E304077C40030A6B8 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9B71BB96304077C30030A6B8 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 9BA00007304077C40030A6B8;
+			remoteInfo = "BigV Watch App";
+		};
 		9B71BBAE304077C40030A6B8 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 9B71BB96304077C30030A6B8 /* Project object */;
@@ -23,8 +34,23 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		9BA0000B304077C40030A6B8 /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				9BA0000C304077C40030A6B8 /* BigV Watch App.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		9B71BB9E304077C30030A6B8 /* BigV.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BigV.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		9BA00001304077C40030A6B8 /* BigV Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "BigV Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		9B71BBAD304077C40030A6B8 /* BigVTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BigVTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		9B71BBB7304077C40030A6B8 /* BigVUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BigVUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -37,6 +63,13 @@
 			);
 			target = 9B71BB9D304077C30030A6B8 /* BigV */;
 		};
+		9BA0000F304077C40030A6B8 /* Exceptions for "BigV Watch App" folder in "BigV Watch App" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 9BA00007304077C40030A6B8 /* BigV Watch App */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -46,6 +79,19 @@
 				9B71BBD0304077C40030A6B8 /* Exceptions for "BigV" folder in "BigV" target */,
 			);
 			path = BigV;
+			sourceTree = "<group>";
+		};
+		9BA00002304077C40030A6B8 /* BigV Watch App */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				9BA0000F304077C40030A6B8 /* Exceptions for "BigV Watch App" folder in "BigV Watch App" target */,
+			);
+			path = "BigV Watch App";
+			sourceTree = "<group>";
+		};
+		9BA00003304077C40030A6B8 /* BigVShared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = BigVShared;
 			sourceTree = "<group>";
 		};
 		9B71BBB0304077C40030A6B8 /* BigVTests */ = {
@@ -76,6 +122,11 @@
 			files = (
 			);
 		};
+		9BA00004304077C40030A6B8 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -83,6 +134,8 @@
 			isa = PBXGroup;
 			children = (
 				9B71BBA0304077C30030A6B8 /* BigV */,
+				9BA00002304077C40030A6B8 /* BigV Watch App */,
+				9BA00003304077C40030A6B8 /* BigVShared */,
 				9B71BBB0304077C40030A6B8 /* BigVTests */,
 				9B71BBBA304077C40030A6B8 /* BigVUITests */,
 				9B71BB9F304077C30030A6B8 /* Products */,
@@ -95,6 +148,7 @@
 				9B71BB9E304077C30030A6B8 /* BigV.app */,
 				9B71BBAD304077C40030A6B8 /* BigVTests.xctest */,
 				9B71BBB7304077C40030A6B8 /* BigVUITests.xctest */,
+				9BA00001304077C40030A6B8 /* BigV Watch App.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -109,11 +163,16 @@
 				9B71BB9A304077C30030A6B8 /* Sources */,
 				9B71BB9B304077C30030A6B8 /* Frameworks */,
 				9B71BB9C304077C30030A6B8 /* Resources */,
+				9BA0000B304077C40030A6B8 /* Embed Watch Content */,
 			);
 			buildRules = (
 			);
+			dependencies = (
+				9BA0000D304077C40030A6B8 /* PBXTargetDependency */,
+			);
 			fileSystemSynchronizedGroups = (
 				9B71BBA0304077C30030A6B8 /* BigV */,
+				9BA00003304077C40030A6B8 /* BigVShared */,
 			);
 			name = BigV;
 			productName = BigV;
@@ -162,6 +221,25 @@
 			productReference = 9B71BBB7304077C40030A6B8 /* BigVUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		9BA00007304077C40030A6B8 /* BigV Watch App */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9BA00008304077C40030A6B8 /* Build configuration list for PBXNativeTarget "BigV Watch App" */;
+			buildPhases = (
+				9BA00006304077C40030A6B8 /* Sources */,
+				9BA00004304077C40030A6B8 /* Frameworks */,
+				9BA00005304077C40030A6B8 /* Resources */,
+			);
+			buildRules = (
+			);
+			fileSystemSynchronizedGroups = (
+				9BA00002304077C40030A6B8 /* BigV Watch App */,
+				9BA00003304077C40030A6B8 /* BigVShared */,
+			);
+			name = "BigV Watch App";
+			productName = "BigV Watch App";
+			productReference = 9BA00001304077C40030A6B8 /* BigV Watch App.app */;
+			productType = "com.apple.product-type.application";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -183,6 +261,9 @@
 						CreatedOnToolsVersion = 27.0;
 						TestTargetID = 9B71BB9D304077C30030A6B8;
 					};
+					9BA00007304077C40030A6B8 = {
+						CreatedOnToolsVersion = 27.0;
+					};
 				};
 			};
 			buildConfigurationList = 9B71BB99304077C30030A6B8 /* Build configuration list for PBXProject "BigV" */;
@@ -200,6 +281,7 @@
 			projectRoot = "";
 			targets = (
 				9B71BB9D304077C30030A6B8 /* BigV */,
+				9BA00007304077C40030A6B8 /* BigV Watch App */,
 				9B71BBAC304077C40030A6B8 /* BigVTests */,
 				9B71BBB6304077C40030A6B8 /* BigVUITests */,
 			);
@@ -222,6 +304,11 @@
 			files = (
 			);
 		};
+		9BA00005304077C40030A6B8 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -240,9 +327,19 @@
 			files = (
 			);
 		};
+		9BA00006304077C40030A6B8 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		9BA0000D304077C40030A6B8 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 9BA00007304077C40030A6B8 /* BigV Watch App */;
+			targetProxy = 9BA0000E304077C40030A6B8 /* PBXContainerItemProxy */;
+		};
 		9B71BBAF304077C40030A6B8 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 9B71BB9D304077C30030A6B8 /* BigV */;
@@ -539,6 +636,80 @@
 			};
 			name = Release;
 		};
+		9BA00009304077C40030A6B8 /* Debug configuration for PBXNativeTarget "BigV Watch App" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "BigV Watch App/BigV Watch App.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 4;
+				DEVELOPMENT_TEAM = KP3ZH5K2SY;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "BigV Watch App/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = BigV;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "BigV reads your heart rate on the Watch so the phone can show it live while you ride.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "BigV starts a workout session on the Watch to read your heart rate and credit your Activity rings. Your ride is saved to Health by the iPhone.";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.grantperry.BigV;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.3;
+				PRODUCT_BUNDLE_IDENTIFIER = com.grantperry.BigV.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "watchos watchsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.5;
+			};
+			name = Debug;
+		};
+		9BA0000A304077C40030A6B8 /* Release configuration for PBXNativeTarget "BigV Watch App" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "BigV Watch App/BigV Watch App.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 4;
+				DEVELOPMENT_TEAM = KP3ZH5K2SY;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "BigV Watch App/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = BigV;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "BigV reads your heart rate on the Watch so the phone can show it live while you ride.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "BigV starts a workout session on the Watch to read your heart rate and credit your Activity rings. Your ride is saved to Health by the iPhone.";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.grantperry.BigV;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.3;
+				PRODUCT_BUNDLE_IDENTIFIER = com.grantperry.BigV.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "watchos watchsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.5;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -571,6 +742,14 @@
 			buildConfigurations = (
 				9B71BBC6304077C40030A6B8 /* Debug configuration for PBXNativeTarget "BigVUITests" */,
 				9B71BBC7304077C40030A6B8 /* Release configuration for PBXNativeTarget "BigVUITests" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		9BA00008304077C40030A6B8 /* Build configuration list for PBXNativeTarget "BigV Watch App" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9BA00009304077C40030A6B8 /* Debug configuration for PBXNativeTarget "BigV Watch App" */,
+				9BA0000A304077C40030A6B8 /* Release configuration for PBXNativeTarget "BigV Watch App" */,
 			);
 			defaultConfigurationName = Release;
 		};
