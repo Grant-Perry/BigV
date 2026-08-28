@@ -125,6 +125,45 @@ final class RideStorageManager {
       saveIfDue()
    }
 
+   // MARK: - Radar Passes
+
+   /// Records one completed vehicle pass and folds it into the ride's totals.
+   ///
+   /// Passes arrive at road frequency — dozens per ride, not thousands — so
+   /// they ride the same batching as samples rather than forcing a save each:
+   /// the next sample batch or `flush()` commits them within seconds.
+   func appendRadarPass(
+      _ pass: RideRadarTracker.Pass,
+      latitude: Double?,
+      longitude: Double?
+   ) {
+      guard let ride = activeRide else { return }
+
+      let event = RideRadarEvent(
+         timestamp: pass.lastSeenAt,
+         trackID: Int(pass.trackID),
+         minimumDistance: pass.minimumDistanceMeters,
+         maximumClosingSpeed: pass.maximumClosingSpeedMetersPerSecond,
+         peakTier: pass.peakTier,
+         latitude: latitude,
+         longitude: longitude
+      )
+      event.ride = ride
+      modelContext.insert(event)
+
+      ride.vehicleCount += 1
+      ride.closestPassDistance = min(
+         ride.closestPassDistance ?? .greatestFiniteMagnitude,
+         pass.minimumDistanceMeters
+      )
+      ride.maximumClosingSpeed = max(
+         ride.maximumClosingSpeed ?? 0,
+         pass.maximumClosingSpeedMetersPerSecond
+      )
+
+      saveIfDue()
+   }
+
    // MARK: - Flushing
 
    /// Commits anything pending. Used on pause, end and scene backgrounding.

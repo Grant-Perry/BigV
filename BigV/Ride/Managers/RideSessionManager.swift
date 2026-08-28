@@ -32,17 +32,32 @@ final class RideSessionManager {
    private let rideRouteRecorder: RideRouteRecorder
    private let routeGuidanceManager: RouteGuidanceManager?
    private let rideWatchManager: RideWatchManager?
+   private let rideRadarManager: RideRadarManager?
+   private let rideRadarAnnouncer: RideRadarAnnouncer?
    private var telemetryEngine: RideTelemetryEngine
    private var rideClock = RideClock()
+   private var radarTracker = RideRadarTracker()
 
    private var locationTask: Task<Void, Never>?
    private var clockTask: Task<Void, Never>?
    private var finalizeTask: Task<Void, Never>?
    private var authorizationTask: Task<Void, Never>?
    private var watchLinkTask: Task<Void, Never>?
+   private var radarTask: Task<Void, Never>?
+   private var radarHousekeepingTask: Task<Void, Never>?
 
    private var lastSampleAt: Date?
+
+   /// The last accepted fix, kept so a radar pass can be stamped with where the
+   /// rider was. Lives here rather than on `RideState`: no view needs it.
+   private var lastRiderCoordinate: CLLocationCoordinate2D?
+
    private var lastHeartRateAt: Date?
+   private var lastRadarFrameAt: Date?
+   private var lastRadarPublishAt: Date = .distantPast
+
+   /// Passes completed before this ride started don't belong to it.
+   private var radarPassCountAtRideStart = 0
 
    /// Displayed speed drops to zero when samples stop arriving for this long.
    private let sampleStalenessWindow: TimeInterval = 4
@@ -50,6 +65,13 @@ final class RideSessionManager {
    /// Heart rate clears when the wrist stops feeding one for this long. Wider than
    /// the speed window because watchOS writes beats in batches, not per second.
    private let heartRateStalenessWindow: TimeInterval = 15
+
+   /// The radar notifies at ~7 Hz, but SwiftUI does not need every frame:
+   /// track updates republish at 5 Hz. Alert edges bypass the cap for latency.
+   private let radarPublishInterval: TimeInterval = 0.2
+
+   /// A silent radar this long means its tracks are phantoms; clear the board.
+   private let radarFrameStalenessWindow: TimeInterval = 3
 
    // MARK: - Initialization
 
@@ -62,7 +84,9 @@ final class RideSessionManager {
       rideHealthManager: RideHealthManager? = nil,
       rideRouteRecorder: RideRouteRecorder = RideRouteRecorder(),
       routeGuidanceManager: RouteGuidanceManager? = nil,
-      rideWatchManager: RideWatchManager? = nil
+      rideWatchManager: RideWatchManager? = nil,
+      rideRadarManager: RideRadarManager? = nil,
+      rideRadarAnnouncer: RideRadarAnnouncer? = nil
    ) {
       self.locationManager = locationManager
       self.rideStorageManager = rideStorageManager
@@ -73,6 +97,8 @@ final class RideSessionManager {
       self.rideRouteRecorder = rideRouteRecorder
       self.routeGuidanceManager = routeGuidanceManager
       self.rideWatchManager = rideWatchManager
+      self.rideRadarManager = rideRadarManager
+      self.rideRadarAnnouncer = rideRadarAnnouncer
       self.telemetryEngine = RideTelemetryEngine(configuration: configuration)
    }
 
@@ -84,10 +110,21 @@ final class RideSessionManager {
       telemetryEngine.reset()
       rideRouteRecorder.reset()
       rideClock.reset()
+
+      // The radar link outlives rides: a new ride must not blank the tape or
+      // drop the connection readout, only restart its pass count.
+      let radar = state.radar
       state = RideState()
+      state.radar = radar
+      radarPassCountAtRideStart = radarTracker.vehiclePassCount
+      state.radar.vehiclePassCount = 0
+      state.radar.closestPassDistanceMeters = nil
+      state.radar.maximumPassClosingSpeedMetersPerSecond = nil
+
       finishedRideID = nil
       state.phase = .acquiringGPS
       lastSampleAt = nil
+      lastRiderCoordinate = nil
 
       ScreenAwakeService.setKeepAwake(true)
       startLocationStream()
@@ -182,9 +219,15 @@ final class RideSessionManager {
       telemetryEngine.reset()
       rideRouteRecorder.reset()
       rideClock.reset()
+
+      // Radar life is not bound to ride life; the tape stays live on idle.
+      let radar = state.radar
       state = RideState()
+      state.radar = radar
+
       finishedRideID = nil
       lastSampleAt = nil
+      lastRiderCoordinate = nil
       mirrorToWatch()
    }
 
@@ -370,6 +413,7 @@ final class RideSessionManager {
    private func appendRoutePoint(_ location: CLLocation) {
       guard state.phase == .recording else { return }
       rideRouteRecorder.append(location.coordinate)
+      lastRiderCoordinate = location.coordinate
    }
 
    // MARK: - Clock
@@ -378,6 +422,7 @@ final class RideSessionManager {
       // Runs in every active phase, unlike the rest of the tick: a paused rider
       // whose Watch dropped off must not keep a frozen pulse on screen.
       expireStaleHeartRate()
+      expireStaleRadarTracks()
 
       if state.phase == .acquiringGPS {
          mirrorToWatch()
@@ -489,7 +534,233 @@ final class RideSessionManager {
    }
 
    private func mirrorToWatch() {
-      rideWatchManager?.publish(RideWatchMetricsSnapshot(state: state))
+      rideWatchManager?.publish(
+         RideWatchMetricsSnapshot(state: state, includesRadar: isRadarDisplayAvailable)
+      )
+   }
+
+   // MARK: - Radar Link
+
+   /// Whether the radar stream is currently open.
+   private(set) var isRadarLinkActive = false
+
+   /// Whether there is a radar worth drawing chrome for: a remembered pairing
+   /// or the debug simulator. Views hide the tape entirely otherwise.
+   var isRadarDisplayAvailable: Bool {
+      guard let rideRadarManager else { return false }
+      return isRadarLinkActive && rideRadarManager.isPairedOrSimulated
+   }
+
+   /// Opens the radar link for the life of the app, gated on the rider's
+   /// preference. Like the watch link, this is not tied to a ride: alerts have
+   /// to work while soft-pedalling before START, so `stopStreams()` leaves it
+   /// alone and ride resets preserve its snapshot.
+   func activateRadarLink() {
+      guard UserDefaults.standard.bool(forKey: "radar.enabled") else { return }
+      openRadarLink()
+   }
+
+   /// Opens the link unconditionally — the pairing sheet's enable path.
+   func openRadarLink() {
+      guard let rideRadarManager else { return }
+
+      closeRadarLink()
+      isRadarLinkActive = true
+
+      let events = rideRadarManager.startUpdates()
+      radarTask = Task { [weak self] in
+         for await event in events {
+            guard let self else { return }
+            self.handle(event)
+         }
+      }
+
+      // The ride clock only ticks during a ride, but a radar that goes silent
+      // at a coffee stop must still clear its phantoms.
+      radarHousekeepingTask = Task { [weak self] in
+         while !Task.isCancelled {
+            do {
+               try await Task.sleep(for: .seconds(1))
+            } catch {
+               return
+            }
+
+            guard let self else { return }
+            self.expireStaleRadarTracks()
+         }
+      }
+
+      DebugPrint(mode: .radar, "Radar link opened")
+   }
+
+   /// Tears the link down and blanks the board — the disable / forget path.
+   func closeRadarLink() {
+      guard isRadarLinkActive || radarTask != nil else { return }
+
+      radarTask?.cancel()
+      radarTask = nil
+      radarHousekeepingTask?.cancel()
+      radarHousekeepingTask = nil
+      rideRadarManager?.stopUpdates()
+
+      radarTracker.reset()
+      lastRadarFrameAt = nil
+      radarPassCountAtRideStart = 0
+
+      // Pulses survive so a view's `.sensoryFeedback` trigger cannot fire on
+      // a counter that jumped backwards to zero. Pass aggregates blank with
+      // the rest of the board — the stored ride row keeps the real totals.
+      let alertPulse = state.radar.alertPulse
+      let clearPulse = state.radar.clearPulse
+      state.radar = RideRadarSnapshot()
+      state.radar.alertPulse = alertPulse
+      state.radar.clearPulse = clearPulse
+
+      isRadarLinkActive = false
+      mirrorToWatch()
+
+      DebugPrint(mode: .radar, "Radar link closed")
+   }
+
+   private func handle(_ event: RideRadarLinkEvent) {
+      switch event {
+         case .frame(let frame):
+            ingest(frame)
+
+         case .connection(let connection):
+            state.radar.connection = connection
+            if connection == .connected {
+               state.radar.issue = nil
+            }
+
+            // Rare, and the wrist pip must not show a live radar that is gone.
+            mirrorToWatch()
+            DebugPrint(mode: .radar, "Radar connection: \(connection.rawValue)")
+
+         case .battery(let percent):
+            state.radar.batteryPercent = percent
+
+         case .issue(let issue):
+            state.radar.issue = issue
+            DebugPrint(mode: .radar, "Radar issue: \(issue.rawValue)")
+      }
+   }
+
+   private func ingest(_ frame: RideRadarFrame) {
+      lastRadarFrameAt = frame.receivedAt
+
+      let events = radarTracker.ingest(frame, at: frame.receivedAt)
+      process(events)
+
+      // Edges bypass the republish cap: an alert must not wait out a window.
+      publishRadar(force: !events.isEmpty)
+
+      // The wrist mirror runs at 1 Hz, which is too slow for an alert; an
+      // edge is mirrored the moment the fresh tier is in `state`.
+      if containsAlertEdge(events) {
+         mirrorToWatch()
+      }
+   }
+
+   private func process(_ events: [RideRadarTracker.Event]) {
+      for event in events {
+         switch event {
+            case .threatEntered(let trackID):
+               state.radar.alertPulse += 1
+               rideRadarAnnouncer?.announceApproach()
+               DebugPrint(mode: .radar, "Threat entered: track \(trackID)")
+
+            case .tierEscalated(let trackID, let tier):
+               state.radar.alertPulse += 1
+               rideRadarAnnouncer?.announceDanger()
+               DebugPrint(mode: .radar, "Track \(trackID) escalated to \(tier)")
+
+            case .allClear:
+               state.radar.clearPulse += 1
+               rideRadarAnnouncer?.announceAllClear()
+               DebugPrint(mode: .radar, "All clear")
+
+            case .passCompleted(let pass):
+               persistRadarPass(pass)
+               DebugPrint(
+                  mode: .radar,
+                  "Pass complete: track \(pass.trackID), closest \(Int(pass.minimumDistanceMeters)) m"
+               )
+         }
+      }
+   }
+
+   /// Writes one stored row per completed pass and folds it into the ride's
+   /// running aggregates — but only while a ride is actually recording, so an
+   /// idle phone with a live radar cannot invent orphan events.
+   private func persistRadarPass(_ pass: RideRadarTracker.Pass) {
+      guard state.phase == .recording, let rideStorageManager else { return }
+
+      rideStorageManager.appendRadarPass(
+         pass,
+         latitude: lastRiderCoordinate?.latitude,
+         longitude: lastRiderCoordinate?.longitude
+      )
+      state.hasStorageFailure = rideStorageManager.hasFailure
+
+      // Mirrored into the snapshot so the post-ride summary reads its radar
+      // tiles from the same state as every other total.
+      state.radar.closestPassDistanceMeters = min(
+         state.radar.closestPassDistanceMeters ?? .greatestFiniteMagnitude,
+         pass.minimumDistanceMeters
+      )
+      state.radar.maximumPassClosingSpeedMetersPerSecond = max(
+         state.radar.maximumPassClosingSpeedMetersPerSecond ?? 0,
+         pass.maximumClosingSpeedMetersPerSecond
+      )
+   }
+
+   /// Whether any event should push the mirror to the wrist right now.
+   private func containsAlertEdge(_ events: [RideRadarTracker.Event]) -> Bool {
+      events.contains { event in
+         switch event {
+            case .threatEntered, .tierEscalated, .allClear: true
+            case .passCompleted: false
+         }
+      }
+   }
+
+   /// Republishes tracker state into `RideState` at a 5 Hz cap so SwiftUI is
+   /// not thrashed by the radar's ~7 Hz notify rate.
+   private func publishRadar(force: Bool) {
+      let now = Date.now
+      guard force || now.timeIntervalSince(lastRadarPublishAt) >= radarPublishInterval else {
+         return
+      }
+      lastRadarPublishAt = now
+
+      state.radar.tracks = radarTracker.tracks
+      state.radar.aggregateTier = radarTracker.aggregateTier
+      state.radar.nearestDistanceMeters = radarTracker.nearestTrack?.distanceMeters
+      state.radar.nearestClosingSpeedMetersPerSecond =
+         radarTracker.nearestTrack?.closingSpeedMetersPerSecond
+      state.radar.vehiclePassCount = max(
+         0, radarTracker.vehiclePassCount - radarPassCountAtRideStart
+      )
+   }
+
+   /// Clears phantom vehicles when the radar stops reporting. Runs from both
+   /// the ride tick and the radar housekeeping loop; both paths are idempotent.
+   private func expireStaleRadarTracks() {
+      guard state.radar.hasVehicles,
+            let lastRadarFrameAt,
+            Date.now.timeIntervalSince(lastRadarFrameAt) > radarFrameStalenessWindow
+      else { return }
+
+      let events = radarTracker.expireStaleTracks(at: .now)
+      process(events)
+      publishRadar(force: true)
+
+      if containsAlertEdge(events) {
+         mirrorToWatch()
+      }
+
+      DebugPrint(mode: .radar, "Radar went silent; board cleared")
    }
 
    // MARK: - Publishing

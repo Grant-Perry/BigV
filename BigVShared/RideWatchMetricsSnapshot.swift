@@ -24,6 +24,24 @@ nonisolated struct RideWatchMetricsSnapshot: Sendable, Equatable {
    let locationIssue: String?
    let horizontalAccuracy: Double?
 
+   /// The phone's measurement-system preference, mirrored so wrist labels
+   /// always match the phone. Imperial when the key predates the units
+   /// feature — the app's default.
+   let unitSystem: RideUnitSystem
+
+   // MARK: - Radar
+
+   /// The rear radar's contribution, every field optional so a build on either
+   /// side that predates the radar decodes the rest of the mirror untouched.
+   /// `radarConnected` doubles as the presence marker: `nil` means the phone
+   /// has no radar in play at all, distinct from a radar that dropped its link.
+   let radarConnected: Bool?
+   let radarTier: RideRadarThreatTier?
+   let radarCount: Int?
+   let radarNearest: Double?
+   let radarAlertPulse: Int?
+   let radarClearPulse: Int?
+
    // MARK: - Initialization
 
    init(
@@ -35,7 +53,14 @@ nonisolated struct RideWatchMetricsSnapshot: Sendable, Equatable {
       isMoving: Bool,
       capturedAt: Date = .now,
       locationIssue: String? = nil,
-      horizontalAccuracy: Double? = nil
+      horizontalAccuracy: Double? = nil,
+      unitSystem: RideUnitSystem = .imperial,
+      radarConnected: Bool? = nil,
+      radarTier: RideRadarThreatTier? = nil,
+      radarCount: Int? = nil,
+      radarNearest: Double? = nil,
+      radarAlertPulse: Int? = nil,
+      radarClearPulse: Int? = nil
    ) {
       self.phase = phase
       self.speed = speed
@@ -46,6 +71,13 @@ nonisolated struct RideWatchMetricsSnapshot: Sendable, Equatable {
       self.capturedAt = capturedAt
       self.locationIssue = locationIssue
       self.horizontalAccuracy = horizontalAccuracy
+      self.unitSystem = unitSystem
+      self.radarConnected = radarConnected
+      self.radarTier = radarTier
+      self.radarCount = radarCount
+      self.radarNearest = radarNearest
+      self.radarAlertPulse = radarAlertPulse
+      self.radarClearPulse = radarClearPulse
    }
 
    // MARK: - Wire Format
@@ -60,6 +92,13 @@ nonisolated struct RideWatchMetricsSnapshot: Sendable, Equatable {
       static let capturedAt = "capturedAt"
       static let locationIssue = "locationIssue"
       static let horizontalAccuracy = "horizontalAccuracy"
+      static let units = "units"
+      static let radarConnected = "radarConnected"
+      static let radarTier = "radarTier"
+      static let radarCount = "radarCount"
+      static let radarNearest = "radarNearest"
+      static let radarAlertPulse = "radarAlertPulse"
+      static let radarClearPulse = "radarClearPulse"
    }
 
    var body: [String: Any] {
@@ -70,7 +109,8 @@ nonisolated struct RideWatchMetricsSnapshot: Sendable, Equatable {
          Key.elapsedTime: elapsedTime,
          Key.hasGPSFix: hasGPSFix,
          Key.isMoving: isMoving,
-         Key.capturedAt: capturedAt.timeIntervalSince1970
+         Key.capturedAt: capturedAt.timeIntervalSince1970,
+         Key.units: unitSystem.rawValue
       ]
 
       if let locationIssue {
@@ -79,6 +119,30 @@ nonisolated struct RideWatchMetricsSnapshot: Sendable, Equatable {
 
       if let horizontalAccuracy {
          payload[Key.horizontalAccuracy] = horizontalAccuracy
+      }
+
+      if let radarConnected {
+         payload[Key.radarConnected] = radarConnected
+      }
+
+      if let radarTier {
+         payload[Key.radarTier] = radarTier.rawValue
+      }
+
+      if let radarCount {
+         payload[Key.radarCount] = radarCount
+      }
+
+      if let radarNearest {
+         payload[Key.radarNearest] = radarNearest
+      }
+
+      if let radarAlertPulse {
+         payload[Key.radarAlertPulse] = radarAlertPulse
+      }
+
+      if let radarClearPulse {
+         payload[Key.radarClearPulse] = radarClearPulse
       }
 
       return payload
@@ -104,6 +168,14 @@ nonisolated struct RideWatchMetricsSnapshot: Sendable, Equatable {
       self.capturedAt = Date(timeIntervalSince1970: capturedAt)
       self.locationIssue = body[Key.locationIssue] as? String
       self.horizontalAccuracy = body[Key.horizontalAccuracy] as? Double
+      self.unitSystem = (body[Key.units] as? String)
+         .flatMap(RideUnitSystem.init) ?? .imperial
+      self.radarConnected = body[Key.radarConnected] as? Bool
+      self.radarTier = (body[Key.radarTier] as? Int).flatMap(RideRadarThreatTier.init)
+      self.radarCount = body[Key.radarCount] as? Int
+      self.radarNearest = body[Key.radarNearest] as? Double
+      self.radarAlertPulse = body[Key.radarAlertPulse] as? Int
+      self.radarClearPulse = body[Key.radarClearPulse] as? Int
    }
 
    // MARK: - Freshness

@@ -121,10 +121,10 @@ final class RideMapViewModel {
       state.hasGPSFix ? RideFormatters.speed(state.speed) : RideFormatters.placeholder
    }
 
-   var speedUnit: String { RideFormatters.Unit.speed }
+   var speedUnit: String { RideUnitSystem.current.speedUnit }
 
    var distance: String { RideFormatters.distance(state.distance) }
-   var distanceUnit: String { RideFormatters.Unit.distance }
+   var distanceUnit: String { RideUnitSystem.current.distanceUnit }
 
    var heading: String {
       RideFormatters.cardinal(state.course) ?? RideFormatters.placeholder

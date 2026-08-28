@@ -182,12 +182,8 @@ extension Color {
    static let gpFinalTop                 = Color(#colorLiteral(red: 0.4196078431, green: 0.2901960784, blue: 0.4745098039, alpha: 1))	
    static let gpLivePlayHead             = Color(#colorLiteral(red: 0.4196078431, green: 0.2901960784, blue: 0.4745098039, alpha: 1))
 
-   static let gpBreadcrumb              = Color(#colorLiteral(red: 0.768627451, green: 0.6078431373, blue: 0.8588235294, alpha: 1))
+   static let gpBreadcrumb               = Color(#colorLiteral(red: 0.768627451, green: 0.6078431373, blue: 0.8588235294, alpha: 1))
    static let gpGuidedRoute              = Color(#colorLiteral(red: 0.2392156869, green: 0.6745098233, blue: 0.9686274529, alpha: 1))
-
-
-
-
 
 
 	  /// Calculate luminance using WCAG formula

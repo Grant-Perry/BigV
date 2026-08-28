@@ -21,6 +21,9 @@ final class RideRouteViewModel {
    private(set) var totals: RideTotals?
    private(set) var titleText = ""
 
+   /// Radar passes with a known rider position, ready for the route map.
+   private(set) var radarPasses: [RideRadarPassAnnotation] = []
+
    /// `true` once a load has resolved. Separates "the store has not answered yet"
    /// from "this ride genuinely has no route", so a screen waiting on a ride that
    /// is still being finalized never claims the route is missing.
@@ -50,6 +53,7 @@ final class RideRouteViewModel {
       route = RideRoute(coordinates: RideRouteDownsampler.route(from: ride.samples))
       totals = RideTotals(ride: ride)
       titleText = ride.startDate.formatted(date: .abbreviated, time: .shortened)
+      radarPasses = Self.radarPasses(from: ride)
       isLoaded = true
 
       DebugPrint(
@@ -69,5 +73,27 @@ final class RideRouteViewModel {
       route = .empty
       totals = nil
       titleText = ""
+      radarPasses = []
+   }
+
+   // MARK: - Radar Passes
+
+   /// Passes recorded before the first GPS fix have no coordinate; they count
+   /// in the totals but cannot be placed on the map.
+   private static func radarPasses(from ride: Ride) -> [RideRadarPassAnnotation] {
+      ride.radarEvents
+         .sorted { $0.timestamp < $1.timestamp }
+         .enumerated()
+         .compactMap { index, event in
+            guard let latitude = event.latitude, let longitude = event.longitude else {
+               return nil
+            }
+            return RideRadarPassAnnotation(
+               id: index,
+               latitude: latitude,
+               longitude: longitude,
+               tier: event.peakTier
+            )
+         }
    }
 }

@@ -16,6 +16,10 @@ struct RideRouteMapView: View {
    var isLoaded: Bool = true
    var height: CGFloat = 220
 
+   /// Radar passes plotted along the route. Defaults empty so screens without
+   /// radar data render the map they always did.
+   var radarPasses: [RideRadarPassAnnotation] = []
+
    var body: some View {
       Group {
          if let region = route.region, route.isDrawable {
@@ -50,6 +54,10 @@ struct RideRouteMapView: View {
          MapPolyline(coordinates: route.coordinates)
             .stroke(Color.gpBreadcrumb, style: .routeLine)
 
+         ForEach(radarPasses) { pass in
+            radarPassDot(for: pass)
+         }
+
          if let start = route.startCoordinate {
             endpoint(at: start, label: "Ride start", tint: .green)
          }
@@ -60,6 +68,18 @@ struct RideRouteMapView: View {
       }
       .mapStyle(.rideRoute)
       .accessibilityLabel("Route map")
+   }
+
+   /// A vehicle pass, wearing the same tier palette as the live tape: amber
+   /// for an ordinary pass, red for one that peaked high.
+   private func radarPassDot(for pass: RideRadarPassAnnotation) -> some MapContent {
+      Annotation("Vehicle pass", coordinate: pass.coordinate, anchor: .center) {
+         Circle()
+            .fill(pass.tier == .high ? RideChromeTokens.halt : RideChromeTokens.amber)
+            .stroke(.black.opacity(0.6), lineWidth: 1)
+            .frame(width: 7, height: 7)
+      }
+      .annotationTitles(.hidden)
    }
 
    private func endpoint(

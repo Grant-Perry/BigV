@@ -7,16 +7,18 @@ import Foundation
 
 /// Converts SI telemetry into rider-facing strings.
 ///
-/// The ride engine stores everything in meters and meters/second. Imperial
-/// conversion happens here and nowhere else.
+/// The ride engine stores everything in meters and meters/second. Unit
+/// conversion happens here and nowhere else, steered by `RideUnitSystem`:
+/// every formatter defaults to the persisted preference, and a caller that
+/// needs live re-rendering (or the Watch, which mirrors the phone's choice)
+/// passes the system explicitly.
 nonisolated enum RideFormatters {
 
    // MARK: - Unit Labels
 
+   /// Labels that never change with the measurement system. Speed, distance
+   /// and elevation labels live on `RideUnitSystem`, because they do.
    enum Unit {
-      static let speed = "MPH"
-      static let distance = "MI"
-      static let elevation = "FT"
       static let grade = "%"
       static let cadence = "RPM"
       static let heartRate = "BPM"
@@ -27,37 +29,42 @@ nonisolated enum RideFormatters {
 
    // MARK: - Speed
 
-   static func speed(_ metersPerSecond: Double) -> String {
-      let milesPerHour = Measurement(value: max(0, metersPerSecond), unit: UnitSpeed.metersPerSecond)
-         .converted(to: .milesPerHour)
+   static func speed(_ metersPerSecond: Double, system: RideUnitSystem = .current) -> String {
+      let unit: UnitSpeed = system == .imperial ? .milesPerHour : .kilometersPerHour
+      let value = Measurement(value: max(0, metersPerSecond), unit: UnitSpeed.metersPerSecond)
+         .converted(to: unit)
          .value
-      return milesPerHour.formatted(.number.precision(.fractionLength(1)))
+      return value.formatted(.number.precision(.fractionLength(1)))
    }
 
    // MARK: - Distance
 
-   static func distance(_ meters: Double) -> String {
-      let miles = Measurement(value: max(0, meters), unit: UnitLength.meters)
-         .converted(to: .miles)
+   static func distance(_ meters: Double, system: RideUnitSystem = .current) -> String {
+      let unit: UnitLength = system == .imperial ? .miles : .kilometers
+      let value = Measurement(value: max(0, meters), unit: UnitLength.meters)
+         .converted(to: unit)
          .value
-      return miles.formatted(.number.precision(.fractionLength(2)))
+      return value.formatted(.number.precision(.fractionLength(2)))
    }
 
    // MARK: - Elevation
 
-   static func elevation(_ meters: Double) -> String {
+   static func elevation(_ meters: Double, system: RideUnitSystem = .current) -> String {
+      guard system == .imperial else {
+         return meters.formatted(.number.precision(.fractionLength(0)))
+      }
       let feet = Measurement(value: meters, unit: UnitLength.meters)
          .converted(to: .feet)
          .value
       return feet.formatted(.number.precision(.fractionLength(0)))
    }
 
-   static func elevationGain(_ meters: Double) -> String {
-      "+\(elevation(max(0, meters)))"
+   static func elevationGain(_ meters: Double, system: RideUnitSystem = .current) -> String {
+      "+\(elevation(max(0, meters), system: system))"
    }
 
-   static func elevationLoss(_ meters: Double) -> String {
-      "-\(elevation(max(0, meters)))"
+   static func elevationLoss(_ meters: Double, system: RideUnitSystem = .current) -> String {
+      "-\(elevation(max(0, meters), system: system))"
    }
 
    // MARK: - Duration
@@ -87,8 +94,34 @@ nonisolated enum RideFormatters {
 
    // MARK: - Accuracy
 
-   static func accuracy(_ meters: Double) -> String {
-      "\(meters.formatted(.number.precision(.fractionLength(0))) ) m"
+   static func accuracy(_ meters: Double, system: RideUnitSystem = .current) -> String {
+      guard system == .imperial else {
+         return "\(meters.formatted(.number.precision(.fractionLength(0)))) m"
+      }
+      let feet = Measurement(value: meters, unit: UnitLength.meters)
+         .converted(to: .feet)
+         .value
+      return "\(feet.formatted(.number.precision(.fractionLength(0)))) ft"
+   }
+
+   // MARK: - Radar Distance
+
+   /// A rear-radar range: short-range figures a rider reacts to, so metric
+   /// reads whole meters and imperial reads feet rounded to fives — the same
+   /// convention the Varia app uses. Never miles or kilometers; the radar's
+   /// whole world is 140 m.
+   static func radarDistance(_ meters: Double, system: RideUnitSystem = .current) -> String {
+      let clamped = max(0, meters)
+
+      guard system == .imperial else {
+         return "\(Int(clamped.rounded())) m"
+      }
+
+      let feet = Measurement(value: clamped, unit: UnitLength.meters)
+         .converted(to: .feet)
+         .value
+      let rounded = Int((feet / 5).rounded()) * 5
+      return "\(rounded) ft"
    }
 
    // MARK: - Heading

@@ -14,8 +14,8 @@ enum PlannedRouteFormatters {
 
    // MARK: - Distance
 
-   static func distance(_ meters: Double) -> String {
-      "\(RideFormatters.distance(meters)) \(RideFormatters.Unit.distance)"
+   static func distance(_ meters: Double, system: RideUnitSystem = .current) -> String {
+      "\(RideFormatters.distance(meters, system: system)) \(system.distanceUnit)"
    }
 
    // MARK: - Travel Time

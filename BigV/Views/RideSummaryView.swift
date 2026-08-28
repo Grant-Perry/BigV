@@ -20,7 +20,8 @@ struct RideSummaryView: View {
                RideRouteMapView(
                   route: rideRouteViewModel.route,
                   isLoaded: rideRouteViewModel.isLoaded,
-                  height: 200
+                  height: 200,
+                  radarPasses: rideRouteViewModel.radarPasses
                )
 
                RideTotalsGridView(totals: rideViewModel.totals, identifierPrefix: "summary.tile")

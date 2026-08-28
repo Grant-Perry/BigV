@@ -21,6 +21,8 @@ final class RideHistoryViewModel {
       let averageSpeedText: String
       let maximumSpeedText: String
       let elevationGainText: String
+      let speedUnit: String
+      let distanceUnit: String
    }
 
    // MARK: - State
@@ -33,7 +35,7 @@ final class RideHistoryViewModel {
 
    var olderRows: [Row] { Array(rows.dropFirst()) }
 
-   var distanceUnit: String { RideFormatters.Unit.distance }
+   var distanceUnit: String { RideUnitSystem.current.distanceUnit }
 
    // MARK: - Dependencies
 
@@ -77,14 +79,19 @@ final class RideHistoryViewModel {
    // MARK: - Mapping
 
    private static func row(for ride: Ride) -> Row {
-      Row(
+      // Rows snapshot the system at load; `load()` runs on every appearance,
+      // so a units change in setup is picked up the next time history opens.
+      let system = RideUnitSystem.current
+      return Row(
          id: ride.persistentModelID,
          dateText: ride.startDate.formatted(date: .abbreviated, time: .shortened),
-         distanceText: RideFormatters.distance(ride.distance),
+         distanceText: RideFormatters.distance(ride.distance, system: system),
          durationText: RideFormatters.duration(ride.duration),
-         averageSpeedText: RideFormatters.speed(ride.averageSpeed),
-         maximumSpeedText: RideFormatters.speed(ride.maximumSpeed),
-         elevationGainText: RideFormatters.elevationGain(ride.elevationGain)
+         averageSpeedText: RideFormatters.speed(ride.averageSpeed, system: system),
+         maximumSpeedText: RideFormatters.speed(ride.maximumSpeed, system: system),
+         elevationGainText: RideFormatters.elevationGain(ride.elevationGain, system: system),
+         speedUnit: system.speedUnit,
+         distanceUnit: system.distanceUnit
       )
    }
 }

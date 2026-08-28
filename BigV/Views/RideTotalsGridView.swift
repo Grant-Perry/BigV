@@ -18,13 +18,25 @@ struct RideTotalsGridView: View {
 
    var body: some View {
       LazyVGrid(columns: tileColumns, spacing: 10) {
-         tile("DISTANCE", totals.distance, unit: RideFormatters.Unit.distance, id: "distance", alignment: .trailing)
+         tile("DISTANCE", totals.distance, unit: totals.distanceUnit, id: "distance", alignment: .trailing)
          tile("RIDE TIME", totals.rideTime, id: "rideTime", alignment: .leading)
          tile("MOVING TIME", totals.movingTime, alignment: .trailing)
-         tile("AVG SPEED", totals.averageSpeed, unit: RideFormatters.Unit.speed, alignment: .leading)
-         tile("MAX SPEED", totals.maximumSpeed, unit: RideFormatters.Unit.speed, alignment: .trailing)
-         tile("ELEV GAIN", totals.elevationGain, unit: RideFormatters.Unit.elevation, alignment: .leading)
-         tile("ELEV LOSS", totals.elevationLoss, unit: RideFormatters.Unit.elevation, alignment: .trailing)
+         tile("AVG SPEED", totals.averageSpeed, unit: totals.speedUnit, alignment: .leading)
+         tile("MAX SPEED", totals.maximumSpeed, unit: totals.speedUnit, alignment: .trailing)
+         tile("ELEV GAIN", totals.elevationGain, unit: totals.elevationUnit, alignment: .leading)
+         tile("ELEV LOSS", totals.elevationLoss, unit: totals.elevationUnit, alignment: .trailing)
+
+         // Radar totals appear only when the ride actually recorded passes,
+         // so a radar-less ride shows exactly the grid it always did.
+         if let vehicleCount = totals.vehicleCount {
+            tile("VEHICLES", vehicleCount, id: "vehicles", alignment: .leading)
+         }
+         if let closestPass = totals.closestPass {
+            tile("CLOSEST PASS", closestPass, id: "closestPass", alignment: .trailing)
+         }
+         if let maximumClosingSpeed = totals.maximumClosingSpeed {
+            tile("MAX CLOSING", maximumClosingSpeed, unit: totals.speedUnit, id: "maxClosing", alignment: .leading)
+         }
       }
    }
 

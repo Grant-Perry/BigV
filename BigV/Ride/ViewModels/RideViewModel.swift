@@ -17,10 +17,24 @@ final class RideViewModel {
    // MARK: - Dependencies
 
    private let rideSessionManager: RideSessionManager
+   private let rideRadarSettings: RideRadarSettings
+   private let rideUnitsSettings: RideUnitsSettings
 
-   init(rideSessionManager: RideSessionManager = RideSessionManager()) {
+   init(
+      rideSessionManager: RideSessionManager = RideSessionManager(),
+      rideRadarSettings: RideRadarSettings = RideRadarSettings(),
+      rideUnitsSettings: RideUnitsSettings = RideUnitsSettings()
+   ) {
       self.rideSessionManager = rideSessionManager
+      self.rideRadarSettings = rideRadarSettings
+      self.rideUnitsSettings = rideUnitsSettings
    }
+
+   // MARK: - Units
+
+   /// Read through the observable settings so every formatted figure
+   /// re-renders the moment the rider changes systems in setup.
+   var unitSystem: RideUnitSystem { rideUnitsSettings.system }
 
    // MARK: - State
 
@@ -38,24 +52,24 @@ final class RideViewModel {
    // MARK: - Headline
 
    var speed: String {
-      state.hasGPSFix ? RideFormatters.speed(state.speed) : RideFormatters.placeholder
+      state.hasGPSFix ? RideFormatters.speed(state.speed, system: unitSystem) : RideFormatters.placeholder
    }
 
-   var speedUnit: String { RideFormatters.Unit.speed }
+   var speedUnit: String { unitSystem.speedUnit }
 
    // MARK: - Metric Tiles
 
-   var totals: RideTotals { RideTotals(state: state) }
+   var totals: RideTotals { RideTotals(state: state, system: unitSystem) }
 
    var distance: String { totals.distance }
-   var distanceUnit: String { RideFormatters.Unit.distance }
+   var distanceUnit: String { unitSystem.distanceUnit }
 
    var rideTime: String { totals.rideTime }
    var movingTime: String { totals.movingTime }
 
    var elevationGain: String { totals.elevationGain }
    var elevationLoss: String { totals.elevationLoss }
-   var elevationUnit: String { RideFormatters.Unit.elevation }
+   var elevationUnit: String { unitSystem.elevationUnit }
 
    var averageSpeed: String { totals.averageSpeed }
    var maximumSpeed: String { totals.maximumSpeed }
@@ -88,6 +102,54 @@ final class RideViewModel {
 
    var heartRateBeatsPerMinute: Double? { state.heartRate }
 
+   // MARK: - Radar
+
+   var radar: RideRadarSnapshot { state.radar }
+
+   /// Whether radar chrome belongs on screen at all. No pairing, no simulator,
+   /// or the feature switched off → no empty rails anywhere.
+   var showsRadarTape: Bool { rideSessionManager.isRadarDisplayAvailable }
+
+   /// The tape dims when the link is down or the ride is paused — present but
+   /// visibly not live, matching the speed hero's treatment.
+   var isRadarDimmed: Bool { !state.radar.isConnected || isPaused }
+
+   var radarSide: RideRadarSide { rideRadarSettings.side }
+
+   var radarTracks: [RideRadarTracker.Track] { state.radar.tracks }
+   var radarTier: RideRadarThreatTier? { state.radar.aggregateTier }
+   var isRadarConnected: Bool { state.radar.isConnected }
+   var radarConnection: RideRadarConnectionState { state.radar.connection }
+   var radarVehicleCount: Int { state.radar.tracks.count }
+   var radarPassCount: Int { state.radar.vehiclePassCount }
+
+   var radarNearestDistance: String? {
+      state.radar.nearestDistanceMeters.map {
+         RideFormatters.radarDistance($0, system: unitSystem)
+      }
+   }
+
+   /// Closing speed of the nearest vehicle in the app's display unit.
+   var radarClosingSpeed: String? {
+      guard let closing = state.radar.nearestClosingSpeedMetersPerSecond,
+            closing > 0
+      else { return nil }
+      return RideFormatters.speed(closing, system: unitSystem)
+   }
+
+   var radarBattery: String? {
+      state.radar.batteryPercent.map { "\($0)%" }
+   }
+
+   var radarIssueMessage: String? { state.radar.issue?.message }
+
+   /// Monotonic alert edges for `.sensoryFeedback` and the edge-tint overlay.
+   var radarAlertPulse: Int { state.radar.alertPulse }
+   var radarClearPulse: Int { state.radar.clearPulse }
+
+   var radarAlertHapticsEnabled: Bool { rideRadarSettings.alertHapticsEnabled }
+   var radarOverlayEnabled: Bool { rideRadarSettings.overlayEnabled }
+
    // MARK: - Status
 
    var statusText: String {
@@ -102,7 +164,7 @@ final class RideViewModel {
 
    var accuracyText: String? {
       guard let accuracy = state.horizontalAccuracy else { return nil }
-      return RideFormatters.accuracy(accuracy)
+      return RideFormatters.accuracy(accuracy, system: unitSystem)
    }
 
    var issueMessage: String? { state.locationIssue?.message }

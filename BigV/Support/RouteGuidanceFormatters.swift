@@ -19,15 +19,30 @@ enum RouteGuidanceFormatters {
    private static let metersPerFoot: Double = 0.3048
    private static let metersPerMile: Double = 1_609.344
 
-   /// Below this, distance to a turn reads in feet. A tenth of a mile is where
-   /// feet stop being a number a rider can act on.
+   /// Below this, an imperial distance to a turn reads in feet. A tenth of a
+   /// mile is where feet stop being a number a rider can act on.
    private static let feetCeiling: Double = 300
+
+   /// Below a kilometer, a metric distance to a turn reads in meters.
+   private static let metersCeiling: Double = 950
 
    // MARK: - Turn Distance
 
    /// Distance to a maneuver, written.
-   static func turnDistance(_ meters: CLLocationDistance) -> String {
+   static func turnDistance(
+      _ meters: CLLocationDistance,
+      system: RideUnitSystem = .current
+   ) -> String {
       let clamped = max(0, meters)
+
+      guard system == .imperial else {
+         guard clamped >= metersCeiling else {
+            let rounded = (clamped / 10).rounded() * 10
+            return "\(Int(rounded)) m"
+         }
+         let kilometers = clamped / 1_000
+         return "\(kilometers.formatted(.number.precision(.fractionLength(kilometers < 10 ? 1 : 0)))) km"
+      }
 
       guard clamped >= feetCeiling else {
          let feet = (clamped / metersPerFoot / 10).rounded() * 10
@@ -40,8 +55,15 @@ enum RouteGuidanceFormatters {
 
    /// Distance to a maneuver, spoken. Rounded harder than the written form
    /// because "four hundred and thirty feet" is noise at 20 mph.
-   static func spokenDistance(_ meters: CLLocationDistance) -> String {
+   static func spokenDistance(
+      _ meters: CLLocationDistance,
+      system: RideUnitSystem = .current
+   ) -> String {
       let clamped = max(0, meters)
+
+      guard system == .imperial else {
+         return spokenMetricDistance(clamped)
+      }
 
       guard clamped >= feetCeiling else {
          let feet = (clamped / metersPerFoot / 50).rounded() * 50
@@ -68,6 +90,25 @@ enum RouteGuidanceFormatters {
          : rounded.formatted(.number.precision(.fractionLength(1)))
 
       return "\(value) miles"
+   }
+
+   /// Metric riders hear whole meters to the nearest fifty, then kilometers to
+   /// one decimal — the convention every metric bike computer speaks.
+   private static func spokenMetricDistance(_ clamped: CLLocationDistance) -> String {
+      guard clamped >= metersCeiling else {
+         let rounded = (clamped / 50).rounded() * 50
+         return "\(Int(max(50, rounded))) meters"
+      }
+
+      let kilometers = (clamped / 1_000 * 10).rounded() / 10
+
+      guard kilometers != 1 else { return "1 kilometer" }
+
+      let value = kilometers == kilometers.rounded()
+         ? "\(Int(kilometers))"
+         : kilometers.formatted(.number.precision(.fractionLength(1)))
+
+      return "\(value) kilometers"
    }
 
    // MARK: - Remaining

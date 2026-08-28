@@ -21,7 +21,10 @@ struct RideWatchDashboardView: View {
                RideWatchStatusLine(
                   statusText: rideWatchViewModel.statusText,
                   hasGPSFix: rideWatchViewModel.hasGPSFix,
-                  isConnected: rideWatchViewModel.linkState == .connected
+                  isConnected: rideWatchViewModel.linkState == .connected,
+                  showsRadar: rideWatchViewModel.hasRadar,
+                  isRadarConnected: rideWatchViewModel.isRadarConnected,
+                  radarTier: rideWatchViewModel.radarTier
                )
 
                glance
@@ -84,6 +87,16 @@ struct RideWatchDashboardView: View {
             showsHeart: true,
             beatsPerMinute: rideWatchViewModel.heartRateBeatsPerMinute
          )
+
+         if rideWatchViewModel.hasRadar {
+            RideWatchRadarStrip(
+               isConnected: rideWatchViewModel.isRadarConnected,
+               tier: rideWatchViewModel.radarTier,
+               vehicleCount: rideWatchViewModel.radarVehicleCount,
+               nearestDistanceMeters: rideWatchViewModel.radarNearestMeters,
+               nearestDistanceText: rideWatchViewModel.radarNearestDistance
+            )
+         }
       }
       .padding(.horizontal, 10)
       .padding(.vertical, 8)

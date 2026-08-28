@@ -21,4 +21,18 @@ enum RideWatchHaptics {
    static func playRideEnd() {
       WKInterfaceDevice.current().play(.stop)
    }
+
+   // MARK: - Radar
+
+   /// A vehicle entered the radar's board. Fired on the alert-pulse edge only,
+   /// never per snapshot, so the wrist taps once per event like the phone does.
+   static func playRadarApproach() {
+      WKInterfaceDevice.current().play(.directionUp)
+   }
+
+   /// A tracked vehicle escalated to the high tier — the one tap that must
+   /// read as urgent through a jersey sleeve.
+   static func playRadarDanger() {
+      WKInterfaceDevice.current().play(.notification)
+   }
 }

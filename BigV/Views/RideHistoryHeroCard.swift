@@ -38,8 +38,8 @@ struct RideHistoryHeroCard: View {
             HStack(spacing: 0) {
                heroStat(row.distanceText, unit: distanceUnit, title: "DISTANCE")
                heroStat(row.durationText, unit: nil, title: "TIME")
-               heroStat(row.averageSpeedText, unit: RideFormatters.Unit.speed, title: "AVG")
-               heroStat(row.maximumSpeedText, unit: RideFormatters.Unit.speed, title: "MAX")
+               heroStat(row.averageSpeedText, unit: row.speedUnit, title: "AVG")
+               heroStat(row.maximumSpeedText, unit: row.speedUnit, title: "MAX")
             }
          }
          .padding(.horizontal, 16)

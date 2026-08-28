@@ -50,6 +50,11 @@ final class RideWatchViewModel {
    private var wantsSensing = false
    private var isSceneActive = false
 
+   /// The alert pulse from the last radar-bearing snapshot, so wrist haptics
+   /// fire on edges only. `nil` until the first radar snapshot lands — that
+   /// first sight of a mid-ride counter must set a baseline, not buzz.
+   private var lastRadarAlertPulse: Int?
+
    private var activationTask: Task<Void, Never>?
    private var linkTask: Task<Void, Never>?
    private var sensorTask: Task<Void, Never>?
@@ -127,22 +132,28 @@ final class RideWatchViewModel {
       rideWatchLinkManager.send(command)
    }
 
+   // MARK: - Units
+
+   /// The phone's preference, riding every snapshot. Imperial until the first
+   /// snapshot lands — the same default the phone starts from.
+   private var unitSystem: RideUnitSystem { snapshot?.unitSystem ?? .imperial }
+
    // MARK: - Headline
 
    var speed: String {
       guard let snapshot, snapshot.hasGPSFix else { return RideFormatters.placeholder }
-      return RideFormatters.speed(snapshot.speed)
+      return RideFormatters.speed(snapshot.speed, system: unitSystem)
    }
 
-   var speedUnit: String { RideFormatters.Unit.speed }
+   var speedUnit: String { unitSystem.speedUnit }
 
    // MARK: - Metrics
 
    var distance: String {
-      RideFormatters.distance(snapshot?.distance ?? 0)
+      RideFormatters.distance(snapshot?.distance ?? 0, system: unitSystem)
    }
 
-   var distanceUnit: String { RideFormatters.Unit.distance }
+   var distanceUnit: String { unitSystem.distanceUnit }
 
    var elapsedTime: String {
       RideFormatters.duration(snapshot?.elapsedTime ?? 0)
@@ -180,7 +191,7 @@ final class RideWatchViewModel {
          case .idle: "Ready"
          case .acquiringGPS:
             snapshot?.locationIssue
-               ?? snapshot?.horizontalAccuracy.map { "Phone GPS \(Int($0.rounded())) m" }
+               ?? snapshot?.horizontalAccuracy.map { "Phone GPS \(RideFormatters.accuracy($0, system: unitSystem))" }
                ?? "Phone GPS…"
          case .recording: "Recording"
          case .paused: "Paused"
@@ -189,6 +200,24 @@ final class RideWatchViewModel {
    }
 
    var hasGPSFix: Bool { snapshot?.hasGPSFix ?? false }
+
+   // MARK: - Radar
+
+   /// Whether the phone is mirroring a radar at all. Old phone builds and
+   /// radar-less riders send no radar keys, and the glance shows nothing.
+   var hasRadar: Bool { snapshot?.radarConnected != nil }
+
+   var isRadarConnected: Bool { snapshot?.radarConnected == true }
+
+   var radarTier: RideRadarThreatTier? { snapshot?.radarTier }
+
+   var radarVehicleCount: Int { snapshot?.radarCount ?? 0 }
+
+   var radarNearestMeters: Double? { snapshot?.radarNearest }
+
+   var radarNearestDistance: String? {
+      snapshot?.radarNearest.map { RideFormatters.radarDistance($0, system: unitSystem) }
+   }
 
    /// One line of trouble. A command outcome wins over a standing condition,
    /// which wins over a sensor that never came up.
@@ -250,8 +279,27 @@ final class RideWatchViewModel {
    private func apply(_ incoming: RideWatchMetricsSnapshot) {
       if let snapshot, incoming.capturedAt < snapshot.capturedAt { return }
 
+      playRadarHapticIfNeeded(for: incoming)
       snapshot = incoming
       adopt(incoming.phase)
+   }
+
+   /// Taps the wrist when the phone's radar alert counter advances — edges
+   /// only, so a snapshot stream at 1 Hz plus escalation pushes stays rare.
+   private func playRadarHapticIfNeeded(for incoming: RideWatchMetricsSnapshot) {
+      guard let pulse = incoming.radarAlertPulse else {
+         lastRadarAlertPulse = nil
+         return
+      }
+
+      defer { lastRadarAlertPulse = pulse }
+      guard let lastRadarAlertPulse, pulse > lastRadarAlertPulse else { return }
+
+      if incoming.radarTier == .high {
+         RideWatchHaptics.playRadarDanger()
+      } else {
+         RideWatchHaptics.playRadarApproach()
+      }
    }
 
    private func adopt(_ incoming: RidePhase) {

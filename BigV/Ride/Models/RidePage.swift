@@ -8,11 +8,12 @@ import Foundation
 /// The horizontally swipeable pages of the live ride screen.
 ///
 /// Declaration order is swipe order, and the first case is the landing page. New
-/// pages (climb, radar, stats, weather) are added here and nowhere else.
+/// pages (climb, stats, weather) are added here and nowhere else.
 enum RidePage: Int, CaseIterable, Identifiable, Sendable {
 
    case dashboard
    case map
+   case radar
 
    var id: Int { rawValue }
 
@@ -21,6 +22,7 @@ enum RidePage: Int, CaseIterable, Identifiable, Sendable {
       switch self {
          case .dashboard: "Dashboard"
          case .map: "Map"
+         case .radar: "Radar"
       }
    }
 }

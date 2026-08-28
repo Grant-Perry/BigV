@@ -15,6 +15,8 @@ struct RideDashboardView: View {
    let onShowHistory: () -> Void
    let onPlanRoute: () -> Void
    let onExpandMap: () -> Void
+   let onShowRadar: () -> Void
+   let onShowSetup: () -> Void
 
    @Environment(\.verticalSizeClass) private var verticalSizeClass
    @State private var isDrawerOpen = true
@@ -30,6 +32,8 @@ struct RideDashboardView: View {
                onShowHistory: onShowHistory,
                onPlanRoute: onPlanRoute,
                onExpandMap: onExpandMap,
+               onShowRadar: onShowRadar,
+               onShowSetup: onShowSetup,
                isDrawerOpen: $isDrawerOpen
             )
          } else {
@@ -43,10 +47,38 @@ struct RideDashboardView: View {
 
    private var portrait: some View {
       VStack(spacing: 10) {
+         upperColumn
+
+         RideMapDrawer(
+            rideMapViewModel: rideMapViewModel,
+            isMapMounted: showsDrawerMap,
+            onExpand: onExpandMap,
+            onPlanRoute: onPlanRoute,
+            isOpen: $isDrawerOpen
+         )
+         .overlay(alignment: .bottom) {
+            RideControlBar(rideViewModel: rideViewModel)
+               .padding(.bottom, 10)
+         }
+         .layoutPriority(1)
+      }
+      .padding(.horizontal, 16)
+      .padding(.top, 8)
+      .padding(.bottom, 6)
+   }
+
+   /// Everything above the map drawer — status, guidance, hero, metrics.
+   /// The radar ribbon rides this whole column's tall edge in a reserved
+   /// gutter, so it spans from the top of the dashboard down to just above
+   /// the drawer without colliding with tiles or buttons.
+   private var upperColumn: some View {
+      VStack(spacing: 10) {
          RideDashboardStatusRow(
             rideViewModel: rideViewModel,
             onShowHistory: onShowHistory,
-            onPlanRoute: onPlanRoute
+            onPlanRoute: onPlanRoute,
+            onShowRadar: onShowRadar,
+            onShowSetup: onShowSetup
          )
 
          if routeGuidanceViewModel.isActive {
@@ -73,24 +105,26 @@ struct RideDashboardView: View {
             routeGuidanceViewModel: routeGuidanceViewModel
          )
          .layoutPriority(1)
-
-         RideMapDrawer(
-            rideMapViewModel: rideMapViewModel,
-            isMapMounted: showsDrawerMap,
-            onExpand: onExpandMap,
-            onPlanRoute: onPlanRoute,
-            isOpen: $isDrawerOpen
-         )
-         .overlay(alignment: .bottom) {
-            RideControlBar(rideViewModel: rideViewModel)
-               .padding(.bottom, 10)
-         }
-         .layoutPriority(1)
       }
-      .padding(.horizontal, 16)
-      .padding(.top, 8)
-      .padding(.bottom, 6)
+      .padding(
+         rideViewModel.radarSide.paddingEdge,
+         rideViewModel.showsRadarTape ? Self.radarGutterWidth : 0
+      )
+      .overlay(alignment: rideViewModel.radarSide.overlayAlignment) {
+         if rideViewModel.showsRadarTape {
+            RideRadarTapeView(
+               tracks: rideViewModel.radarTracks,
+               isDimmed: rideViewModel.isRadarDimmed,
+               unitSystem: rideViewModel.unitSystem,
+               tapeWidth: RideRadarTapeView.dashboardWidth
+            )
+            .padding(.vertical, 2)
+         }
+      }
    }
+
+   /// Content inset on the radar side: the tape's width plus a small gap.
+   private static let radarGutterWidth: CGFloat = RideRadarTapeView.dashboardWidth + 8
 }
 
 #Preview("Portrait") {
@@ -102,7 +136,9 @@ struct RideDashboardView: View {
          routeGuidanceViewModel: RouteGuidanceViewModel(),
          onShowHistory: {},
          onPlanRoute: {},
-         onExpandMap: {}
+         onExpandMap: {},
+         onShowRadar: {},
+         onShowSetup: {}
       )
    }
    .preferredColorScheme(.dark)
@@ -117,7 +153,9 @@ struct RideDashboardView: View {
          routeGuidanceViewModel: RouteGuidanceViewModel(),
          onShowHistory: {},
          onPlanRoute: {},
-         onExpandMap: {}
+         onExpandMap: {},
+         onShowRadar: {},
+         onShowSetup: {}
       )
    }
    .preferredColorScheme(.dark)

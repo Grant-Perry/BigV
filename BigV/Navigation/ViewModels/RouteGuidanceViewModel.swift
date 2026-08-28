@@ -73,7 +73,7 @@ final class RouteGuidanceViewModel {
       RouteGuidanceFormatters.distanceRemaining(progress.distanceRemaining)
    }
 
-   var distanceRemainingUnit: String { RideFormatters.Unit.distance }
+   var distanceRemainingUnit: String { RideUnitSystem.current.distanceUnit }
 
    var arrivalTime: String {
       RouteGuidanceFormatters.arrivalTime(progress.estimatedTimeRemaining)

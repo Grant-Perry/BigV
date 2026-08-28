@@ -13,7 +13,9 @@ import Foundation
 /// three hours; one that takes the session exclusively stops it outright. So the
 /// session is claimed immediately before an utterance, ducking whatever is
 /// playing, and released the moment the synthesizer falls idle — which is why a
-/// delegate is worth the ceremony here rather than a poll.
+/// delegate is worth the ceremony here rather than a poll. The claim itself goes
+/// through `RideAudioSession`, which counts claimants, so falling idle here can
+/// never clip a radar tone still sounding.
 @MainActor
 final class RouteGuidanceSpeechAnnouncer {
 
@@ -122,7 +124,9 @@ final class RouteGuidanceSpeechAnnouncer {
       if let claimTask { return await claimTask.value }
 
       let task = Task<Bool, Never> {
-         guard let failure = await RouteGuidanceAudioSession.claim() else { return true }
+         guard let failure = await RideAudioSession.shared.claim(.guidanceSpeech) else {
+            return true
+         }
          DebugPrint(mode: .navigation, "Could not claim the audio session: \(failure)")
          return false
       }
@@ -145,58 +149,9 @@ final class RouteGuidanceSpeechAnnouncer {
       isSessionActive = false
 
       Task {
-         guard let failure = await RouteGuidanceAudioSession.release() else { return }
+         guard let failure = await RideAudioSession.shared.release(.guidanceSpeech) else { return }
          DebugPrint(mode: .navigation, "Could not release the audio session: \(failure)")
       }
-   }
-}
-
-// MARK: - Session Plumbing
-
-/// Claims and releases the shared audio session away from the main actor.
-///
-/// `setActive` establishes an audio route and can block for tens of milliseconds.
-/// On a phone drawing a live map beside active GPS that is a visible hitch every
-/// time a turn is called, so the blocking call is pushed off the main actor. The
-/// asynchronous `activate(options:)` API would do this for us, but it starts at
-/// iOS 27 and the deployment target is 26.5.
-///
-/// Errors come back as text rather than as `Error`, which is not `Sendable`.
-private enum RouteGuidanceAudioSession {
-
-   static func claim() async -> String? {
-      await Task.detached(priority: .userInitiated) {
-         do {
-            let session = AVAudioSession.sharedInstance()
-
-            // `.voicePrompt` is the mode Apple built for navigation: it ducks
-            // rather than interrupts, and routes sensibly over CarPlay and
-            // Bluetooth.
-            try session.setCategory(
-               .playback,
-               mode: .voicePrompt,
-               options: [.duckOthers, .interruptSpokenAudioAndMixWithOthers]
-            )
-            try session.setActive(true)
-            return nil
-         } catch {
-            return error.localizedDescription
-         }
-      }.value
-   }
-
-   static func release() async -> String? {
-      await Task.detached(priority: .userInitiated) {
-         do {
-            try AVAudioSession.sharedInstance().setActive(
-               false,
-               options: .notifyOthersOnDeactivation
-            )
-            return nil
-         } catch {
-            return error.localizedDescription
-         }
-      }.value
    }
 }
 

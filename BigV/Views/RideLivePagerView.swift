@@ -15,27 +15,40 @@ struct RideLivePagerView: View {
    let routeGuidanceViewModel: RouteGuidanceViewModel
    let onShowHistory: () -> Void
    let onPlanRoute: () -> Void
+   let onShowRadar: () -> Void
+   let onShowSetup: () -> Void
 
    @State private var selectedPage: RidePage = .dashboard
    @State private var isMapPageMounted = false
 
+   /// The radar page exists only when a radar does — no rider without one
+   /// should ever swipe onto an empty road.
+   private var pages: [RidePage] {
+      rideViewModel.showsRadarTape ? RidePage.allCases : [.dashboard, .map]
+   }
+
    var body: some View {
       VStack(spacing: 0) {
          TabView(selection: $selectedPage) {
-            ForEach(RidePage.allCases) { ridePage in
+            ForEach(pages) { ridePage in
                page(for: ridePage)
                   .tag(ridePage)
             }
          }
          .tabViewStyle(.page(indexDisplayMode: .never))
 
-         RidePageIndicatorView(pages: RidePage.allCases, selectedPage: selectedPage)
+         RidePageIndicatorView(pages: pages, selectedPage: selectedPage)
             .padding(.vertical, 6)
       }
       .background(Color.clear)
       .onChange(of: selectedPage) { _, page in
          if page == .map { isMapPageMounted = true }
          routeGuidanceViewModel.collapseTurnList()
+      }
+      .onChange(of: rideViewModel.showsRadarTape) { _, isAvailable in
+         if !isAvailable, selectedPage == .radar {
+            selectedPage = .dashboard
+         }
       }
    }
 
@@ -54,12 +67,20 @@ struct RideLivePagerView: View {
    private var swipeToDashboard: some Gesture {
       DragGesture(minimumDistance: 40)
          .onEnded { value in
-            guard RidePageSwipe.isBack(value) else { return }
+            if RidePageSwipe.isBack(value) {
+               // Following: no map pan, so the whole page can page back.
+               // Exploring: only a leading-edge swipe, so a map pan stays a pan.
+               if rideMapViewModel.isFollowingRider || RidePageSwipe.startsAtLeadingEdge(value) {
+                  selectedPage = .dashboard
+               }
+               return
+            }
 
-            // Following: no map pan, so the whole page can page back.
-            // Exploring: only a leading-edge swipe, so a map pan stays a pan.
-            if rideMapViewModel.isFollowingRider || RidePageSwipe.startsAtLeadingEdge(value) {
-               selectedPage = .dashboard
+            // Forward off the map lands on the radar page, when one exists.
+            if RidePageSwipe.isForward(value),
+               rideMapViewModel.isFollowingRider,
+               pages.contains(.radar) {
+               selectedPage = .radar
             }
          }
    }
@@ -77,7 +98,9 @@ struct RideLivePagerView: View {
                showsDrawerMap: selectedPage == .dashboard,
                onShowHistory: onShowHistory,
                onPlanRoute: onPlanRoute,
-               onExpandMap: { selectedPage = .map }
+               onExpandMap: { selectedPage = .map },
+               onShowRadar: onShowRadar,
+               onShowSetup: onShowSetup
             )
             .simultaneousGesture(swipeToMap)
 
@@ -85,6 +108,7 @@ struct RideLivePagerView: View {
             Group {
                if isMapPageMounted {
                   RideMapView(
+                     rideViewModel: rideViewModel,
                      rideMapViewModel: rideMapViewModel,
                      routeGuidanceViewModel: routeGuidanceViewModel,
                      onPlanRoute: onPlanRoute
@@ -94,6 +118,12 @@ struct RideLivePagerView: View {
                }
             }
             .simultaneousGesture(swipeToDashboard)
+
+         case .radar:
+            RideRadarPageView(
+               rideViewModel: rideViewModel,
+               onShowRadar: onShowRadar
+            )
       }
    }
 }
@@ -147,7 +177,9 @@ private enum RidePageSwipe {
       rideMapViewModel: RideMapViewModel(),
       routeGuidanceViewModel: RouteGuidanceViewModel(),
       onShowHistory: {},
-      onPlanRoute: {}
+      onPlanRoute: {},
+      onShowRadar: {},
+      onShowSetup: {}
    )
    .preferredColorScheme(.dark)
 }

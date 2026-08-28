@@ -22,7 +22,8 @@ struct RideRouteDetailView: View {
                RideRouteMapView(
                   route: rideRouteViewModel.route,
                   isLoaded: rideRouteViewModel.isLoaded,
-                  height: 280
+                  height: 280,
+                  radarPasses: rideRouteViewModel.radarPasses
                )
 
                if let totals = rideRouteViewModel.totals {

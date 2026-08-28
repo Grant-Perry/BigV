@@ -18,7 +18,7 @@ struct RideHistoryRideCard: View {
                .font(.subheadline.weight(.semibold))
                .foregroundStyle(.white)
 
-            Text("\(row.averageSpeedText) \(RideFormatters.Unit.speed) avg")
+            Text("\(row.averageSpeedText) \(row.speedUnit) avg")
                .font(.caption.weight(.medium))
                .monospacedDigit()
                .foregroundStyle(.white.opacity(0.42))

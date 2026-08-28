@@ -63,6 +63,11 @@ struct RideState: Sendable, Equatable {
 
    var healthKitExport: RideHealthExportStatus = .idle
 
+   // MARK: - Rear Radar
+
+   /// Everything the Varia radar knows about the road behind.
+   var radar = RideRadarSnapshot()
+
    // MARK: - Sensor Slots
 
    /// Populated once the Watch or a BLE strap is connected.

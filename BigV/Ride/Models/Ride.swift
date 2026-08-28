@@ -44,6 +44,18 @@ final class Ride {
    var averageCadence: Double?
    var averagePower: Double?
 
+   // MARK: - Radar Totals
+
+   /// Vehicles that passed while the ride was recording, from the rear radar.
+   var vehicleCount: Int = 0
+
+   /// Closest pass in meters. `nil` when the ride recorded no radar passes.
+   var closestPassDistance: Double?
+
+   /// Fastest closing speed in meters/second across every pass. `nil` when the
+   /// ride recorded no radar passes.
+   var maximumClosingSpeed: Double?
+
    // MARK: - Export Links
 
    /// Identifier of the HealthKit workout written for this ride.
@@ -53,6 +65,11 @@ final class Ride {
 
    @Relationship(deleteRule: .cascade, inverse: \RideSample.ride)
    var samples: [RideSample] = []
+
+   // MARK: - Radar Events
+
+   @Relationship(deleteRule: .cascade, inverse: \RideRadarEvent.ride)
+   var radarEvents: [RideRadarEvent] = []
 
    // MARK: - Initialization
 
