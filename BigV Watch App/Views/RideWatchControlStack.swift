@@ -5,25 +5,29 @@
 
 import SwiftUI
 
-/// The remote. Whatever the phone's phase allows, sized for a gloved tap.
+/// Compact remote. Two actions sit side by side so they stop eating the glance.
 struct RideWatchControlStack: View {
 
    let controls: [RideWatchControl]
    let onSend: (RideRemoteCommand) -> Void
 
    var body: some View {
-      VStack(spacing: 6) {
+      let pairing = controls.count > 1
+
+      HStack(spacing: 6) {
          ForEach(controls) { control in
             Button {
                onSend(control.command)
             } label: {
                Text(control.title)
-                  .font(.footnote.weight(.bold))
-                  .kerning(0.8)
+                  .font(.system(size: 11, weight: .bold))
+                  .kerning(0.5)
                   .frame(maxWidth: .infinity)
+                  .frame(height: pairing ? 26 : 30)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(tint(for: control.role))
+            .buttonStyle(.plain)
+            .foregroundStyle(.white)
+            .background(tint(for: control.role), in: Capsule())
             .accessibilityIdentifier("watch.button.\(control.command.rawValue)")
          }
       }
@@ -41,13 +45,22 @@ struct RideWatchControlStack: View {
 }
 
 #Preview {
-   RideWatchControlStack(
-      controls: [
-         RideWatchControl(command: .pause, title: "PAUSE", role: .hold),
-         RideWatchControl(command: .end, title: "END", role: .stop)
-      ],
-      onSend: { _ in }
-   )
+   VStack(spacing: 12) {
+      RideWatchControlStack(
+         controls: [
+            RideWatchControl(command: .pause, title: "PAUSE", role: .hold),
+            RideWatchControl(command: .end, title: "END", role: .stop)
+         ],
+         onSend: { _ in }
+      )
+
+      RideWatchControlStack(
+         controls: [
+            RideWatchControl(command: .start, title: "START", role: .go)
+         ],
+         onSend: { _ in }
+      )
+   }
    .padding()
    .background(RideChromeTokens.void)
 }

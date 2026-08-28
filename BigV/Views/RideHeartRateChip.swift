@@ -11,12 +11,15 @@ struct RideHeartRateChip: View {
 
    let value: String
    let unit: String
+   var beatsPerMinute: Double?
 
    var body: some View {
       HStack(spacing: 6) {
-         Image(systemName: .heartIcon)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(RideDashboardTheme.pulse)
+         RideHeartPulseView(
+            beatsPerMinute: beatsPerMinute,
+            isBeating: beatsPerMinute != nil,
+            font: .caption.weight(.semibold)
+         )
 
          Text(value)
             .font(.caption.weight(.bold))
@@ -37,14 +40,10 @@ struct RideHeartRateChip: View {
    }
 }
 
-private extension String {
-   static let heartIcon = "heart.fill"
-}
-
 #Preview {
    ZStack {
       RideAtmosphereBackground()
-      RideHeartRateChip(value: "142", unit: "BPM")
+      RideHeartRateChip(value: "142", unit: "BPM", beatsPerMinute: 142)
          .padding()
    }
 }

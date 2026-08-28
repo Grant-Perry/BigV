@@ -9,6 +9,10 @@ import SwiftUI
 /// full map page. Swipe the grabber: up opens, down collapses.
 struct RideMapDrawer: View {
 
+   static let collapsedHeight: CGFloat = 72
+   static let openHeight: CGFloat = 220
+   static let controlClearance: CGFloat = 62
+
    let rideMapViewModel: RideMapViewModel
    var isMapMounted: Bool
    var isVertical: Bool = true
@@ -25,8 +29,8 @@ struct RideMapDrawer: View {
             mapBody
          }
       }
-      .frame(maxWidth: .infinity, maxHeight: isVertical && !isOpen ? 36 : .infinity)
-      .frame(height: isVertical ? (isOpen ? 220 : 36) : nil)
+      .frame(maxWidth: .infinity, maxHeight: isVertical && !isOpen ? Self.collapsedHeight : .infinity)
+      .frame(height: isVertical ? (isOpen ? Self.openHeight : Self.collapsedHeight) : nil)
       .clipShape(.rect(cornerRadius: 18, style: .continuous))
       .overlay {
          RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -45,10 +49,8 @@ struct RideMapDrawer: View {
             .frame(width: 36, height: 4)
 
          if !isOpen {
-            Text("MAP")
-               .font(.caption2.weight(.bold))
-               .kerning(1.2)
-               .foregroundStyle(.white.opacity(0.55))
+            Color.clear
+               .frame(height: 44)
          }
       }
       .frame(maxWidth: .infinity)
@@ -110,7 +112,7 @@ struct RideMapDrawer: View {
          }
       }
       .padding(.trailing, 12)
-      .padding(.bottom, 12)
+      .padding(.bottom, Self.controlClearance)
       .zIndex(1)
    }
 

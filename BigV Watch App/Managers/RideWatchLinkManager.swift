@@ -112,62 +112,81 @@ final class RideWatchLinkManager {
       let request = RideRemoteCommandRequest(command: command)
       let payload = RideWatchMessage.command(request).payload
 
-      guard let session else {
+      guard let session, session.activationState == .activated else {
          eventContinuation?.yield(.commandUndelivered)
          return
       }
 
-      guard linkState.allowsLiveMessages else {
-         queue(payload, for: command, on: session)
+      // Durable copy first. Start used to die with the glance when a button
+      // tap inactivated the scene; transferUserInfo still reaches the phone.
+      session.transferUserInfo(payload)
+
+      guard linkState.allowsLiveMessages, session.isReachable else {
+         eventContinuation?.yield(.commandUndelivered)
+         DebugPrint(mode: .sessionLifecycle, "Queued \(command.rawValue) for an unreachable phone")
          return
       }
 
       let events = eventContinuation
 
       session.sendMessage(payload, replyHandler: { reply in
-         guard let message = RideWatchMessage(payload: reply),
-               case .commandReceipt(let receipt) = message
-         else { return }
+         Task { @MainActor in
+            guard let message = RideWatchMessage(payload: reply),
+                  case .commandReceipt(let receipt) = message
+            else { return }
 
-         events?.yield(.receipt(receipt))
+            events?.yield(.receipt(receipt))
+         }
       }, errorHandler: { _ in
-         events?.yield(.commandUndelivered)
+         Task { @MainActor in
+            events?.yield(.commandUndelivered)
+         }
       })
 
       DebugPrint(mode: .sessionLifecycle, "Sent \(command.rawValue) live")
    }
 
-   /// Hands a command to the background queue when the phone is out of reach.
-   ///
-   /// Reported as undelivered either way: the rider is told it did not land now,
-   /// and if it does land in time the mirrored phase corrects the screen a moment
-   /// later.
-   private func queue(_ payload: [String: Any], for command: RideRemoteCommand, on session: WCSession) {
-      guard linkState.allowsQueuedUpdates else {
-         eventContinuation?.yield(.commandUndelivered)
-         return
+   func report(_ reading: RideWatchHeartRateReading) {
+      guard let session, session.activationState == .activated else { return }
+
+      let payload = RideWatchMessage.heartRate(reading).payload
+
+      // Application context is the Watch→phone slot. It survives the glance
+      // being kicked to the clock — sendMessage does not, because the Watch
+      // app is then unreachable.
+      do {
+         try session.updateApplicationContext(payload)
+      } catch {
+         relayContinuation?.yield(
+            .deliveryFailed("Heart rate context failed: \(error.localizedDescription)")
+         )
       }
 
-      session.transferUserInfo(payload)
-      eventContinuation?.yield(.commandUndelivered)
-
-      DebugPrint(mode: .sessionLifecycle, "Queued \(command.rawValue) for an unreachable phone")
-   }
-
-   func report(_ reading: RideWatchHeartRateReading) {
-      guard let session, linkState.allowsLiveMessages else { return }
+      guard linkState.allowsLiveMessages, session.isReachable else { return }
 
       let failures = relayContinuation
-      session.sendMessage(RideWatchMessage.heartRate(reading).payload, replyHandler: nil) { error in
+      session.sendMessage(payload, replyHandler: nil) { error in
          failures?.yield(.deliveryFailed("Heart rate send failed: \(error.localizedDescription)"))
       }
    }
 
    func reportHeartRateEnded() {
-      guard let session, linkState.allowsLiveMessages else { return }
+      guard let session, session.activationState == .activated else { return }
+
+      let payload = RideWatchMessage.heartRateEnded.payload
+
+      do {
+         try session.updateApplicationContext(payload)
+      } catch {
+         relayContinuation?.yield(
+            .deliveryFailed("Heart rate stop context failed: \(error.localizedDescription)")
+         )
+      }
+
+      guard linkState.allowsLiveMessages, session.isReachable else { return }
 
       let failures = relayContinuation
-      session.sendMessage(RideWatchMessage.heartRateEnded.payload, replyHandler: nil) { error in
+      session.sendMessage(payload, replyHandler: nil) { error in
          failures?.yield(.deliveryFailed("Heart rate stop failed: \(error.localizedDescription)"))
       }
    }
@@ -219,9 +238,11 @@ final class RideWatchLinkManager {
             session.activationState == .activated
       else { return }
 
+      let context = session.receivedApplicationContext
       hasSeededFromContext = true
 
-      guard let message = RideWatchMessage(payload: session.receivedApplicationContext),
+      guard !context.isEmpty,
+            let message = RideWatchMessage(payload: context),
             case .metrics(let snapshot) = message
       else { return }
 
@@ -240,14 +261,24 @@ final class RideWatchLinkManager {
          return
       }
 
-      let resolved = RideWatchLinkState.resolve(
-         isSupported: true,
-         activation: RideWatchActivation(session.activationState),
-         isPaired: true,
-         isCompanionAppInstalled: true,
-         isReachable: session.isReachable
-      )
+      let activation = RideWatchActivation(session.activationState)
+      guard activation == .activated else {
+         applyLinkState(.activating)
+         return
+      }
 
+      applyLinkState(
+         RideWatchLinkState.resolve(
+            isSupported: true,
+            activation: activation,
+            isPaired: true,
+            isCompanionAppInstalled: true,
+            isReachable: session.isReachable
+         )
+      )
+   }
+
+   private func applyLinkState(_ resolved: RideWatchLinkState) {
       guard resolved != linkState else { return }
 
       linkState = resolved

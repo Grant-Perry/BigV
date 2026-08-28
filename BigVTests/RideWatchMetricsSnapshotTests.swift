@@ -42,6 +42,19 @@ struct RideWatchMetricsSnapshotTests {
       #expect(snapshot.capturedAt == reference)
    }
 
+   @Test func aLocationIssueAndAccuracyRideOnTheMirror() {
+      var state = recordingState()
+      state.phase = .acquiringGPS
+      state.hasGPSFix = false
+      state.locationIssue = .temporarilyUnavailable
+      state.horizontalAccuracy = 48
+
+      let snapshot = RideWatchMetricsSnapshot(state: state, capturedAt: reference)
+
+      #expect(snapshot.locationIssue == "No phone GPS yet")
+      #expect(snapshot.horizontalAccuracy == 48)
+   }
+
    @Test func afreshRideStateProjectsAnIdleGlance() {
       let snapshot = RideWatchMetricsSnapshot(state: RideState(), capturedAt: reference)
 

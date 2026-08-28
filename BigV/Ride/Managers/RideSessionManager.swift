@@ -293,6 +293,7 @@ final class RideSessionManager {
       switch event {
          case .issue(let issue):
             state.locationIssue = issue
+            mirrorToWatch()
             DebugPrint(mode: .locationFiltering, "Location issue: \(issue.rawValue)")
 
          case .location(let location):
@@ -306,6 +307,10 @@ final class RideSessionManager {
 
       let outcome = telemetryEngine.ingest(location)
       publishTelemetry()
+
+      if state.phase == .acquiringGPS {
+         mirrorToWatch()
+      }
 
       switch outcome {
          case .acquiredFix, .reseeded:
@@ -373,6 +378,11 @@ final class RideSessionManager {
       // Runs in every active phase, unlike the rest of the tick: a paused rider
       // whose Watch dropped off must not keep a frozen pulse on screen.
       expireStaleHeartRate()
+
+      if state.phase == .acquiringGPS {
+         mirrorToWatch()
+         return
+      }
 
       guard state.phase == .recording else { return }
 

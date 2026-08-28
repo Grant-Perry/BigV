@@ -10,40 +10,50 @@ struct RideWatchDashboardView: View {
 
    let rideWatchViewModel: RideWatchViewModel
 
+   @Environment(\.scenePhase) private var scenePhase
+
    var body: some View {
-      ScrollView {
-         VStack(spacing: 8) {
-            RideWatchStatusLine(
-               statusText: rideWatchViewModel.statusText,
-               hasGPSFix: rideWatchViewModel.hasGPSFix,
-               isConnected: rideWatchViewModel.linkState == .connected
-            )
+      ZStack {
+         RideWatchAtmosphereBackground()
 
-            glance
+         ScrollView {
+            VStack(spacing: 6) {
+               RideWatchStatusLine(
+                  statusText: rideWatchViewModel.statusText,
+                  hasGPSFix: rideWatchViewModel.hasGPSFix,
+                  isConnected: rideWatchViewModel.linkState == .connected
+               )
 
-            RideWatchControlStack(
-               controls: rideWatchViewModel.controls,
-               onSend: rideWatchViewModel.send
-            )
+               glance
 
-            if let noticeText = rideWatchViewModel.noticeText {
-               Text(noticeText)
-                  .font(.system(size: 10, weight: .medium))
-                  .foregroundStyle(RideChromeTokens.ember)
-                  .multilineTextAlignment(.center)
-                  .frame(maxWidth: .infinity)
+               RideWatchControlStack(
+                  controls: rideWatchViewModel.controls,
+                  onSend: rideWatchViewModel.send
+               )
+
+               if let noticeText = rideWatchViewModel.noticeText {
+                  Text(noticeText)
+                     .font(.system(size: 10, weight: .medium))
+                     .foregroundStyle(RideChromeTokens.ember)
+                     .multilineTextAlignment(.center)
+                     .frame(maxWidth: .infinity)
+               }
             }
+            .padding(.horizontal, 4)
          }
-         .padding(.horizontal, 4)
+         .scrollBounceBehavior(.basedOnSize)
       }
-      .background(RideChromeTokens.void)
       .task { await rideWatchViewModel.activate() }
+      .onAppear { rideWatchViewModel.noteScene(isActive: scenePhase == .active) }
+      .onChange(of: scenePhase) { _, phase in
+         rideWatchViewModel.noteScene(isActive: phase == .active)
+      }
    }
 
    // MARK: - Glance
 
    private var glance: some View {
-      VStack(spacing: 8) {
+      VStack(spacing: 6) {
          RideWatchSpeedHero(
             value: rideWatchViewModel.speed,
             unit: rideWatchViewModel.speedUnit,
@@ -70,11 +80,13 @@ struct RideWatchDashboardView: View {
             value: rideWatchViewModel.heartRate,
             unit: rideWatchViewModel.heartRateUnit,
             tint: RideChromeTokens.pulse,
-            isDimmed: !rideWatchViewModel.isSensingHeartRate
+            isDimmed: !rideWatchViewModel.isSensingHeartRate,
+            showsHeart: true,
+            beatsPerMinute: rideWatchViewModel.heartRateBeatsPerMinute
          )
       }
       .padding(.horizontal, 10)
-      .padding(.vertical, 10)
+      .padding(.vertical, 8)
       .rideWatchCard()
    }
 }

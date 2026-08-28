@@ -18,8 +18,10 @@ struct RideTelemetryEngine {
 
    struct Configuration: Sendable {
 
-      /// Accuracy required to declare an initial fix.
-      var fixAcquisitionAccuracy: Double = 30
+      /// Accuracy required to declare an initial fix. Loose on purpose: the
+      /// first lock just has to start the ride. Recording still uses
+      /// `maxHorizontalAccuracy`.
+      var fixAcquisitionAccuracy: Double = 65
 
       /// Accuracy required for a sample to contribute once recording.
       var maxHorizontalAccuracy: Double = 20

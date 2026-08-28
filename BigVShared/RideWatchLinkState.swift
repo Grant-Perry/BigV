@@ -77,7 +77,7 @@ nonisolated enum RideWatchLinkState: String, Sendable, CaseIterable {
          case .unsupported: "No Watch support"
          case .activating: "Linking…"
          case .notPaired: "No Watch paired"
-         case .appNotInstalled: "Install BigV on Watch"
+         case .appNotInstalled: "Install BigVelo on Watch"
          case .unreachable: "Phone out of range"
          case .connected: nil
       }

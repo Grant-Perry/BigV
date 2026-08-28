@@ -66,8 +66,14 @@ final class RideViewModel {
 
    var gradeUnit: String { RideFormatters.Unit.grade }
 
+   var course: Double { state.course }
+
    var heading: String {
       RideFormatters.cardinal(state.course) ?? RideFormatters.placeholder
+   }
+
+   var headingDegrees: String {
+      RideFormatters.headingDegrees(state.course) ?? RideFormatters.placeholder
    }
 
    // MARK: - Sensors
@@ -80,13 +86,15 @@ final class RideViewModel {
 
    var heartRateUnit: String { RideFormatters.Unit.heartRate }
 
+   var heartRateBeatsPerMinute: Double? { state.heartRate }
+
    // MARK: - Status
 
    var statusText: String {
       switch state.phase {
          case .idle: "Ready"
          case .acquiringGPS: "Acquiring GPS"
-         case .recording: state.isMoving ? "Recording" : "Stopped"
+         case .recording: "Recording"
          case .paused: "Paused"
          case .finished: "Ride complete"
       }

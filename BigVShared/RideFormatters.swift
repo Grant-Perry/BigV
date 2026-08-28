@@ -101,8 +101,20 @@ nonisolated enum RideFormatters {
          "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
          "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"
       ]
-      let normalized = degrees.truncatingRemainder(dividingBy: 360)
+      let normalized = normalizedHeading(degrees)
       let index = Int((normalized / 22.5).rounded()) % points.count
       return points[index]
+   }
+
+   /// Whole-degree bearing. Returns `nil` for an unknown course.
+   static func headingDegrees(_ degrees: Double) -> String? {
+      guard degrees >= 0 else { return nil }
+      let rounded = Int(normalizedHeading(degrees).rounded()) % 360
+      return "\(rounded)°"
+   }
+
+   private static func normalizedHeading(_ degrees: Double) -> Double {
+      let wrapped = degrees.truncatingRemainder(dividingBy: 360)
+      return wrapped < 0 ? wrapped + 360 : wrapped
    }
 }

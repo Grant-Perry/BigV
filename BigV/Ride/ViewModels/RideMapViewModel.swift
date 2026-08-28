@@ -133,8 +133,7 @@ final class RideMapViewModel {
    /// `nil` while the course is unknown, so the view can hide the pill instead of
    /// showing a placeholder bearing.
    var headingDegrees: String? {
-      guard state.course >= 0 else { return nil }
-      return "\(Int(state.course.rounded()))°"
+      RideFormatters.headingDegrees(state.course)
    }
 
    // MARK: - Map Presentation

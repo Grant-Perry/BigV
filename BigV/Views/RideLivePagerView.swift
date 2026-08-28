@@ -17,6 +17,7 @@ struct RideLivePagerView: View {
    let onPlanRoute: () -> Void
 
    @State private var selectedPage: RidePage = .dashboard
+   @State private var isMapPageMounted = false
 
    var body: some View {
       VStack(spacing: 0) {
@@ -32,7 +33,8 @@ struct RideLivePagerView: View {
             .padding(.vertical, 6)
       }
       .background(Color.clear)
-      .onChange(of: selectedPage) { _, _ in
+      .onChange(of: selectedPage) { _, page in
+         if page == .map { isMapPageMounted = true }
          routeGuidanceViewModel.collapseTurnList()
       }
    }
@@ -80,11 +82,17 @@ struct RideLivePagerView: View {
             .simultaneousGesture(swipeToMap)
 
          case .map:
-            RideMapView(
-               rideMapViewModel: rideMapViewModel,
-               routeGuidanceViewModel: routeGuidanceViewModel,
-               onPlanRoute: onPlanRoute
-            )
+            Group {
+               if isMapPageMounted {
+                  RideMapView(
+                     rideMapViewModel: rideMapViewModel,
+                     routeGuidanceViewModel: routeGuidanceViewModel,
+                     onPlanRoute: onPlanRoute
+                  )
+               } else {
+                  Color.clear
+               }
+            }
             .simultaneousGesture(swipeToDashboard)
       }
    }

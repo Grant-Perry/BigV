@@ -45,10 +45,13 @@ final class RideHealthManager {
 
    // MARK: - Authorization
 
-   /// Asks once, in context, while the rider is waiting for a GPS fix.
+   /// Asks in context, while the rider is waiting for a GPS fix, and again
+   /// immediately before the write. Calling this after the rider has already
+   /// answered is a no-op — HealthKit will not re-prompt — but it *will* pick
+   /// up newly added share types that a one-shot `notDetermined` check would
+   /// skip forever.
    func requestAuthorizationIfNeeded() async {
       guard HKHealthStore.isHealthDataAvailable() else { return }
-      guard healthStore.authorizationStatus(for: HKObjectType.workoutType()) == .notDetermined else { return }
 
       do {
          try await healthStore.requestAuthorization(toShare: shareTypes, read: [])
@@ -98,7 +101,39 @@ final class RideHealthManager {
 
    // MARK: - Workout
 
+   /// `HKWorkoutBuilder` is the only supported write. A denied quantity type
+   /// must not abort it — the rider who allowed Workouts but flipped off
+   /// Cycling Distance used to get a hard fail for a workout that would have
+   /// saved. iOS 26 can also return a nil workout with no error; one retry
+   /// on a fresh builder is the documented recovery.
    private func writeWorkout(
+      from start: Date,
+      to end: Date,
+      distance: Double,
+      activeEnergy: Double?
+   ) async throws -> HKWorkout {
+      do {
+         return try await writeWorkoutUsingBuilder(
+            from: start,
+            to: end,
+            distance: distance,
+            activeEnergy: activeEnergy
+         )
+      } catch {
+         DebugPrint(
+            mode: .healthKit,
+            "Builder write failed (\(error.localizedDescription)); retrying once"
+         )
+         return try await writeWorkoutUsingBuilder(
+            from: start,
+            to: end,
+            distance: distance,
+            activeEnergy: activeEnergy
+         )
+      }
+   }
+
+   private func writeWorkoutUsingBuilder(
       from start: Date,
       to end: Date,
       distance: Double,
@@ -116,14 +151,20 @@ final class RideHealthManager {
 
       try await workoutBuilder.beginCollection(at: start)
 
-      let samples = Self.quantitySamples(
-         distance: distance,
-         activeEnergy: activeEnergy,
-         from: start,
-         to: end
+      let samples = shareableSamples(
+         Self.quantitySamples(
+            distance: distance,
+            activeEnergy: activeEnergy,
+            from: start,
+            to: end
+         )
       )
       if !samples.isEmpty {
-         try await Self.add(samples, to: workoutBuilder)
+         do {
+            try await Self.add(samples, to: workoutBuilder)
+         } catch {
+            DebugPrint(mode: .healthKit, "Quantity samples skipped: \(error.localizedDescription)")
+         }
       }
 
       try await workoutBuilder.endCollection(at: end)
@@ -149,13 +190,23 @@ final class RideHealthManager {
       }
    }
 
-   private static func quantitySamples(
+   private func shareableSamples(_ samples: [HKQuantitySample]) -> [HKSample] {
+      samples.filter { isAuthorized(toShare: $0.quantityType) }
+   }
+
+   private func isAuthorized(toShare sampleType: HKSampleType) -> Bool {
+      healthStore.authorizationStatus(for: sampleType) == .sharingAuthorized
+   }
+
+   /// Exposed for tests. HealthKit still has to accept the samples; this only
+   /// decides which ones are worth offering.
+   static func quantitySamples(
       distance: Double,
       activeEnergy: Double?,
       from start: Date,
       to end: Date
-   ) -> [HKSample] {
-      var samples: [HKSample] = []
+   ) -> [HKQuantitySample] {
+      var samples: [HKQuantitySample] = []
 
       if distance > 0 {
          samples.append(
@@ -188,6 +239,10 @@ final class RideHealthManager {
    /// invalidates a workout that already landed.
    private func insertRoute(_ locations: [CLLocation], for workout: HKWorkout) async {
       guard locations.count > 1 else { return }
+      guard isAuthorized(toShare: HKSeriesType.workoutRoute()) else {
+         DebugPrint(mode: .healthKit, "Workout route not authorized; workout saved without a path")
+         return
+      }
 
       let routeBuilder = HKWorkoutRouteBuilder(healthStore: healthStore, device: .local())
 

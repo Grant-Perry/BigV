@@ -21,6 +21,8 @@ nonisolated struct RideWatchMetricsSnapshot: Sendable, Equatable {
    let hasGPSFix: Bool
    let isMoving: Bool
    let capturedAt: Date
+   let locationIssue: String?
+   let horizontalAccuracy: Double?
 
    // MARK: - Initialization
 
@@ -31,7 +33,9 @@ nonisolated struct RideWatchMetricsSnapshot: Sendable, Equatable {
       elapsedTime: TimeInterval,
       hasGPSFix: Bool,
       isMoving: Bool,
-      capturedAt: Date = .now
+      capturedAt: Date = .now,
+      locationIssue: String? = nil,
+      horizontalAccuracy: Double? = nil
    ) {
       self.phase = phase
       self.speed = speed
@@ -40,6 +44,8 @@ nonisolated struct RideWatchMetricsSnapshot: Sendable, Equatable {
       self.hasGPSFix = hasGPSFix
       self.isMoving = isMoving
       self.capturedAt = capturedAt
+      self.locationIssue = locationIssue
+      self.horizontalAccuracy = horizontalAccuracy
    }
 
    // MARK: - Wire Format
@@ -52,10 +58,12 @@ nonisolated struct RideWatchMetricsSnapshot: Sendable, Equatable {
       static let hasGPSFix = "hasGPSFix"
       static let isMoving = "isMoving"
       static let capturedAt = "capturedAt"
+      static let locationIssue = "locationIssue"
+      static let horizontalAccuracy = "horizontalAccuracy"
    }
 
    var body: [String: Any] {
-      [
+      var payload: [String: Any] = [
          Key.phase: phase.rawValue,
          Key.speed: speed,
          Key.distance: distance,
@@ -64,6 +72,16 @@ nonisolated struct RideWatchMetricsSnapshot: Sendable, Equatable {
          Key.isMoving: isMoving,
          Key.capturedAt: capturedAt.timeIntervalSince1970
       ]
+
+      if let locationIssue {
+         payload[Key.locationIssue] = locationIssue
+      }
+
+      if let horizontalAccuracy {
+         payload[Key.horizontalAccuracy] = horizontalAccuracy
+      }
+
+      return payload
    }
 
    init?(body: [String: Any]) {
@@ -84,6 +102,8 @@ nonisolated struct RideWatchMetricsSnapshot: Sendable, Equatable {
       self.hasGPSFix = hasGPSFix
       self.isMoving = isMoving
       self.capturedAt = Date(timeIntervalSince1970: capturedAt)
+      self.locationIssue = body[Key.locationIssue] as? String
+      self.horizontalAccuracy = body[Key.horizontalAccuracy] as? Double
    }
 
    // MARK: - Freshness

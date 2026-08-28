@@ -23,10 +23,10 @@ import HealthKit
 /// class of bug BigMetric shipped.
 ///
 /// So this manager takes the sensor half of the session and refuses the recording
-/// half. It never touches `associatedWorkoutBuilder`, never calls
-/// `beginCollection`, and therefore has nothing to `finishWorkout` or
-/// `discardWorkout`. A workout object cannot appear from this target, because the
-/// object that would create one is never brought into existence.
+/// half. It does call `beginCollection` — watchOS ends a session that never
+/// collects, which is how the glance used to bounce to the watch face on Start.
+/// It never calls `finishWorkout`. The builder is discarded only if we tear the
+/// session down for real, so Health still only gets the phone's ride.
 ///
 /// Activity rings are unaffected by that choice. watchOS credits Move and
 /// Exercise for the duration of an active session regardless of who saves the
@@ -40,10 +40,8 @@ import HealthKit
 /// ## Lingering sessions
 ///
 /// watchOS preserves an active session across a crash or a force-quit and
-/// relaunches the app for it. `endOrphanedSession()` sweeps that up at launch,
-/// before anything else starts. Because this session never saved anything, the
-/// sweep is unambiguous: end it. There is no rider data to weigh against a clean
-/// slate — the phone has the ride.
+/// relaunches the app for it. `reclaimOrphanedSession()` adopts that session
+/// at launch. Ending it would dismiss the glance — the phone still has the ride.
 @Observable
 @MainActor
 final class RideWatchWorkoutManager {
@@ -61,6 +59,7 @@ final class RideWatchWorkoutManager {
    private let healthStore = HKHealthStore()
 
    private var session: HKWorkoutSession?
+   private var builder: HKLiveWorkoutBuilder?
    private var relay: RideWatchWorkoutRelay?
    private var relayTask: Task<Void, Never>?
 
@@ -89,17 +88,21 @@ final class RideWatchWorkoutManager {
 
    // MARK: - Recovery
 
-   /// Ends a session that outlived the app. Must run before the first
-   /// `startSensing()`, or it could recover — and then end — the session we just
-   /// opened ourselves.
-   func endOrphanedSession() async {
+   /// Adopts a session that outlived the app. Must run before the first
+   /// `startSensing()`. Ending it here is how you bounce the rider to the face
+   /// on launch.
+   func reclaimOrphanedSession() async {
       guard HKHealthStore.isHealthDataAvailable(), session == nil else { return }
 
       do {
          guard let recovered = try await healthStore.recoverActiveWorkoutSession() else { return }
 
-         recovered.end()
-         DebugPrint(mode: .healthKit, "Ended an orphaned workout session from a previous launch")
+         startRelay(for: recovered)
+         session = recovered
+         builder = recovered.associatedWorkoutBuilder()
+         isSensing = recovered.state == .running
+
+         DebugPrint(mode: .healthKit, "Reclaimed an orphaned workout session")
       } catch {
          DebugPrint(mode: .healthKit, "Workout session recovery failed: \(error.localizedDescription)")
       }
@@ -108,13 +111,33 @@ final class RideWatchWorkoutManager {
    // MARK: - Sensing
 
    /// Opens the sensor session and streams heart rate for as long as it runs.
+   ///
+   /// A parked session is resumed in place. Ending one and starting another
+   /// in the same breath is exactly how watchOS decides the workout is over
+   /// and throws the rider back at the watch face.
    func startSensing() -> AsyncStream<RideWatchHeartRateReading> {
-      stopSensing()
+      if let session {
+         switch session.state {
+            case .paused:
+               return resumeParkedSession(session)
+            case .running:
+               return attachHeartRateStream()
+            case .notStarted, .prepared:
+               let startDate = Date.now
+               session.prepare()
+               session.startActivity(with: startDate)
+               beginCollection(at: startDate)
+               isSensing = true
+               failure = nil
+               return attachHeartRateStream()
+            case .ended, .stopped:
+               discardEndedSession()
+            @unknown default:
+               discardEndedSession()
+         }
+      }
 
-      let (stream, continuation) = AsyncStream<RideWatchHeartRateReading>.makeStream(
-         bufferingPolicy: .bufferingNewest(8)
-      )
-      heartRateContinuation = continuation
+      let (stream, continuation) = makeHeartRateStream()
 
       guard HKHealthStore.isHealthDataAvailable() else {
          failure = "Health data unavailable"
@@ -128,12 +151,21 @@ final class RideWatchWorkoutManager {
 
       do {
          let session = try HKWorkoutSession(healthStore: healthStore, configuration: configuration)
+         let builder = session.associatedWorkoutBuilder()
+         builder.dataSource = HKLiveWorkoutDataSource(
+            healthStore: healthStore,
+            workoutConfiguration: configuration
+         )
          let startDate = Date.now
 
          startRelay(for: session)
-         session.startActivity(with: startDate)
-
          self.session = session
+         self.builder = builder
+
+         session.prepare()
+         session.startActivity(with: startDate)
+         beginCollection(at: startDate)
+
          isSensing = true
          failure = nil
 
@@ -150,17 +182,30 @@ final class RideWatchWorkoutManager {
       return stream
    }
 
+   /// Pauses the HealthKit session without ending it.
+   ///
+   /// `HKWorkoutSession.end()` dismisses the Watch app. Pause and End on the
+   /// remote must never do that while the rider is still looking at the glance.
+   func parkSensing() {
+      detachHeartRateStream()
+
+      guard let session, session.state == .running else {
+         isSensing = false
+         return
+      }
+
+      session.pause()
+      isSensing = false
+
+      DebugPrint(mode: .healthKit, "Sensor session parked")
+   }
+
    /// Tears the session down unconditionally.
    ///
-   /// A bare `end()` is the whole teardown. The documented sequence —
-   /// `endCollection` then `finishWorkout` — exists to save a workout, and there
-   /// is no builder here to save one from.
+   /// `discardWorkout` plus `end()` is the only teardown. Never call this from
+   /// a button or a scene-phase blip — that is how the glance used to die.
    func stopSensing() {
-      heartRateTask?.cancel()
-      heartRateTask = nil
-
-      heartRateContinuation?.finish()
-      heartRateContinuation = nil
+      detachHeartRateStream()
 
       relayTask?.cancel()
       relayTask = nil
@@ -173,11 +218,71 @@ final class RideWatchWorkoutManager {
          return
       }
 
+      isSensing = false
+      builder?.discardWorkout()
+      builder = nil
       session.end()
       self.session = nil
-      isSensing = false
 
       DebugPrint(mode: .healthKit, "Sensor session ended")
+   }
+
+   /// watchOS ends a session that never collects. We collect so the glance
+   /// stays up; we never `finishWorkout`, so Health still only gets the phone's
+   /// ride.
+   private func beginCollection(at date: Date) {
+      guard let builder else { return }
+
+      Task { [weak self] in
+         do {
+            try await builder.beginCollection(at: date)
+         } catch {
+            self?.failure = error.localizedDescription
+            DebugPrint(
+               mode: .healthKit,
+               "Workout collection failed: \(error.localizedDescription)"
+            )
+         }
+      }
+   }
+
+   // MARK: - Park / Resume
+
+   private func resumeParkedSession(_ session: HKWorkoutSession) -> AsyncStream<RideWatchHeartRateReading> {
+      session.resume()
+      isSensing = true
+      failure = nil
+
+      DebugPrint(mode: .healthKit, "Sensor session resumed from park")
+      return attachHeartRateStream()
+   }
+
+   private func attachHeartRateStream() -> AsyncStream<RideWatchHeartRateReading> {
+      detachHeartRateStream()
+
+      let (stream, continuation) = makeHeartRateStream()
+      startHeartRateStream(from: Date.now, into: continuation)
+      isSensing = true
+      return stream
+   }
+
+   private func makeHeartRateStream() -> (
+      AsyncStream<RideWatchHeartRateReading>,
+      AsyncStream<RideWatchHeartRateReading>.Continuation
+   ) {
+      let (stream, continuation) = AsyncStream<RideWatchHeartRateReading>.makeStream(
+         bufferingPolicy: .bufferingNewest(8)
+      )
+      heartRateContinuation = continuation
+      return (stream, continuation)
+   }
+
+   private func detachHeartRateStream() {
+      heartRateTask?.cancel()
+      heartRateTask = nil
+
+      heartRateContinuation?.finish()
+      heartRateContinuation = nil
    }
 
    // MARK: - Session Events
@@ -205,15 +310,29 @@ final class RideWatchWorkoutManager {
    private func handle(_ event: RideWatchSensorEvent) {
       switch event {
          case .ended:
-            guard isSensing else { return }
             DebugPrint(mode: .healthKit, "Sensor session ended by watchOS")
-            stopSensing()
+            discardEndedSession()
 
          case .failed(let reason):
             failure = reason
             DebugPrint(mode: .healthKit, "Sensor session failed: \(reason)")
-            stopSensing()
+            discardEndedSession()
       }
+   }
+
+   /// The session is already dead. Ending it again is how you bounce the rider
+   /// off the glance.
+   private func discardEndedSession() {
+      detachHeartRateStream()
+
+      relayTask?.cancel()
+      relayTask = nil
+      relay?.finish()
+      relay = nil
+
+      builder = nil
+      session = nil
+      isSensing = false
    }
 
    // MARK: - Heart Rate

@@ -7,11 +7,9 @@ import SwiftUI
 
 /// The wrist-sized version of the phone's content card.
 ///
-/// Gradient wash with a highlight edge, exactly like `RideGlassCard` — dense
-/// metric text has to stay readable on a vibrating bike, and a material that
-/// samples what is behind it does not. Deliberately not Liquid Glass, and
-/// deliberately without the phone's trail-plate art: that atmosphere is wrong at
-/// this size and costs battery to composite on an always-on display.
+/// Thin gradient wash over the faded trail so the numbers stay readable on a
+/// vibrating bike. Not Liquid Glass — a material that samples what is behind it
+/// is the wrong trade on a 45 mm always-on display.
 struct RideWatchCard<Content: View>: View {
 
    var cornerRadius: CGFloat = 12
@@ -34,9 +32,9 @@ struct RideWatchCard<Content: View>: View {
    private var wash: LinearGradient {
       LinearGradient(
          colors: [
-            Color.white.opacity(0.10),
-            RideChromeTokens.graphite.opacity(0.90),
-            Color.black.opacity(0.66)
+            Color.white.opacity(0.08),
+            RideChromeTokens.graphite.opacity(0.52),
+            Color.black.opacity(0.40)
          ],
          startPoint: .topLeading,
          endPoint: .bottomTrailing

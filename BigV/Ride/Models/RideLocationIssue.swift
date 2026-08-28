@@ -22,6 +22,16 @@ enum RideLocationIssue: String, Sendable, Equatable {
       }
    }
 
+   /// Wrist-sized. The Ultra's GPS is not in this loop — the phone is.
+   var watchMessage: String {
+      switch self {
+         case .authorizationDenied: "Allow Location on iPhone"
+         case .servicesDisabled: "Turn on Location Services"
+         case .temporarilyUnavailable: "No phone GPS yet"
+         case .failed: "Phone GPS stopped"
+      }
+   }
+
    /// Whether the rider must change something before recording can work.
    var requiresRiderAction: Bool {
       switch self {

@@ -15,6 +15,20 @@ struct RideMapCanvasView: View {
    var allowsInteraction: Bool = true
 
    var body: some View {
+      GeometryReader { proxy in
+         if proxy.size.width >= 8, proxy.size.height >= 8 {
+            mapCanvas
+               .frame(width: proxy.size.width, height: proxy.size.height)
+         }
+      }
+   }
+
+   // MARK: - Canvas
+
+   /// TabView keeps the off-screen map page in the hierarchy at 0×0. MapKit
+   /// then asks Metal for a zero drawable — that is the Start crash, not the
+   /// WatchConnectivity noise in the same console dump.
+   private var mapCanvas: some View {
       Map(
          position: $rideMapViewModel.cameraPosition,
          interactionModes: allowsInteraction ? rideMapViewModel.interactionModes : []

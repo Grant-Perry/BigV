@@ -11,13 +11,6 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		9BA0000E304077C40030A6B8 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 9B71BB96304077C30030A6B8 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 9BA00007304077C40030A6B8;
-			remoteInfo = "BigV Watch App";
-		};
 		9B71BBAE304077C40030A6B8 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 9B71BB96304077C30030A6B8 /* Project object */;
@@ -32,27 +25,32 @@
 			remoteGlobalIDString = 9B71BB9D304077C30030A6B8;
 			remoteInfo = BigV;
 		};
+		9BA0000E304077C40030A6B8 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9B71BB96304077C30030A6B8 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 9BA00007304077C40030A6B8;
+			remoteInfo = "BigV Watch App";
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
 		9BA0000B304077C40030A6B8 /* Embed Watch Content */ = {
 			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
 			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
-			dstSubfolderSpec = 16;
+			dstSubfolder = Product;
 			files = (
 				9BA0000C304077C40030A6B8 /* BigV Watch App.app in Embed Watch Content */,
 			);
 			name = "Embed Watch Content";
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		9B71BB9E304077C30030A6B8 /* BigV.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BigV.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		9BA00001304077C40030A6B8 /* BigV Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "BigV Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		9B71BBAD304077C40030A6B8 /* BigVTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BigVTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		9B71BBB7304077C40030A6B8 /* BigVUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BigVUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		9BA00001304077C40030A6B8 /* BigV Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "BigV Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -81,6 +79,16 @@
 			path = BigV;
 			sourceTree = "<group>";
 		};
+		9B71BBB0304077C40030A6B8 /* BigVTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = BigVTests;
+			sourceTree = "<group>";
+		};
+		9B71BBBA304077C40030A6B8 /* BigVUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = BigVUITests;
+			sourceTree = "<group>";
+		};
 		9BA00002304077C40030A6B8 /* BigV Watch App */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -92,16 +100,6 @@
 		9BA00003304077C40030A6B8 /* BigVShared */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = BigVShared;
-			sourceTree = "<group>";
-		};
-		9B71BBB0304077C40030A6B8 /* BigVTests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = BigVTests;
-			sourceTree = "<group>";
-		};
-		9B71BBBA304077C40030A6B8 /* BigVUITests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = BigVUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -335,11 +333,6 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		9BA0000D304077C40030A6B8 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 9BA00007304077C40030A6B8 /* BigV Watch App */;
-			targetProxy = 9BA0000E304077C40030A6B8 /* PBXContainerItemProxy */;
-		};
 		9B71BBAF304077C40030A6B8 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 9B71BB9D304077C30030A6B8 /* BigV */;
@@ -349,6 +342,11 @@
 			isa = PBXTargetDependency;
 			target = 9B71BB9D304077C30030A6B8 /* BigV */;
 			targetProxy = 9B71BBB8304077C40030A6B8 /* PBXContainerItemProxy */;
+		};
+		9BA0000D304077C40030A6B8 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 9BA00007304077C40030A6B8 /* BigV Watch App */;
+			targetProxy = 9BA0000E304077C40030A6B8 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -481,14 +479,15 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = BigV/BigV.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 13;
 				DEVELOPMENT_TEAM = KP3ZH5K2SY;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = BigV/Info.plist;
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "BigV reads cycling workout data from Apple Health to enrich your ride metrics.";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "BigV saves your rides to Apple Health as cycling workouts, including distance and route.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "BigV needs your location to record ride speed, distance, elevation and route.";
+				INFOPLIST_KEY_CFBundleDisplayName = BigVelo;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "BigVelo reads cycling workout data from Apple Health to enrich your ride metrics.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "BigVelo saves your rides to Apple Health as cycling workouts, including distance and route.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "BigVelo needs your location to record ride speed, distance, elevation and route.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -498,8 +497,8 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.4;
-				PRODUCT_BUNDLE_IDENTIFIER = com.grantperry.BigV;
+				MARKETING_VERSION = 1.5;
+				PRODUCT_BUNDLE_IDENTIFIER = com.grantperry.BigVelo;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -518,14 +517,15 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = BigV/BigV.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 13;
 				DEVELOPMENT_TEAM = KP3ZH5K2SY;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = BigV/Info.plist;
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "BigV reads cycling workout data from Apple Health to enrich your ride metrics.";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "BigV saves your rides to Apple Health as cycling workouts, including distance and route.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "BigV needs your location to record ride speed, distance, elevation and route.";
+				INFOPLIST_KEY_CFBundleDisplayName = BigVelo;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "BigVelo reads cycling workout data from Apple Health to enrich your ride metrics.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "BigVelo saves your rides to Apple Health as cycling workouts, including distance and route.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "BigVelo needs your location to record ride speed, distance, elevation and route.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -535,8 +535,8 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.4;
-				PRODUCT_BUNDLE_IDENTIFIER = com.grantperry.BigV;
+				MARKETING_VERSION = 1.5;
+				PRODUCT_BUNDLE_IDENTIFIER = com.grantperry.BigVelo;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -553,12 +553,12 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 13;
 				DEVELOPMENT_TEAM = KP3ZH5K2SY;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
-				MARKETING_VERSION = 1.4;
-				PRODUCT_BUNDLE_IDENTIFIER = com.grantperry.BigVTests;
+				MARKETING_VERSION = 1.5;
+				PRODUCT_BUNDLE_IDENTIFIER = com.grantperry.BigVeloTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -576,12 +576,12 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 13;
 				DEVELOPMENT_TEAM = KP3ZH5K2SY;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
-				MARKETING_VERSION = 1.4;
-				PRODUCT_BUNDLE_IDENTIFIER = com.grantperry.BigVTests;
+				MARKETING_VERSION = 1.5;
+				PRODUCT_BUNDLE_IDENTIFIER = com.grantperry.BigVeloTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -598,11 +598,11 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 13;
 				DEVELOPMENT_TEAM = KP3ZH5K2SY;
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.4;
-				PRODUCT_BUNDLE_IDENTIFIER = com.grantperry.BigVUITests;
+				MARKETING_VERSION = 1.5;
+				PRODUCT_BUNDLE_IDENTIFIER = com.grantperry.BigVeloUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -619,11 +619,11 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 13;
 				DEVELOPMENT_TEAM = KP3ZH5K2SY;
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.4;
-				PRODUCT_BUNDLE_IDENTIFIER = com.grantperry.BigVUITests;
+				MARKETING_VERSION = 1.5;
+				PRODUCT_BUNDLE_IDENTIFIER = com.grantperry.BigVeloUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -643,21 +643,21 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "BigV Watch App/BigV Watch App.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 13;
 				DEVELOPMENT_TEAM = KP3ZH5K2SY;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "BigV Watch App/Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = BigV;
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "BigV reads your heart rate on the Watch so the phone can show it live while you ride.";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "BigV starts a workout session on the Watch to read your heart rate and credit your Activity rings. Your ride is saved to Health by the iPhone.";
-				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.grantperry.BigV;
+				INFOPLIST_KEY_CFBundleDisplayName = BigVelo;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "BigVelo reads your heart rate on the Watch so the phone can show it live while you ride.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "BigVelo starts a workout session on the Watch to read your heart rate and credit your Activity rings. Your ride is saved to Health by the iPhone.";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.grantperry.BigVelo;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.4;
-				PRODUCT_BUNDLE_IDENTIFIER = com.grantperry.BigV.watchkitapp;
+				MARKETING_VERSION = 1.5;
+				PRODUCT_BUNDLE_IDENTIFIER = com.grantperry.BigVelo.watchkitapp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
 				SKIP_INSTALL = YES;
@@ -680,21 +680,21 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "BigV Watch App/BigV Watch App.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 13;
 				DEVELOPMENT_TEAM = KP3ZH5K2SY;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "BigV Watch App/Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = BigV;
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "BigV reads your heart rate on the Watch so the phone can show it live while you ride.";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "BigV starts a workout session on the Watch to read your heart rate and credit your Activity rings. Your ride is saved to Health by the iPhone.";
-				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.grantperry.BigV;
+				INFOPLIST_KEY_CFBundleDisplayName = BigVelo;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "BigVelo reads your heart rate on the Watch so the phone can show it live while you ride.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "BigVelo starts a workout session on the Watch to read your heart rate and credit your Activity rings. Your ride is saved to Health by the iPhone.";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.grantperry.BigVelo;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.4;
-				PRODUCT_BUNDLE_IDENTIFIER = com.grantperry.BigV.watchkitapp;
+				MARKETING_VERSION = 1.5;
+				PRODUCT_BUNDLE_IDENTIFIER = com.grantperry.BigVelo.watchkitapp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
 				SKIP_INSTALL = YES;

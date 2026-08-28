@@ -132,11 +132,14 @@ final class RideWatchManager {
 
    /// Mirrors the ride to the wrist. Cheap enough to call every second.
    func publish(_ snapshot: RideWatchMetricsSnapshot) {
-      guard let session, linkState.allowsQueuedUpdates else { return }
+      guard let session,
+            session.activationState == .activated,
+            linkState.allowsQueuedUpdates
+      else { return }
 
       let payload = RideWatchMessage.metrics(snapshot).payload
 
-      if linkState.allowsLiveMessages {
+      if linkState.allowsLiveMessages, session.isReachable {
          let failures = relayContinuation
          session.sendMessage(payload, replyHandler: nil) { error in
             failures?.yield(.deliveryFailed("Mirror send failed: \(error.localizedDescription)"))
@@ -169,6 +172,7 @@ final class RideWatchManager {
       switch event {
          case .linkChanged:
             refreshLinkState()
+            seedFromWatchContext()
 
          case .needsReactivation:
             session?.activate()
@@ -189,7 +193,7 @@ final class RideWatchManager {
    private func apply(_ message: RideWatchMessage, reply: RideWatchReplyBox) {
       switch message {
          case .heartRate(let reading):
-            guard reading.isPlausible, reading.isFresh() else {
+            guard reading.isPlausible, reading.isFresh(within: 20) else {
                DebugPrint(
                   mode: .sensors,
                   limit: 20,
@@ -215,6 +219,22 @@ final class RideWatchManager {
       }
    }
 
+   // MARK: - Seeding
+
+   /// The Watch writes its latest pulse into its own application context so a
+   /// phone that was killed, pocketed, or unreachable still comes up with a beat
+   /// instead of an empty chip.
+   private func seedFromWatchContext() {
+      guard let session, session.activationState == .activated else { return }
+
+      let context = session.receivedApplicationContext
+      guard !context.isEmpty,
+            let message = RideWatchMessage(payload: context)
+      else { return }
+
+      apply(message, reply: .unanswerable)
+   }
+
    // MARK: - Link State
 
    private func refreshLinkState() {
@@ -223,14 +243,30 @@ final class RideWatchManager {
          return
       }
 
-      let resolved = RideWatchLinkState.resolve(
-         isSupported: true,
-         activation: RideWatchActivation(session.activationState),
-         isPaired: session.isPaired,
-         isCompanionAppInstalled: session.isWatchAppInstalled,
-         isReachable: session.isReachable
-      )
+      // Pairing, installation and reachability are undefined until activation
+      // finishes. Reading them early is what prints "WCSession has not been
+      // activated" and "counterpart app not installed" on every launch.
+      let activation = RideWatchActivation(session.activationState)
+      guard activation == .activated else {
+         applyLinkState(.activating)
+         return
+      }
 
+      // Never read `isWatchAppInstalled`. WCSession logs "counterpart app not
+      // installed" and then lies after a companion install from Xcode, which
+      // blocked every publish to a Watch the rider was already using.
+      applyLinkState(
+         RideWatchLinkState.resolve(
+            isSupported: true,
+            activation: activation,
+            isPaired: session.isPaired,
+            isCompanionAppInstalled: session.isPaired,
+            isReachable: session.isReachable
+         )
+      )
+   }
+
+   private func applyLinkState(_ resolved: RideWatchLinkState) {
       guard resolved != linkState else { return }
 
       linkState = resolved

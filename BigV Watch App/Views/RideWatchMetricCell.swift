@@ -13,6 +13,8 @@ struct RideWatchMetricCell: View {
    var unit: String?
    var tint: Color = .white
    var isDimmed = false
+   var showsHeart = false
+   var beatsPerMinute: Double?
 
    var body: some View {
       VStack(alignment: .leading, spacing: 0) {
@@ -21,9 +23,18 @@ struct RideWatchMetricCell: View {
             .kerning(0.6)
             .foregroundStyle(.white.opacity(0.45))
 
-         HStack(alignment: .firstTextBaseline, spacing: 2) {
+         HStack(alignment: .firstTextBaseline, spacing: 3) {
+            if showsHeart {
+               RideHeartPulseView(
+                  beatsPerMinute: beatsPerMinute,
+                  isBeating: !isDimmed && beatsPerMinute != nil,
+                  font: .system(size: 12, weight: .semibold)
+               )
+               .offset(y: 1)
+            }
+
             Text(value)
-               .font(.system(size: 19, weight: .semibold, design: .rounded))
+               .font(.system(size: 18, weight: .semibold, design: .rounded))
                .monospacedDigit()
                .foregroundStyle(isDimmed ? tint.opacity(0.4) : tint)
                .lineLimit(1)
@@ -46,7 +57,14 @@ struct RideWatchMetricCell: View {
 #Preview {
    HStack {
       RideWatchMetricCell(title: "DIST", value: "12.84", unit: "MI")
-      RideWatchMetricCell(title: "TIME", value: "1:12:04")
+      RideWatchMetricCell(
+         title: "HEART",
+         value: "67",
+         unit: "BPM",
+         tint: RideChromeTokens.pulse,
+         showsHeart: true,
+         beatsPerMinute: 67
+      )
    }
    .padding()
    .background(RideChromeTokens.void)

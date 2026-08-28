@@ -18,7 +18,7 @@ struct RideWatchSpeedHero: View {
    var body: some View {
       HStack(alignment: .firstTextBaseline, spacing: 3) {
          Text(value)
-            .font(.system(size: 44, weight: .semibold, design: .rounded))
+            .font(.system(size: 40, weight: .semibold, design: .rounded))
             .monospacedDigit()
             .foregroundStyle(isLive ? RideChromeTokens.ice : Color.white.opacity(0.4))
             .lineLimit(1)

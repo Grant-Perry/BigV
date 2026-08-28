@@ -37,12 +37,14 @@ struct RideDashboardLandscapeView: View {
             RideSpeedHeroView(
                value: rideViewModel.speed,
                unit: rideViewModel.speedUnit,
+               course: rideViewModel.course,
+               heading: rideViewModel.heading,
+               headingDegrees: rideViewModel.headingDegrees,
                isDimmed: !rideViewModel.hasGPSFix || rideViewModel.isPaused,
-               numeralSize: 72
+               isExpanded: !isDrawerOpen
             )
             .frame(maxHeight: .infinity)
-
-            RideControlBar(rideViewModel: rideViewModel)
+            .layoutPriority(-1)
          }
          .frame(maxWidth: .infinity, maxHeight: .infinity)
 
@@ -60,7 +62,11 @@ struct RideDashboardLandscapeView: View {
                onPlanRoute: onPlanRoute,
                isOpen: $isDrawerOpen
             )
-            .frame(minHeight: isDrawerOpen ? 120 : 36)
+            .overlay(alignment: .bottom) {
+               RideControlBar(rideViewModel: rideViewModel)
+                  .padding(.bottom, 10)
+            }
+            .frame(minHeight: isDrawerOpen ? 120 : RideMapDrawer.collapsedHeight)
          }
          .frame(maxWidth: 340)
       }

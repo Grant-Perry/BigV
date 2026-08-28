@@ -11,7 +11,7 @@ struct RideMarkView: View {
    var isLive: Bool
 
    var body: some View {
-      Image(systemName: .markIcon)
+      Image(systemName: .headingMark)
          .font(.caption.weight(.heavy))
          .foregroundStyle(isLive ? RideDashboardTheme.ice : RideDashboardTheme.ember)
          .accessibilityHidden(true)
@@ -19,5 +19,5 @@ struct RideMarkView: View {
 }
 
 private extension String {
-   static let markIcon = "arrowtriangle.up.right.fill"
+   static let headingMark = "location.north.fill"
 }

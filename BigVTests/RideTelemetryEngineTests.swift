@@ -93,6 +93,21 @@ struct RideTelemetryEngineTests {
       #expect(engine.hasFix == false)
    }
 
+   @Test func acquiresFixAtTheAcquisitionThreshold() {
+      var engine = RideTelemetryEngine()
+      let reference = Date()
+
+      let location = sample(
+         northing: 0,
+         horizontalAccuracy: 65,
+         secondsFromStart: 0,
+         reference: reference
+      )
+
+      #expect(engine.ingest(location) == .acquiredFix)
+      #expect(engine.hasFix)
+   }
+
    @Test func acquiresFixOnUsableSample() {
       var engine = RideTelemetryEngine()
       let reference = Date()

@@ -43,7 +43,7 @@ enum RoutePlanningFailure: String, Error, Sendable {
             "Planning a route needs the network. Reconnect and try again."
 
          case .originUnavailable:
-            "BigV needs your location to plan a route from where you are."
+            "BigVelo needs your location to plan a route from where you are."
 
          case .failed:
             "The routing service could not answer. Try again."

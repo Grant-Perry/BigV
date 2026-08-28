@@ -59,17 +59,20 @@ struct RideDashboardView: View {
          RideSpeedHeroView(
             value: rideViewModel.speed,
             unit: rideViewModel.speedUnit,
+            course: rideViewModel.course,
+            heading: rideViewModel.heading,
+            headingDegrees: rideViewModel.headingDegrees,
             isDimmed: !rideViewModel.hasGPSFix || rideViewModel.isPaused,
-            numeralSize: isDrawerOpen ? 84 : 108
+            isExpanded: !isDrawerOpen
          )
          .frame(maxHeight: .infinity)
+         .layoutPriority(-1)
 
          RideDashboardMetricsGrid(
             rideViewModel: rideViewModel,
             routeGuidanceViewModel: routeGuidanceViewModel
          )
-
-         RideControlBar(rideViewModel: rideViewModel)
+         .layoutPriority(1)
 
          RideMapDrawer(
             rideMapViewModel: rideMapViewModel,
@@ -78,6 +81,11 @@ struct RideDashboardView: View {
             onPlanRoute: onPlanRoute,
             isOpen: $isDrawerOpen
          )
+         .overlay(alignment: .bottom) {
+            RideControlBar(rideViewModel: rideViewModel)
+               .padding(.bottom, 10)
+         }
+         .layoutPriority(1)
       }
       .padding(.horizontal, 16)
       .padding(.top, 8)

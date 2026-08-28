@@ -21,8 +21,12 @@ struct RideDashboardStatusRow: View {
             hasGPSFix: rideViewModel.hasGPSFix
          )
 
-         if let heartRate = rideViewModel.heartRate {
-            RideHeartRateChip(value: heartRate, unit: rideViewModel.heartRateUnit)
+         if !rideViewModel.isIdle {
+            RideHeartRateChip(
+               value: rideViewModel.heartRate ?? RideFormatters.placeholder,
+               unit: rideViewModel.heartRateUnit,
+               beatsPerMinute: rideViewModel.heartRateBeatsPerMinute
+            )
          }
 
          RideSearchButton(style: .chip, identifier: "ride.button.search", action: onPlanRoute)

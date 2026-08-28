@@ -49,6 +49,13 @@ final class RideLocationManager {
       stopUpdates()
       requestAuthorizationIfNeeded()
 
+      // Watch-started rides leave the phone in a pocket. Without a background
+      // session up front, liveUpdates never delivers a first sample, so the
+      // old "wait for a fix" path could never start the session either.
+      if isAuthorized {
+         beginBackgroundSessionIfNeeded()
+      }
+
       let (stream, continuation) = AsyncStream<Event>.makeStream(
          bufferingPolicy: .bufferingNewest(16)
       )
@@ -93,6 +100,9 @@ final class RideLocationManager {
             }
 
             if update.locationUnavailable {
+               if isAuthorized {
+                  beginBackgroundSessionIfNeeded()
+               }
                continuation.yield(.issue(.temporarilyUnavailable))
                continue
             }
@@ -114,10 +124,10 @@ final class RideLocationManager {
 
    /// Keeps location running while mounted with the screen asleep.
    ///
-   /// Deferred until a fix actually arrives: `requestWhenInUseAuthorization()`
-   /// returns while the prompt is still on screen, so creating the session in
-   /// `startUpdates()` would race a first-launch grant. A delivered location is
-   /// proof that authorization was granted.
+   /// `CLBackgroundActivitySession` is what keeps `liveUpdates` alive while
+   /// the phone is locked. Create it as soon as we already have when-in-use;
+   /// a first-launch prompt still waits for `isAuthorized` so we do not
+   /// race the grant.
    private func beginBackgroundSessionIfNeeded() {
       guard backgroundSession == nil else { return }
 

@@ -11,6 +11,7 @@ struct RideWatchStatusLine: View {
    let statusText: String
    let hasGPSFix: Bool
    let isConnected: Bool
+   var versionText: String = RideWatchVersion.label
 
    var body: some View {
       HStack(spacing: 5) {
@@ -24,6 +25,12 @@ struct RideWatchStatusLine: View {
             .lineLimit(1)
 
          Spacer(minLength: 0)
+
+         Text(versionText)
+            .font(.system(size: 9, weight: .semibold, design: .rounded))
+            .monospacedDigit()
+            .foregroundStyle(.white.opacity(0.40))
+            .accessibilityLabel("Version \(versionText)")
 
          if !isConnected {
             Image(systemName: .disconnectedIcon)

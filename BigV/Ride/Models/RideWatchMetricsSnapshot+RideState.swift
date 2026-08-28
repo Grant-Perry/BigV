@@ -19,7 +19,9 @@ extension RideWatchMetricsSnapshot {
          elapsedTime: state.elapsedTime,
          hasGPSFix: state.hasGPSFix,
          isMoving: state.isMoving,
-         capturedAt: capturedAt
+         capturedAt: capturedAt,
+         locationIssue: state.locationIssue?.watchMessage,
+         horizontalAccuracy: state.horizontalAccuracy
       )
    }
 }
