@@ -6,7 +6,7 @@
 import Foundation
 
 /// Lifecycle of a single ride session.
-enum RidePhase: String, Sendable, CaseIterable {
+nonisolated enum RidePhase: String, Sendable, CaseIterable {
 
    /// No ride in progress.
    case idle

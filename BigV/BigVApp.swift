@@ -45,12 +45,19 @@ struct BigVApp: App {
          plannedRouteProvider: MapKitCyclingRoutePlanner()
       )
 
+      // The Watch is a body sensor and a remote, so its manager is handed to the
+      // session rather than to the view layer: heart rate and wrist commands go
+      // through the one type allowed to publish a ride.
       let rideSessionManager = RideSessionManager(
          rideStorageManager: rideStorageManager,
          rideHealthManager: RideHealthManager(),
          rideRouteRecorder: rideRouteRecorder,
-         routeGuidanceManager: routeGuidanceManager
+         routeGuidanceManager: routeGuidanceManager,
+         rideWatchManager: RideWatchManager()
       )
+
+      // Opened here, not per ride: START from the wrist has to reach an idle phone.
+      rideSessionManager.activateWatchLink()
 
       sharedModelContainer = modelContainer
       _rideViewModel = State(initialValue: RideViewModel(rideSessionManager: rideSessionManager))

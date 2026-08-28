@@ -31,6 +31,7 @@ final class RideSessionManager {
    private let rideFinalizer: RideFinalizer
    private let rideRouteRecorder: RideRouteRecorder
    private let routeGuidanceManager: RouteGuidanceManager?
+   private let rideWatchManager: RideWatchManager?
    private var telemetryEngine: RideTelemetryEngine
    private var rideClock = RideClock()
 
@@ -38,11 +39,17 @@ final class RideSessionManager {
    private var clockTask: Task<Void, Never>?
    private var finalizeTask: Task<Void, Never>?
    private var authorizationTask: Task<Void, Never>?
+   private var watchLinkTask: Task<Void, Never>?
 
    private var lastSampleAt: Date?
+   private var lastHeartRateAt: Date?
 
    /// Displayed speed drops to zero when samples stop arriving for this long.
    private let sampleStalenessWindow: TimeInterval = 4
+
+   /// Heart rate clears when the wrist stops feeding one for this long. Wider than
+   /// the speed window because watchOS writes beats in batches, not per second.
+   private let heartRateStalenessWindow: TimeInterval = 15
 
    // MARK: - Initialization
 
@@ -54,7 +61,8 @@ final class RideSessionManager {
       rideStorageManager: RideStorageManager? = nil,
       rideHealthManager: RideHealthManager? = nil,
       rideRouteRecorder: RideRouteRecorder = RideRouteRecorder(),
-      routeGuidanceManager: RouteGuidanceManager? = nil
+      routeGuidanceManager: RouteGuidanceManager? = nil,
+      rideWatchManager: RideWatchManager? = nil
    ) {
       self.locationManager = locationManager
       self.rideStorageManager = rideStorageManager
@@ -64,6 +72,7 @@ final class RideSessionManager {
       )
       self.rideRouteRecorder = rideRouteRecorder
       self.routeGuidanceManager = routeGuidanceManager
+      self.rideWatchManager = rideWatchManager
       self.telemetryEngine = RideTelemetryEngine(configuration: configuration)
    }
 
@@ -84,6 +93,7 @@ final class RideSessionManager {
       startLocationStream()
       startClock()
       requestHealthAuthorization()
+      mirrorToWatch()
 
       DebugPrint(mode: .sessionLifecycle, "Ride start requested")
    }
@@ -96,6 +106,7 @@ final class RideSessionManager {
       telemetryEngine.markSpeedStale()
       publishTelemetry()
       flushPendingWork()
+      mirrorToWatch()
 
       DebugPrint(mode: .sessionLifecycle, "Ride paused")
    }
@@ -106,6 +117,7 @@ final class RideSessionManager {
       rideClock.endPause()
       lastSampleAt = nil
       state.phase = .recording
+      mirrorToWatch()
 
       DebugPrint(mode: .sessionLifecycle, "Ride resumed")
    }
@@ -143,6 +155,7 @@ final class RideSessionManager {
       }
 
       state.phase = .finished
+      mirrorToWatch()
 
       DebugPrint(
          mode: .sessionLifecycle,
@@ -172,6 +185,7 @@ final class RideSessionManager {
       state = RideState()
       finishedRideID = nil
       lastSampleAt = nil
+      mirrorToWatch()
    }
 
    // MARK: - Discarding
@@ -323,6 +337,7 @@ final class RideSessionManager {
 
       rideStorageManager?.beginRide(startDate: startDate)
       state.hasStorageFailure = rideStorageManager?.hasFailure ?? false
+      mirrorToWatch()
 
       DebugPrint(mode: .sessionLifecycle, "GPS fix acquired, recording started")
    }
@@ -355,10 +370,15 @@ final class RideSessionManager {
    // MARK: - Clock
 
    private func tick() {
+      // Runs in every active phase, unlike the rest of the tick: a paused rider
+      // whose Watch dropped off must not keep a frozen pulse on screen.
+      expireStaleHeartRate()
+
       guard state.phase == .recording else { return }
 
       refreshElapsedTime()
       expireStaleSpeed()
+      mirrorToWatch()
    }
 
    private func refreshElapsedTime() {
@@ -379,6 +399,87 @@ final class RideSessionManager {
 
       telemetryEngine.markSpeedStale()
       publishTelemetry()
+   }
+
+   // MARK: - Watch Link
+
+   /// Opens the wrist link for the life of the app.
+   ///
+   /// Not tied to a ride: START has to work from the wrist while the phone sits
+   /// idle in a pocket, so this stream outlives every session and `stopStreams()`
+   /// deliberately leaves it alone.
+   func activateWatchLink() {
+      guard let rideWatchManager else { return }
+
+      watchLinkTask?.cancel()
+      let events = rideWatchManager.activate()
+
+      watchLinkTask = Task { [weak self] in
+         for await event in events {
+            guard let self else { return }
+            self.handle(event)
+         }
+      }
+   }
+
+   private func handle(_ event: RideWatchManager.Event) {
+      switch event {
+         case .heartRate(let beatsPerMinute):
+            state.heartRate = beatsPerMinute
+            lastHeartRateAt = beatsPerMinute == nil ? nil : .now
+
+         case .command(let request, let acknowledgement):
+            apply(request, acknowledgement: acknowledgement)
+      }
+   }
+
+   /// Drops a pulse the wrist stopped sending.
+   ///
+   /// The Watch says so explicitly when it stops sensing, but that message needs
+   /// reachability. This covers the case where it never arrived.
+   private func expireStaleHeartRate() {
+      guard state.heartRate != nil,
+            let lastHeartRateAt,
+            Date.now.timeIntervalSince(lastHeartRateAt) > heartRateStalenessWindow
+      else { return }
+
+      state.heartRate = nil
+      self.lastHeartRateAt = nil
+
+      DebugPrint(mode: .sensors, "Heart rate expired; wrist stopped reporting")
+   }
+
+   /// Judges a remote command, then acts through the same lifecycle methods the
+   /// phone's own buttons use.
+   ///
+   /// Every one of those methods already guards its phase, so a command that
+   /// arrives twice — a live send and a queued transfer racing each other — costs
+   /// nothing. The validator exists only to tell the rider *why* nothing happened.
+   private func apply(
+      _ request: RideRemoteCommandRequest,
+      acknowledgement: RideRemoteCommandAcknowledgement
+   ) {
+      let outcome = RideRemoteCommandValidator.evaluate(request, phase: state.phase)
+
+      if outcome == .accepted {
+         switch request.command {
+            case .start: start()
+            case .pause: pause()
+            case .resume: resume()
+            case .end: end()
+         }
+      }
+
+      acknowledgement(outcome, phase: state.phase)
+
+      DebugPrint(
+         mode: .sessionLifecycle,
+         "Remote \(request.command.rawValue): \(outcome.rawValue), now \(state.phase.rawValue)"
+      )
+   }
+
+   private func mirrorToWatch() {
+      rideWatchManager?.publish(RideWatchMetricsSnapshot(state: state))
    }
 
    // MARK: - Publishing
