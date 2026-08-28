@@ -141,52 +141,8 @@ struct RouteGuidanceBannerView: View {
 
    // MARK: - Controls
 
-   @ViewBuilder
    private var controls: some View {
-      if routeGuidanceViewModel.hasArrived {
-         Button("Done", action: routeGuidanceViewModel.dismissArrival)
-            .font(.subheadline.weight(.bold))
-            .buttonStyle(.borderedProminent)
-            .tint(.green)
-            .accessibilityIdentifier("guidance.button.done")
-      } else {
-         HStack(spacing: 4) {
-            circleButton(
-               icon: routeGuidanceViewModel.isVoiceEnabled ? .voiceOnIcon : .voiceOffIcon,
-               tint: routeGuidanceViewModel.isVoiceEnabled ? .white.opacity(0.85) : .white.opacity(0.35),
-               label: routeGuidanceViewModel.isVoiceEnabled ? "Mute voice guidance" : "Unmute voice guidance",
-               identifier: "guidance.button.voice",
-               action: routeGuidanceViewModel.toggleVoice
-            )
-
-            circleButton(
-               icon: .stopGuidanceIcon,
-               tint: .white.opacity(0.5),
-               label: "Stop guidance",
-               identifier: "guidance.button.stop",
-               action: routeGuidanceViewModel.stopGuidance
-            )
-         }
-      }
-   }
-
-   private func circleButton(
-      icon: String,
-      tint: Color,
-      label: String,
-      identifier: String,
-      action: @escaping () -> Void
-   ) -> some View {
-      Button(action: action) {
-         Image(systemName: icon)
-            .font(.footnote.weight(.semibold))
-            .foregroundStyle(tint)
-            .frame(width: 38, height: 38)
-            .contentShape(.circle)
-      }
-      .buttonStyle(.plain)
-      .accessibilityLabel(label)
-      .accessibilityIdentifier(identifier)
+      RouteGuidanceControlsView(routeGuidanceViewModel: routeGuidanceViewModel)
    }
 
    // MARK: - Footer
@@ -238,9 +194,6 @@ struct RouteGuidanceBannerView: View {
 // MARK: - Icons
 
 private extension String {
-   static let voiceOnIcon = "speaker.wave.2.fill"
-   static let voiceOffIcon = "speaker.slash.fill"
-   static let stopGuidanceIcon = "xmark"
    static let expandIcon = "chevron.down"
    static let collapseIcon = "chevron.up"
 }

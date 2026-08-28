@@ -211,6 +211,83 @@ struct RouteGuidanceManagerTests {
       #expect(plannedRouteManager.hasActiveRoute)
    }
 
+   /// The rider asked for the route gone, not the ride gone. This manager must
+   /// never be able to reach the session, so the check is that it drops its own
+   /// state and the line, and nothing else.
+   @Test func endingNavigationClearsTheRouteAndStopsGuidance() {
+      let plannedRouteManager = PlannedRouteManager()
+      plannedRouteManager.activate(straightRoute(length: 1_000), to: destination)
+      let manager = makeManager(planner: FakeRoutePlanner(), plannedRouteManager: plannedRouteManager)
+
+      ride(manager, from: 0, to: 100)
+      #expect(manager.phase == .guiding)
+
+      manager.endNavigation()
+
+      #expect(manager.phase == .inactive)
+      #expect(manager.progress == .inactive)
+      #expect(manager.destinationName == nil)
+      #expect(plannedRouteManager.hasActiveRoute == false)
+      #expect(plannedRouteManager.destination == nil)
+   }
+
+   @Test func endingNavigationSurvivesTheNextGPSSamples() {
+      let plannedRouteManager = PlannedRouteManager()
+      plannedRouteManager.activate(straightRoute(length: 1_000), to: destination)
+      let manager = makeManager(planner: FakeRoutePlanner(), plannedRouteManager: plannedRouteManager)
+
+      ride(manager, from: 0, to: 100)
+      manager.endNavigation()
+
+      // The ride is still recording, so samples keep arriving. None of them may
+      // resurrect the route the rider just threw away.
+      ride(manager, from: 120, to: 300, startingAtSecond: 100)
+
+      #expect(manager.phase == .inactive)
+      #expect(plannedRouteManager.hasActiveRoute == false)
+   }
+
+   @Test func planningAgainAfterEndingNavigationGuidesOnceMore() {
+      let plannedRouteManager = PlannedRouteManager()
+      plannedRouteManager.activate(straightRoute(length: 1_000), to: destination)
+      let manager = makeManager(planner: FakeRoutePlanner(), plannedRouteManager: plannedRouteManager)
+
+      ride(manager, from: 0, to: 100)
+      manager.endNavigation()
+      ride(manager, from: 120, to: 140, startingAtSecond: 100)
+      #expect(manager.phase == .inactive)
+
+      plannedRouteManager.activate(straightRoute(length: 1_000), to: destination)
+      ride(manager, from: 160, to: 200, startingAtSecond: 200)
+
+      #expect(manager.phase == .guiding)
+      #expect(manager.destinationName == "The Coffee Place")
+   }
+
+   /// Ending navigation mid-reroute must retire the in-flight request too, or a
+   /// late answer would put a route back on a map the rider just cleared.
+   @Test func endingNavigationDuringARerouteDiscardsTheAnswer() async {
+      let planner = FakeRoutePlanner()
+      planner.result = .success([straightRoute(length: 900, north: 200)])
+      planner.holdsUntilReleased = true
+
+      let plannedRouteManager = PlannedRouteManager()
+      plannedRouteManager.activate(straightRoute(length: 4_000), to: destination)
+      let manager = makeManager(planner: planner, plannedRouteManager: plannedRouteManager)
+
+      ride(manager, from: 0, to: 200)
+      strayOffRoute(manager, east: 220, startingAtSecond: 100)
+      await settle()
+      #expect(planner.requestCount == 1)
+
+      manager.endNavigation()
+      planner.release()
+      await settle()
+
+      #expect(plannedRouteManager.hasActiveRoute == false)
+      #expect(manager.phase == .inactive)
+   }
+
    @Test func activatingANewRouteResumesGuidanceAfterStopping() {
       let plannedRouteManager = PlannedRouteManager()
       plannedRouteManager.activate(straightRoute(length: 1_000), to: destination)

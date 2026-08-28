@@ -20,13 +20,6 @@ struct RouteGuidanceStripView: View {
    var body: some View {
       VStack(alignment: .leading, spacing: 8) {
          strip
-            .onTapGesture(perform: routeGuidanceViewModel.toggleTurnList)
-            .accessibilityAddTraits(routeGuidanceViewModel.canPresentTurnList ? .isButton : [])
-            .accessibilityHint(
-               routeGuidanceViewModel.canPresentTurnList
-                  ? (routeGuidanceViewModel.isTurnListPresented ? "Hides the turn list" : "Shows all turns")
-                  : ""
-            )
 
          if routeGuidanceViewModel.isTurnListPresented {
             RouteGuidanceTurnListView(
@@ -37,7 +30,34 @@ struct RouteGuidanceStripView: View {
       }
    }
 
+   /// The turn readout takes the tap that expands the list; the controls sit
+   /// outside it so muting or ending navigation never opens the turn list by
+   /// accident.
    private var strip: some View {
+      HStack(spacing: 6) {
+         turnSummary
+            .contentShape(.rect)
+            .onTapGesture(perform: routeGuidanceViewModel.toggleTurnList)
+            .accessibilityAddTraits(routeGuidanceViewModel.canPresentTurnList ? .isButton : [])
+            .accessibilityHint(turnListHint)
+
+         RouteGuidanceControlsView(
+            routeGuidanceViewModel: routeGuidanceViewModel,
+            diameter: 34
+         )
+      }
+      .padding(.leading, 14)
+      .padding(.trailing, 6)
+      .padding(.vertical, 6)
+      .rideGlassCard(density: .hud, cornerRadius: 14)
+      .overlay(
+         RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .stroke(accent.opacity(0.35), lineWidth: 1)
+      )
+      .accessibilityIdentifier("dashboard.guidance")
+   }
+
+   private var turnSummary: some View {
       HStack(spacing: 12) {
          Image(systemName: .guidanceIcon)
             .font(.footnote.weight(.bold))
@@ -62,14 +82,12 @@ struct RouteGuidanceStripView: View {
                .foregroundStyle(.white.opacity(0.4))
          }
       }
-      .padding(.horizontal, 14)
-      .padding(.vertical, 10)
-      .rideGlassCard(density: .hud, cornerRadius: 14)
-      .overlay(
-         RoundedRectangle(cornerRadius: 14, style: .continuous)
-            .stroke(accent.opacity(0.35), lineWidth: 1)
-      )
-      .accessibilityIdentifier("dashboard.guidance")
+      .padding(.vertical, 4)
+   }
+
+   private var turnListHint: String {
+      guard routeGuidanceViewModel.canPresentTurnList else { return "" }
+      return routeGuidanceViewModel.isTurnListPresented ? "Hides the turn list" : "Shows all turns"
    }
 
    private func jump(to turn: PlannedRouteManeuver) {

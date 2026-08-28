@@ -170,16 +170,22 @@ final class RouteGuidanceViewModel {
       set { routeGuidanceManager.isVoiceEnabled = newValue }
    }
 
+   var voiceButtonLabel: String {
+      isVoiceEnabled ? "Mute voice guidance" : "Unmute voice guidance"
+   }
+
    func toggleVoice() {
       routeGuidanceManager.isVoiceEnabled.toggle()
    }
 
    // MARK: - Intent
 
-   func stopGuidance() {
+   /// Drops the route and the turn calls in one action. The ride keeps
+   /// recording, which is the part riders need spelled out.
+   func endNavigation() {
       collapseTurnList()
       selectedTurnID = nil
-      routeGuidanceManager.stopFollowing()
+      routeGuidanceManager.endNavigation()
    }
 
    func dismissArrival() {

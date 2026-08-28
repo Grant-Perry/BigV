@@ -197,6 +197,20 @@ final class RouteGuidanceManager {
       DebugPrint(mode: .navigation, "Rider stopped guidance")
    }
 
+   /// Ends navigation outright: the turn calls stop and the planned line comes
+   /// off the map.
+   ///
+   /// The ride is deliberately untouched. Recording, the clock, the breadcrumb
+   /// and the Health export all carry on — abandoning a route is not abandoning
+   /// the ride, and losing a workout to a cancelled navigation would be
+   /// indefensible.
+   func endNavigation() {
+      stopFollowing()
+      plannedRouteManager.clear()
+
+      DebugPrint(mode: .navigation, "Rider ended navigation; ride continues")
+   }
+
    func dismissArrival() {
       guard phase == .arrived else { return }
       stop()
