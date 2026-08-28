@@ -257,6 +257,11 @@ extension RideRadarSide {
    var paddingEdge: Edge.Set {
       self == .leading ? .leading : .trailing
    }
+
+   /// The edge the tape slides off when the radar link drops.
+   var transitionEdge: Edge {
+      self == .leading ? .leading : .trailing
+   }
 }
 
 // MARK: - Lateral Hook

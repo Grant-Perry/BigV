@@ -18,6 +18,7 @@ struct RideDashboardStatusRow: View {
       HStack(spacing: 8) {
          RideStatusBar(
             statusText: rideViewModel.statusText,
+            showsLabel: !rideViewModel.isRecording,
             accuracyText: rideViewModel.accuracyText,
             issueMessage: rideViewModel.issueMessage,
             hasGPSFix: rideViewModel.hasGPSFix
@@ -33,7 +34,7 @@ struct RideDashboardStatusRow: View {
 
          // Live cue whenever a radar is set up; on idle it doubles as the way
          // in to pairing, so the feature is discoverable before first pairing.
-         if rideViewModel.showsRadarTape || rideViewModel.isIdle {
+         if rideViewModel.isRadarAvailable || rideViewModel.isIdle {
             RideRadarChip(
                connection: rideViewModel.radarConnection,
                tier: rideViewModel.radarTier,

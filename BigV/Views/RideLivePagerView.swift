@@ -24,7 +24,7 @@ struct RideLivePagerView: View {
    /// The radar page exists only when a radar does — no rider without one
    /// should ever swipe onto an empty road.
    private var pages: [RidePage] {
-      rideViewModel.showsRadarTape ? RidePage.allCases : [.dashboard, .map]
+      rideViewModel.isRadarAvailable ? RidePage.allCases : [.dashboard, .map]
    }
 
    var body: some View {
@@ -45,7 +45,7 @@ struct RideLivePagerView: View {
          if page == .map { isMapPageMounted = true }
          routeGuidanceViewModel.collapseTurnList()
       }
-      .onChange(of: rideViewModel.showsRadarTape) { _, isAvailable in
+      .onChange(of: rideViewModel.isRadarAvailable) { _, isAvailable in
          if !isAvailable, selectedPage == .radar {
             selectedPage = .dashboard
          }

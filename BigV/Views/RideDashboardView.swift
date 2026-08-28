@@ -119,8 +119,12 @@ struct RideDashboardView: View {
                tapeWidth: RideRadarTapeView.dashboardWidth
             )
             .padding(.vertical, 2)
+            .transition(.move(edge: rideViewModel.radarSide.transitionEdge).combined(with: .opacity))
          }
       }
+      // The gutter opening and closing is a full-width reflow of the cockpit,
+      // so it slides rather than snapping when a radar drops or reconnects.
+      .animation(.smooth(duration: 0.3), value: rideViewModel.showsRadarTape)
    }
 
    /// Content inset on the radar side: the tape's width plus a small gap.

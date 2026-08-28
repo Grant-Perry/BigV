@@ -53,7 +53,7 @@ struct RideRootView: View {
             tier: rideViewModel.radarTier,
             alertPulse: rideViewModel.radarAlertPulse,
             clearPulse: rideViewModel.radarClearPulse,
-            isEnabled: rideViewModel.radarOverlayEnabled && rideViewModel.showsRadarTape
+            isEnabled: rideViewModel.radarOverlayEnabled && rideViewModel.isRadarAvailable
          )
       }
       .sensoryFeedback(trigger: rideViewModel.radarAlertPulse) { _, _ in

@@ -108,7 +108,13 @@ final class RideViewModel {
 
    /// Whether radar chrome belongs on screen at all. No pairing, no simulator,
    /// or the feature switched off → no empty rails anywhere.
-   var showsRadarTape: Bool { rideSessionManager.isRadarDisplayAvailable }
+   var isRadarAvailable: Bool { rideSessionManager.isRadarDisplayAvailable }
+
+   /// The tape only earns its gutter while the link can still produce pips. A
+   /// radar that is off, out of range, or done retrying hands the width back to
+   /// the cockpit; the status-row chip keeps carrying the OFF state, so nothing
+   /// is hidden from the rider.
+   var showsRadarTape: Bool { isRadarAvailable && radarConnection != .disconnected }
 
    /// The tape dims when the link is down or the ride is paused — present but
    /// visibly not live, matching the speed hero's treatment.
