@@ -8,20 +8,25 @@ import Synchronization
 
 // MARK: - Configuration
 
-enum DebugConfig {
+nonisolated enum DebugConfig {
 
-   /// Active debug areas. Keep this `.none` for production builds.
+   /// Active debug areas. Release builds are always silent; the debug value is
+   /// the working knob.
    ///
    /// Examples:
-   /// - `.none` — silent (production)
+   /// - `.none` — silent
    /// - `.ride` — the live ride engine
    /// - `[.locationFiltering, .telemetry]` — specific areas
-   static let activeMode: DebugMode = .none
+   #if DEBUG
+      static let activeMode: DebugMode = .weather
+   #else
+      static let activeMode: DebugMode = .none
+   #endif
 }
 
 // MARK: - Debug Areas
 
-struct DebugMode: OptionSet, Sendable {
+nonisolated struct DebugMode: OptionSet, Sendable {
 
    let rawValue: Int
 
@@ -35,19 +40,20 @@ struct DebugMode: OptionSet, Sendable {
    static let sensors             = DebugMode(rawValue: 1 << 5)
    static let radar               = DebugMode(rawValue: 1 << 6)
    static let navigation          = DebugMode(rawValue: 1 << 7)
+   static let weather             = DebugMode(rawValue: 1 << 8)
 
    // MARK: - Combinations
 
    static let ride: DebugMode = [.locationFiltering, .telemetry, .sessionLifecycle]
    static let all: DebugMode = [
       .locationFiltering, .telemetry, .sessionLifecycle, .persistence,
-      .healthKit, .sensors, .radar, .navigation
+      .healthKit, .sensors, .radar, .navigation, .weather
    ]
 }
 
 // MARK: - Iteration Tracking
 
-private let debugPrintIterations = Mutex<[String: Int]>([:])
+private nonisolated let debugPrintIterations = Mutex<[String: Int]>([:])
 
 // MARK: - Debug Print
 
@@ -63,7 +69,7 @@ private let debugPrintIterations = Mutex<[String: Int]>([:])
 /// DebugPrint(mode: .telemetry, "Distance: \(distance)")
 /// DebugPrint(mode: .locationFiltering, limit: 20, "Rejected: \(reason)")
 /// ```
-func DebugPrint(
+nonisolated func DebugPrint(
    mode: DebugMode = .all,
    limit: Int = 0,
    file: String = #fileID,

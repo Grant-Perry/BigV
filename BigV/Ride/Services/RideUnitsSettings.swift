@@ -29,7 +29,13 @@ final class RideUnitsSettings {
       didSet { defaults.set(system.rawValue, forKey: RideUnitSystem.defaultsKey) }
    }
 
-   /// Set once the rider has been through the first-run setup sheet.
+   /// Weather's scale, deliberately independent of `system`: riders ask for
+   /// miles and Celsius often enough that tying the two would be wrong.
+   var temperatureUnit: RideTemperatureUnit {
+      didSet { defaults.set(temperatureUnit.rawValue, forKey: RideTemperatureUnit.defaultsKey) }
+   }
+
+   /// Set once the rider has been through first-run setup.
    var hasCompletedSetup: Bool {
       didSet { defaults.set(hasCompletedSetup, forKey: Key.setupCompleted) }
    }
@@ -39,6 +45,7 @@ final class RideUnitsSettings {
    init(defaults: UserDefaults = .standard) {
       self.defaults = defaults
       system = RideUnitSystem.stored(in: defaults)
+      temperatureUnit = RideTemperatureUnit.stored(in: defaults)
       hasCompletedSetup = defaults.bool(forKey: Key.setupCompleted)
    }
 }

@@ -13,28 +13,28 @@ struct RideRouteDetailView: View {
    let rideID: PersistentIdentifier
 
    var body: some View {
-      ZStack {
+      ScrollView {
+         VStack(spacing: 14) {
+            RideRouteMapView(
+               route: rideRouteViewModel.route,
+               isLoaded: rideRouteViewModel.isLoaded,
+               height: 280,
+               radarPasses: rideRouteViewModel.radarPasses
+            )
+
+            if let totals = rideRouteViewModel.totals {
+               RideTotalsGridView(totals: totals, identifierPrefix: "detail.tile")
+            }
+         }
+         .padding(.horizontal, 16)
+         .padding(.vertical, 12)
+      }
+      .scrollIndicators(.hidden)
+      .background {
          RideAtmosphereBackground(scene: .summary)
             .ignoresSafeArea()
-
-         ScrollView {
-            VStack(spacing: 14) {
-               RideRouteMapView(
-                  route: rideRouteViewModel.route,
-                  isLoaded: rideRouteViewModel.isLoaded,
-                  height: 280,
-                  radarPasses: rideRouteViewModel.radarPasses
-               )
-
-               if let totals = rideRouteViewModel.totals {
-                  RideTotalsGridView(totals: totals, identifierPrefix: "detail.tile")
-               }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-         }
-         .scrollIndicators(.hidden)
       }
+      .rideAppFooter()
       .navigationTitle(rideRouteViewModel.titleText)
       .navigationBarTitleDisplayMode(.inline)
       .task(id: rideID) { rideRouteViewModel.load(rideID) }

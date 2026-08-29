@@ -12,11 +12,8 @@ struct RideDashboardLandscapeView: View {
    let rideMapViewModel: RideMapViewModel
    let routeGuidanceViewModel: RouteGuidanceViewModel
    let showsDrawerMap: Bool
-   let onShowHistory: () -> Void
-   let onPlanRoute: () -> Void
    let onExpandMap: () -> Void
    let onShowRadar: () -> Void
-   let onShowSetup: () -> Void
 
    @Binding var isDrawerOpen: Bool
 
@@ -31,10 +28,7 @@ struct RideDashboardLandscapeView: View {
          VStack(spacing: 8) {
             RideDashboardStatusRow(
                rideViewModel: rideViewModel,
-               onShowHistory: onShowHistory,
-               onPlanRoute: onPlanRoute,
-               onShowRadar: onShowRadar,
-               onShowSetup: onShowSetup
+               onShowRadar: onShowRadar
             )
 
             if routeGuidanceViewModel.isActive {
@@ -61,7 +55,8 @@ struct RideDashboardLandscapeView: View {
          VStack(spacing: 8) {
             RideDashboardMetricsGrid(
                rideViewModel: rideViewModel,
-               routeGuidanceViewModel: routeGuidanceViewModel
+               routeGuidanceViewModel: routeGuidanceViewModel,
+               isCompact: true
             )
 
             RideMapDrawer(
@@ -69,14 +64,13 @@ struct RideDashboardLandscapeView: View {
                isMapMounted: showsDrawerMap,
                isVertical: false,
                onExpand: onExpandMap,
-               onPlanRoute: onPlanRoute,
                isOpen: $isDrawerOpen
             )
             .overlay(alignment: .bottom) {
                RideControlBar(rideViewModel: rideViewModel)
                   .padding(.bottom, 10)
             }
-            .frame(minHeight: isDrawerOpen ? 120 : RideMapDrawer.collapsedHeight)
+            .frame(minHeight: isDrawerOpen ? 96 : RideMapDrawer.collapsedHeight)
          }
          .frame(maxWidth: 340)
 

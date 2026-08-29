@@ -13,10 +13,7 @@ struct RideLivePagerView: View {
    let rideViewModel: RideViewModel
    let rideMapViewModel: RideMapViewModel
    let routeGuidanceViewModel: RouteGuidanceViewModel
-   let onShowHistory: () -> Void
-   let onPlanRoute: () -> Void
    let onShowRadar: () -> Void
-   let onShowSetup: () -> Void
 
    @State private var selectedPage: RidePage = .dashboard
    @State private var isMapPageMounted = false
@@ -37,8 +34,7 @@ struct RideLivePagerView: View {
          }
          .tabViewStyle(.page(indexDisplayMode: .never))
 
-         RidePageIndicatorView(pages: pages, selectedPage: selectedPage)
-            .padding(.vertical, 6)
+         bottomStrip
       }
       .background(Color.clear)
       .onChange(of: selectedPage) { _, page in
@@ -50,6 +46,21 @@ struct RideLivePagerView: View {
             selectedPage = .dashboard
          }
       }
+   }
+
+   // MARK: - Bottom Strip
+
+   /// Page dots and the attribution whisper share one band above the tab bar.
+   /// Stacking them as two separate rows would cost the speed hero another
+   /// twenty points for no extra information.
+   private var bottomStrip: some View {
+      VStack(spacing: 4) {
+         RidePageIndicatorView(pages: pages, selectedPage: selectedPage)
+
+         RideAppFooterView(style: .compact)
+      }
+      .padding(.top, 6)
+      .padding(.bottom, 2)
    }
 
    // MARK: - Page Swipe
@@ -96,11 +107,8 @@ struct RideLivePagerView: View {
                rideMapViewModel: rideMapViewModel,
                routeGuidanceViewModel: routeGuidanceViewModel,
                showsDrawerMap: selectedPage == .dashboard,
-               onShowHistory: onShowHistory,
-               onPlanRoute: onPlanRoute,
                onExpandMap: { selectedPage = .map },
-               onShowRadar: onShowRadar,
-               onShowSetup: onShowSetup
+               onShowRadar: onShowRadar
             )
             .simultaneousGesture(swipeToMap)
 
@@ -110,8 +118,7 @@ struct RideLivePagerView: View {
                   RideMapView(
                      rideViewModel: rideViewModel,
                      rideMapViewModel: rideMapViewModel,
-                     routeGuidanceViewModel: routeGuidanceViewModel,
-                     onPlanRoute: onPlanRoute
+                     routeGuidanceViewModel: routeGuidanceViewModel
                   )
                } else {
                   Color.clear
@@ -176,10 +183,8 @@ private enum RidePageSwipe {
       rideViewModel: RideViewModel(),
       rideMapViewModel: RideMapViewModel(),
       routeGuidanceViewModel: RouteGuidanceViewModel(),
-      onShowHistory: {},
-      onPlanRoute: {},
-      onShowRadar: {},
-      onShowSetup: {}
+      onShowRadar: {}
    )
+   .environment(RideWeatherModel(unitsSettings: RideUnitsSettings()))
    .preferredColorScheme(.dark)
 }

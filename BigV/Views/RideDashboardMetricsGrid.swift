@@ -5,78 +5,98 @@
 
 import SwiftUI
 
-/// Dashboard 2-column metrics. Left column trails into the gutter.
+/// Dashboard metrics. Left column trails into the gutter.
+///
+/// Portrait runs two tall columns. Landscape runs three short ones, because the
+/// cockpit there is wide and shallow and two columns of full-size tiles do not
+/// fit above the drawer and the tab bar.
 struct RideDashboardMetricsGrid: View {
 
    let rideViewModel: RideViewModel
    let routeGuidanceViewModel: RouteGuidanceViewModel
+   var isCompact: Bool = false
 
-   private let tileColumns = [
-      GridItem(.flexible(), spacing: 10),
-      GridItem(.flexible(), spacing: 10)
-   ]
+   private var tileColumns: [GridItem] {
+      Array(
+         repeating: GridItem(.flexible(), spacing: 10),
+         count: isCompact ? 3 : 2
+      )
+   }
 
    var body: some View {
       LazyVGrid(columns: tileColumns, spacing: 10) {
-         RideMetricTile(
-            title: "DISTANCE",
+         tile(
+            "DISTANCE",
             value: rideViewModel.distance,
             unit: rideViewModel.distanceUnit,
             identifier: "ride.tile.distance",
             gutterAlignment: .trailing
          )
 
-         RideMetricTile(
-            title: "RIDE TIME",
+         tile(
+            "RIDE TIME",
             value: rideViewModel.rideTime,
-            identifier: "ride.tile.rideTime",
-            gutterAlignment: .leading
+            identifier: "ride.tile.rideTime"
          )
 
-         RideMetricTile(
-            title: "ELEV GAIN",
+         tile(
+            "ELEV GAIN",
             value: rideViewModel.elevationGain,
             unit: rideViewModel.elevationUnit,
             gutterAlignment: .trailing
          )
 
-         RideMetricTile(
-            title: "GRADE",
+         tile(
+            "GRADE",
             value: rideViewModel.grade,
-            unit: rideViewModel.gradeUnit,
-            gutterAlignment: .leading
+            unit: rideViewModel.gradeUnit
          )
 
-         RideMetricTile(
-            title: "AVG SPEED",
+         tile(
+            "AVG SPEED",
             value: rideViewModel.averageSpeed,
             unit: rideViewModel.speedUnit,
             gutterAlignment: .trailing
          )
 
-         RideMetricTile(
-            title: "MAX SPEED",
+         tile(
+            "MAX SPEED",
             value: rideViewModel.maximumSpeed,
-            unit: rideViewModel.speedUnit,
-            gutterAlignment: .leading
+            unit: rideViewModel.speedUnit
          )
 
          if routeGuidanceViewModel.isActive {
-            RideMetricTile(
-               title: "TO GO",
+            tile(
+               "TO GO",
                value: routeGuidanceViewModel.distanceRemaining,
                unit: routeGuidanceViewModel.distanceRemainingUnit,
                identifier: "ride.tile.toGo",
                gutterAlignment: .trailing
             )
 
-            RideMetricTile(
-               title: "ETA",
+            tile(
+               "ETA",
                value: routeGuidanceViewModel.arrivalTime,
-               identifier: "ride.tile.eta",
-               gutterAlignment: .leading
+               identifier: "ride.tile.eta"
             )
          }
       }
+   }
+
+   private func tile(
+      _ title: String,
+      value: String,
+      unit: String? = nil,
+      identifier: String? = nil,
+      gutterAlignment: HorizontalAlignment = .leading
+   ) -> some View {
+      RideMetricTile(
+         title: title,
+         value: value,
+         unit: unit,
+         identifier: identifier,
+         gutterAlignment: gutterAlignment,
+         isCompact: isCompact
+      )
    }
 }

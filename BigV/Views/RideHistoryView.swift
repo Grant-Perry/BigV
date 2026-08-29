@@ -6,34 +6,34 @@
 import SwiftData
 import SwiftUI
 
-/// The product landing page: latest ride as a cinematic card, then the rest.
+/// The Rides tab: latest ride as a cinematic card, then the rest.
 struct RideHistoryView: View {
 
    let rideHistoryViewModel: RideHistoryViewModel
    let rideRouteViewModel: RideRouteViewModel
 
-   @Environment(\.dismiss) private var dismiss
-
    @State private var pendingDeletion: [RideHistoryViewModel.Row] = []
 
    var body: some View {
       NavigationStack {
-         ZStack {
-            RideAtmosphereBackground(scene: .rides)
-
+         Group {
             if rideHistoryViewModel.isEmpty {
                RideHistoryEmptyState()
             } else {
                rideList
             }
          }
+         .frame(maxWidth: .infinity, maxHeight: .infinity)
+         // A background rather than a ZStack sibling: a full-bleed layer inside
+         // a stack inflates the stack past the safe area and the list loses its
+         // navigation-bar and footer insets.
+         .background {
+            RideAtmosphereBackground(scene: .rides)
+               .ignoresSafeArea()
+         }
+         .rideAppFooter()
          .navigationTitle("Rides")
          .navigationBarTitleDisplayMode(.large)
-         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-               Button("Done") { dismiss() }
-            }
-         }
          .navigationDestination(for: PersistentIdentifier.self) { rideID in
             RideRouteDetailView(rideRouteViewModel: rideRouteViewModel, rideID: rideID)
                .onDisappear { loadHeroRoute() }

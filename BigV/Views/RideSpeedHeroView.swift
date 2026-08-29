@@ -55,7 +55,10 @@ struct RideSpeedHeroView: View {
          }
          .padding(.vertical, isExpanded ? 16 : 10)
       }
-      .frame(minHeight: isExpanded ? 340 : 220)
+      // Floors, not targets: the cockpit shares its height with the metrics
+      // grid, the drawer and the tab bar, and a generous minimum here is paid
+      // for by the status row getting crushed to nothing.
+      .frame(minHeight: isExpanded ? 300 : 150)
       .frame(maxWidth: .infinity, maxHeight: .infinity)
       .clipShape(.rect(cornerRadius: 24, style: .continuous))
    }

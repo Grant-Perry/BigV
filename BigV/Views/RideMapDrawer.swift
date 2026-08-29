@@ -10,14 +10,13 @@ import SwiftUI
 struct RideMapDrawer: View {
 
    static let collapsedHeight: CGFloat = 72
-   static let openHeight: CGFloat = 220
+   static let openHeight: CGFloat = 190
    static let controlClearance: CGFloat = 62
 
    let rideMapViewModel: RideMapViewModel
    var isMapMounted: Bool
    var isVertical: Bool = true
    let onExpand: () -> Void
-   let onPlanRoute: () -> Void
 
    @Binding var isOpen: Bool
 
@@ -98,22 +97,13 @@ struct RideMapDrawer: View {
 
    // MARK: - Chrome
 
-   /// Overlay on top of the expand tap layer so the FABs consume their own hits.
+   /// Overlay on top of the expand tap layer so the FAB consumes its own hits.
+   /// Recentring only: address search is a tab now, not map furniture.
    private var chrome: some View {
-      GlassEffectContainer(spacing: 10) {
-         VStack(spacing: 10) {
-            RideSearchButton(
-               style: .fab,
-               identifier: "drawer.button.search",
-               action: onPlanRoute
-            )
-
-            recenterButton
-         }
-      }
-      .padding(.trailing, 12)
-      .padding(.bottom, Self.controlClearance)
-      .zIndex(1)
+      recenterButton
+         .padding(.trailing, 12)
+         .padding(.bottom, Self.controlClearance)
+         .zIndex(1)
    }
 
    private var recenterButton: some View {

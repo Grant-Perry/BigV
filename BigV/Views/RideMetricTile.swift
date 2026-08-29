@@ -16,17 +16,23 @@ struct RideMetricTile: View {
    var identifier: String?
    var gutterAlignment: HorizontalAlignment = .leading
 
+   /// Landscape packs three tiles across a short column, so the numeral and the
+   /// padding both come down and the gutter alternation stops meaning anything.
+   var isCompact: Bool = false
+
    var body: some View {
-      VStack(alignment: gutterAlignment, spacing: 2) {
+      VStack(alignment: isCompact ? .leading : gutterAlignment, spacing: 2) {
          Text(title)
             .font(.caption2.weight(.semibold))
-            .kerning(1)
+            .kerning(isCompact ? 0.5 : 1)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
             .foregroundStyle(.white.opacity(0.55))
             .frame(maxWidth: .infinity, alignment: frameAlignment)
 
          HStack(alignment: .firstTextBaseline, spacing: 4) {
             Text(value)
-               .font(.system(size: 34, weight: .semibold, design: .rounded))
+               .font(.system(size: isCompact ? 26 : 34, weight: .semibold, design: .rounded))
                .monospacedDigit()
                .foregroundStyle(.white)
                .lineLimit(1)
@@ -44,13 +50,14 @@ struct RideMetricTile: View {
          .frame(maxWidth: .infinity, alignment: frameAlignment)
       }
       .frame(maxWidth: .infinity, alignment: frameAlignment)
-      .padding(.horizontal, 14)
-      .padding(.vertical, 12)
+      .padding(.horizontal, isCompact ? 10 : 14)
+      .padding(.vertical, isCompact ? 8 : 12)
       .rideGlassCard(density: .hud)
    }
 
    private var frameAlignment: Alignment {
-      gutterAlignment == .trailing ? .trailing : .leading
+      guard !isCompact else { return .leading }
+      return gutterAlignment == .trailing ? .trailing : .leading
    }
 }
 

@@ -5,22 +5,19 @@
 
 import SwiftUI
 
-/// Search, 3D, satellite and recenter. Inset by the overlay so glass never clips.
+/// 3D, satellite and recenter — how the map is drawn, nothing else.
+///
+/// Address search used to lead this stack; it is a tab now, so the map keeps
+/// only the controls that change the map. Inset by the overlay so glass never
+/// clips.
 struct RideMapFABStack: View {
 
    let rideMapViewModel: RideMapViewModel
-   let onPlanRoute: () -> Void
 
    var body: some View {
       GlassEffectContainer(spacing: 12) {
-         VStack(spacing: 12) {
+         VStack(alignment: .trailing, spacing: 12) {
             HStack(spacing: 12) {
-               RideSearchButton(
-                  style: .fab,
-                  identifier: "map.button.planRoute",
-                  action: onPlanRoute
-               )
-
                circleButton(
                   icon: rideMapViewModel.isPitched ? .flatIcon : .pitchedIcon,
                   tint: rideMapViewModel.isPitched ? RideDashboardTheme.ice : .white.opacity(0.85),
@@ -28,9 +25,7 @@ struct RideMapFABStack: View {
                   identifier: "map.button.pitch",
                   action: rideMapViewModel.togglePitch
                )
-            }
 
-            HStack(spacing: 12) {
                circleButton(
                   icon: rideMapViewModel.isSatellite ? .roadIcon : .satelliteIcon,
                   tint: rideMapViewModel.isSatellite ? RideDashboardTheme.ember : .white.opacity(0.85),
@@ -38,9 +33,9 @@ struct RideMapFABStack: View {
                   identifier: "map.button.imagery",
                   action: rideMapViewModel.toggleSatellite
                )
-
-               cameraModeButton
             }
+
+            cameraModeButton
          }
       }
    }

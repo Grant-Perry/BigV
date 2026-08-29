@@ -22,6 +22,7 @@ struct BigVApp: App {
    @State private var rideMapViewModel: RideMapViewModel
    @State private var rideHistoryViewModel: RideHistoryViewModel
    @State private var rideRadarPairingViewModel: RideRadarPairingViewModel
+   @State private var rideWeatherModel: RideWeatherModel
 
    /// The summary and history detail each get their own route view model so a
    /// finished ride's map can never be overwritten by browsing history.
@@ -58,6 +59,10 @@ struct BigVApp: App {
       // read it, and the formatters' defaults read the same persisted key.
       let rideUnitsSettings = RideUnitsSettings()
 
+      // Route planning and weather both need "where is the rider" while idle,
+      // and neither may open a second `CLLocationManager` to get it.
+      let currentLocationProbe = CurrentLocationProbe()
+
       // The Watch is a body sensor and a remote, so its manager is handed to the
       // session rather than to the view layer: heart rate and wrist commands go
       // through the one type allowed to publish a ride.
@@ -85,6 +90,16 @@ struct BigVApp: App {
          )
       )
       _rideUnitsSettings = State(initialValue: rideUnitsSettings)
+
+      // Weather is owned here, not by the status row: a ride runs for hours,
+      // and the chip must survive every dashboard rebuild without refetching.
+      _rideWeatherModel = State(
+         initialValue: RideWeatherModel(
+            weatherService: RideWeatherService(),
+            locationProbe: currentLocationProbe,
+            unitsSettings: rideUnitsSettings
+         )
+      )
       _rideRadarPairingViewModel = State(
          initialValue: RideRadarPairingViewModel(
             rideRadarManager: rideRadarManager,
@@ -103,7 +118,7 @@ struct BigVApp: App {
          initialValue: RoutePlannerViewModel(
             routeSearchService: RouteSearchService(),
             plannedRouteProvider: MapKitCyclingRoutePlanner(),
-            currentLocationProbe: CurrentLocationProbe(),
+            currentLocationProbe: currentLocationProbe,
             plannedRouteManager: plannedRouteManager
          )
       )
@@ -136,6 +151,7 @@ struct BigVApp: App {
             rideRadarPairingViewModel: rideRadarPairingViewModel,
             rideUnitsSettings: rideUnitsSettings
          )
+         .environment(rideWeatherModel)
       }
       .modelContainer(sharedModelContainer)
    }

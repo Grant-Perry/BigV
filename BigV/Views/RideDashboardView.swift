@@ -12,11 +12,8 @@ struct RideDashboardView: View {
    let rideMapViewModel: RideMapViewModel
    let routeGuidanceViewModel: RouteGuidanceViewModel
    var showsDrawerMap: Bool = true
-   let onShowHistory: () -> Void
-   let onPlanRoute: () -> Void
    let onExpandMap: () -> Void
    let onShowRadar: () -> Void
-   let onShowSetup: () -> Void
 
    @Environment(\.verticalSizeClass) private var verticalSizeClass
    @State private var isDrawerOpen = true
@@ -29,11 +26,8 @@ struct RideDashboardView: View {
                rideMapViewModel: rideMapViewModel,
                routeGuidanceViewModel: routeGuidanceViewModel,
                showsDrawerMap: showsDrawerMap,
-               onShowHistory: onShowHistory,
-               onPlanRoute: onPlanRoute,
                onExpandMap: onExpandMap,
                onShowRadar: onShowRadar,
-               onShowSetup: onShowSetup,
                isDrawerOpen: $isDrawerOpen
             )
          } else {
@@ -53,7 +47,6 @@ struct RideDashboardView: View {
             rideMapViewModel: rideMapViewModel,
             isMapMounted: showsDrawerMap,
             onExpand: onExpandMap,
-            onPlanRoute: onPlanRoute,
             isOpen: $isDrawerOpen
          )
          .overlay(alignment: .bottom) {
@@ -75,10 +68,7 @@ struct RideDashboardView: View {
       VStack(spacing: 10) {
          RideDashboardStatusRow(
             rideViewModel: rideViewModel,
-            onShowHistory: onShowHistory,
-            onPlanRoute: onPlanRoute,
-            onShowRadar: onShowRadar,
-            onShowSetup: onShowSetup
+            onShowRadar: onShowRadar
          )
 
          if routeGuidanceViewModel.isActive {
@@ -138,13 +128,11 @@ struct RideDashboardView: View {
          rideViewModel: RideViewModel(),
          rideMapViewModel: RideMapViewModel(),
          routeGuidanceViewModel: RouteGuidanceViewModel(),
-         onShowHistory: {},
-         onPlanRoute: {},
          onExpandMap: {},
-         onShowRadar: {},
-         onShowSetup: {}
+         onShowRadar: {}
       )
    }
+   .environment(RideWeatherModel(unitsSettings: RideUnitsSettings()))
    .preferredColorScheme(.dark)
 }
 
@@ -155,12 +143,10 @@ struct RideDashboardView: View {
          rideViewModel: RideViewModel(),
          rideMapViewModel: RideMapViewModel(),
          routeGuidanceViewModel: RouteGuidanceViewModel(),
-         onShowHistory: {},
-         onPlanRoute: {},
          onExpandMap: {},
-         onShowRadar: {},
-         onShowSetup: {}
+         onShowRadar: {}
       )
    }
+   .environment(RideWeatherModel(unitsSettings: RideUnitsSettings()))
    .preferredColorScheme(.dark)
 }

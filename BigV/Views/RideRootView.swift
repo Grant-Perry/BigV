@@ -5,7 +5,10 @@
 
 import SwiftUI
 
-/// Switches between the live ride pages, the post-ride summary and history.
+/// The app's tab bar and the four places it leads.
+///
+/// Nothing here is modal except radar pairing, which is hardware setup reached
+/// from two places rather than a destination of its own.
 struct RideRootView: View {
 
    let rideViewModel: RideViewModel
@@ -19,36 +22,45 @@ struct RideRootView: View {
    let rideUnitsSettings: RideUnitsSettings
 
    @Environment(\.scenePhase) private var scenePhase
-   @State private var isShowingHistory = false
-   @State private var isShowingRoutePlanner = false
+   @State private var selectedTab: RideTab = .dashboard
    @State private var isShowingRadarPairing = false
-   @State private var isShowingSetup = false
 
    var body: some View {
-      ZStack {
-         RideAtmosphereBackground(scene: rideViewModel.isFinished ? .summary : .dashboard)
-            .ignoresSafeArea()
-
-         if rideViewModel.isFinished {
-            RideSummaryView(
-               rideViewModel: rideViewModel,
-               rideRouteViewModel: summaryRouteViewModel
-            )
-         } else {
-            RideLivePagerView(
+      TabView(selection: $selectedTab) {
+         Tab(RideTab.dashboard.title, systemImage: RideTab.dashboard.symbolName, value: .dashboard) {
+            RideCockpitView(
                rideViewModel: rideViewModel,
                rideMapViewModel: rideMapViewModel,
                routeGuidanceViewModel: routeGuidanceViewModel,
-               onShowHistory: { isShowingHistory = true },
-               onPlanRoute: { isShowingRoutePlanner = true },
+               summaryRouteViewModel: summaryRouteViewModel,
+               onShowRadar: { isShowingRadarPairing = true }
+            )
+         }
+
+         Tab(RideTab.rides.title, systemImage: RideTab.rides.symbolName, value: .rides) {
+            RideHistoryView(
+               rideHistoryViewModel: rideHistoryViewModel,
+               rideRouteViewModel: historyRouteViewModel
+            )
+         }
+
+         Tab(RideTab.route.title, systemImage: RideTab.route.symbolName, value: .route) {
+            RoutePlannerView(routePlannerViewModel: routePlannerViewModel) {
+               selectedTab = .dashboard
+            }
+         }
+
+         Tab(RideTab.settings.title, systemImage: RideTab.settings.symbolName, value: .settings) {
+            RideSettingsView(
+               unitsSettings: rideUnitsSettings,
                onShowRadar: { isShowingRadarPairing = true },
-               onShowSetup: { isShowingSetup = true }
+               onFinishSetup: { selectedTab = .dashboard }
             )
          }
       }
       .overlay {
-         // The threat tint sits above every page: peripheral colour has to
-         // work no matter what the rider is looking at.
+         // The threat tint sits above every tab: peripheral colour has to work
+         // no matter what the rider is looking at.
          RideRadarAlertOverlay(
             tier: rideViewModel.radarTier,
             alertPulse: rideViewModel.radarAlertPulse,
@@ -63,35 +75,26 @@ struct RideRootView: View {
          rideViewModel.radarAlertHapticsEnabled ? .impact(weight: .light) : nil
       }
       .preferredColorScheme(.dark)
-      .sheet(isPresented: $isShowingHistory) {
-         RideHistoryView(
-            rideHistoryViewModel: rideHistoryViewModel,
-            rideRouteViewModel: historyRouteViewModel
-         )
-         .preferredColorScheme(.dark)
-      }
-      .sheet(isPresented: $isShowingRoutePlanner) {
-         RoutePlannerSheet(routePlannerViewModel: routePlannerViewModel)
-            .preferredColorScheme(.dark)
-      }
       .sheet(isPresented: $isShowingRadarPairing) {
          RideRadarPairingView(pairingViewModel: rideRadarPairingViewModel)
-      }
-      .sheet(isPresented: $isShowingSetup) {
-         RideSetupView(
-            unitsSettings: rideUnitsSettings,
-            onShowRadar: { isShowingRadarPairing = true }
-         )
       }
       .onChange(of: scenePhase) { _, newPhase in
          guard newPhase != .active else { return }
          rideViewModel.flushPendingWork()
       }
+      // A ride can start or end from the wrist while the rider is reading
+      // history, so the cockpit comes to them rather than waiting to be found.
+      .onChange(of: rideViewModel.isRecording) { _, isRecording in
+         if isRecording { selectedTab = .dashboard }
+      }
+      .onChange(of: rideViewModel.isFinished) { _, isFinished in
+         if isFinished { selectedTab = .dashboard }
+      }
       .task {
-         // First launch walks through setup once; after that the gear on the
-         // dashboard is the way back in.
+         // First launch lands on settings so units are chosen once; after that
+         // the tab bar is the way back in.
          if !rideUnitsSettings.hasCompletedSetup {
-            isShowingSetup = true
+            selectedTab = .settings
          }
       }
    }

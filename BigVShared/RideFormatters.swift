@@ -86,6 +86,37 @@ nonisolated enum RideFormatters {
       beatsPerMinute.rounded().formatted(.number.precision(.fractionLength(0)))
    }
 
+   // MARK: - Temperature
+
+   /// WeatherKit is read in Celsius and displayed on the rider's scale, so the
+   /// conversion lands here with every other one.
+   static func temperature(
+      _ celsius: Double,
+      unit: RideTemperatureUnit = .current
+   ) -> String {
+      "\(temperatureNumber(celsius, unit: unit))\(unit.suffix)"
+   }
+
+   /// Bare degrees for dense readouts — the chip and the hourly strip, where the
+   /// scale is already established by the surrounding card.
+   static func temperatureDegrees(
+      _ celsius: Double,
+      unit: RideTemperatureUnit = .current
+   ) -> String {
+      "\(temperatureNumber(celsius, unit: unit))°"
+   }
+
+   /// The numeral alone, for the hero where the unit is set in its own type.
+   static func temperatureNumber(
+      _ celsius: Double,
+      unit: RideTemperatureUnit = .current
+   ) -> String {
+      let value = Measurement(value: celsius, unit: UnitTemperature.celsius)
+         .converted(to: unit.measurementUnit)
+         .value
+      return "\(Int(value.rounded()))"
+   }
+
    // MARK: - Grade
 
    static func grade(_ percent: Double) -> String {

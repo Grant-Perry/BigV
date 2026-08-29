@@ -8,12 +8,11 @@ import SwiftUI
 /// Live numbers, heading and map chrome layered over the ride map.
 ///
 /// Speed and distance sit at the top, under the destination chip, so they never
-/// fight the legal attribution or the FABs. Route search is a magnifying glass.
+/// fight the legal attribution or the FABs.
 struct RideMapOverlayView: View {
 
    let rideMapViewModel: RideMapViewModel
    let routeGuidanceViewModel: RouteGuidanceViewModel
-   let onPlanRoute: () -> Void
 
    var body: some View {
       VStack(spacing: 10) {
@@ -34,11 +33,8 @@ struct RideMapOverlayView: View {
             Spacer(minLength: 0)
                .allowsHitTesting(false)
 
-            RideMapFABStack(
-               rideMapViewModel: rideMapViewModel,
-               onPlanRoute: onPlanRoute
-            )
-            .padding(.trailing, 8)
+            RideMapFABStack(rideMapViewModel: rideMapViewModel)
+               .padding(.trailing, 8)
          }
       }
       .padding(.horizontal, 16)
@@ -162,7 +158,7 @@ private extension String {
       RideMapOverlayView(
          rideMapViewModel: RideMapViewModel(),
          routeGuidanceViewModel: RouteGuidanceViewModel()
-      ) {}
+      )
    }
    .preferredColorScheme(.dark)
 }

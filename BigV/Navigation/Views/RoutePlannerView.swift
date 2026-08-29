@@ -1,19 +1,21 @@
 //
-//  RoutePlannerSheet.swift
+//  RoutePlannerView.swift
 //  BigV
 //
 
 import SwiftUI
 
-/// Plan a ride to somewhere: search, then look at what Apple offers, then commit.
+/// The Route tab: type a destination, look at what Apple offers, then commit.
 ///
-/// Presented as a sheet from the map page while idle, so nothing here ever sits
-/// between the rider and their live numbers.
-struct RoutePlannerSheet: View {
+/// A tab rather than a sheet, so planning a route is somewhere the rider goes
+/// instead of something that covers the cockpit. Following a route hands them
+/// straight back to the dashboard, which is where the line is actually drawn.
+struct RoutePlannerView: View {
 
    let routePlannerViewModel: RoutePlannerViewModel
 
-   @Environment(\.dismiss) private var dismiss
+   /// Called once a route is being followed, so the tab bar can move on.
+   let onFollowRoute: () -> Void
 
    var body: some View {
       NavigationStack {
@@ -23,15 +25,11 @@ struct RoutePlannerSheet: View {
                RideAtmosphereBackground(scene: .rideTo)
                   .ignoresSafeArea()
             }
+            .rideAppFooter()
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackgroundVisibility(.visible, for: .navigationBar)
             .toolbar {
-               ToolbarItem(placement: .topBarLeading) {
-                  Button("Close") { dismiss() }
-                     .accessibilityIdentifier("planner.button.close")
-               }
-
                ToolbarItem(placement: .topBarTrailing) {
                   if routePlannerViewModel.hasActiveRoute {
                      Button("Clear Route", role: .destructive) {
@@ -58,9 +56,7 @@ struct RoutePlannerSheet: View {
             planning
 
          case .preview:
-            RoutePreviewStageView(routePlannerViewModel: routePlannerViewModel) {
-               dismiss()
-            }
+            RoutePreviewStageView(routePlannerViewModel: routePlannerViewModel, onConfirm: onFollowRoute)
       }
    }
 
@@ -88,6 +84,6 @@ struct RoutePlannerSheet: View {
 }
 
 #Preview {
-   RoutePlannerSheet(routePlannerViewModel: RoutePlannerViewModel())
+   RoutePlannerView(routePlannerViewModel: RoutePlannerViewModel(), onFollowRoute: {})
       .preferredColorScheme(.dark)
 }

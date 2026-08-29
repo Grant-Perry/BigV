@@ -12,7 +12,6 @@ struct RideMapView: View {
    let rideViewModel: RideViewModel
    let rideMapViewModel: RideMapViewModel
    let routeGuidanceViewModel: RouteGuidanceViewModel
-   let onPlanRoute: () -> Void
 
    var body: some View {
       ZStack(alignment: .top) {
@@ -23,8 +22,7 @@ struct RideMapView: View {
 
          RideMapOverlayView(
             rideMapViewModel: rideMapViewModel,
-            routeGuidanceViewModel: routeGuidanceViewModel,
-            onPlanRoute: onPlanRoute
+            routeGuidanceViewModel: routeGuidanceViewModel
          )
       }
       .overlay(alignment: rideViewModel.radarSide.overlayAlignment) {
@@ -50,6 +48,6 @@ struct RideMapView: View {
       rideViewModel: RideViewModel(),
       rideMapViewModel: RideMapViewModel(),
       routeGuidanceViewModel: RouteGuidanceViewModel()
-   ) {}
-      .preferredColorScheme(.dark)
+   )
+   .preferredColorScheme(.dark)
 }
