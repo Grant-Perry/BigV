@@ -34,9 +34,11 @@ final class RideSessionManager {
    private let rideWatchManager: RideWatchManager?
    private let rideRadarManager: RideRadarManager?
    private let rideRadarAnnouncer: RideRadarAnnouncer?
+   private let rideWeatherStamper: RideWeatherStamper?
    private var telemetryEngine: RideTelemetryEngine
    private var rideClock = RideClock()
    private var radarTracker = RideRadarTracker()
+   private let heartRateRingBuffer = RideHeartRateRingBuffer()
 
    private var locationTask: Task<Void, Never>?
    private var clockTask: Task<Void, Never>?
@@ -45,6 +47,7 @@ final class RideSessionManager {
    private var watchLinkTask: Task<Void, Never>?
    private var radarTask: Task<Void, Never>?
    private var radarHousekeepingTask: Task<Void, Never>?
+   private var weatherStampTask: Task<Void, Never>?
 
    private var lastSampleAt: Date?
 
@@ -86,7 +89,8 @@ final class RideSessionManager {
       routeGuidanceManager: RouteGuidanceManager? = nil,
       rideWatchManager: RideWatchManager? = nil,
       rideRadarManager: RideRadarManager? = nil,
-      rideRadarAnnouncer: RideRadarAnnouncer? = nil
+      rideRadarAnnouncer: RideRadarAnnouncer? = nil,
+      rideWeatherStamper: RideWeatherStamper? = nil
    ) {
       self.locationManager = locationManager
       self.rideStorageManager = rideStorageManager
@@ -99,6 +103,7 @@ final class RideSessionManager {
       self.rideWatchManager = rideWatchManager
       self.rideRadarManager = rideRadarManager
       self.rideRadarAnnouncer = rideRadarAnnouncer
+      self.rideWeatherStamper = rideWeatherStamper
       self.telemetryEngine = RideTelemetryEngine(configuration: configuration)
    }
 
@@ -125,6 +130,7 @@ final class RideSessionManager {
       state.phase = .acquiringGPS
       lastSampleAt = nil
       lastRiderCoordinate = nil
+      heartRateRingBuffer.clear()
 
       ScreenAwakeService.setKeepAwake(true)
       startLocationStream()
@@ -228,6 +234,7 @@ final class RideSessionManager {
       finishedRideID = nil
       lastSampleAt = nil
       lastRiderCoordinate = nil
+      heartRateRingBuffer.clear()
       mirrorToWatch()
    }
 
@@ -265,6 +272,10 @@ final class RideSessionManager {
 
       state.hasStorageFailure = commit.hasStorageFailure
       finishedRideID = commit.ride?.persistentModelID
+
+      if let committedRide = commit.ride {
+         stampEndWeather(on: committedRide)
+      }
 
       guard let finishedRide = commit.ride, rideFinalizer.exportsToHealth else { return }
 
@@ -357,7 +368,7 @@ final class RideSessionManager {
 
       switch outcome {
          case .acquiredFix, .reseeded:
-            beginRecordingIfNeeded()
+            beginRecordingIfNeeded(at: location)
             appendRoutePoint(location)
 
          case .accepted:
@@ -375,7 +386,7 @@ final class RideSessionManager {
       }
    }
 
-   private func beginRecordingIfNeeded() {
+   private func beginRecordingIfNeeded(at location: CLLocation) {
       lastSampleAt = .now
       guard state.phase == .acquiringGPS else { return }
 
@@ -385,9 +396,41 @@ final class RideSessionManager {
 
       rideStorageManager?.beginRide(startDate: startDate)
       state.hasStorageFailure = rideStorageManager?.hasFailure ?? false
+      stampStartWeather(at: location.coordinate)
       mirrorToWatch()
 
       DebugPrint(mode: .sessionLifecycle, "GPS fix acquired, recording started")
+   }
+
+   // MARK: - Weather Stamping
+
+   /// Off the hot path by construction: the stamp task fetches and writes on
+   /// its own time, and a fetch that outlives the ride simply finds no active
+   /// ride to stamp.
+   private func stampStartWeather(at coordinate: CLLocationCoordinate2D) {
+      guard let rideWeatherStamper else { return }
+
+      weatherStampTask?.cancel()
+      weatherStampTask = Task {
+         await rideWeatherStamper.stampStart(
+            latitude: coordinate.latitude,
+            longitude: coordinate.longitude
+         )
+      }
+   }
+
+   private func stampEndWeather(on ride: Ride) {
+      guard let rideWeatherStamper else { return }
+      let coordinate = lastRiderCoordinate
+
+      weatherStampTask?.cancel()
+      weatherStampTask = Task {
+         await rideWeatherStamper.stampEnd(
+            on: ride,
+            latitude: coordinate?.latitude,
+            longitude: coordinate?.longitude
+         )
+      }
    }
 
    private func persist(_ location: CLLocation) {
@@ -401,7 +444,8 @@ final class RideSessionManager {
          speed: state.speed,
          distance: state.distance,
          grade: state.grade,
-         course: state.course
+         course: state.course,
+         heartRate: state.heartRate
       )
 
       rideStorageManager.append(draft, totals: state)
@@ -482,6 +526,9 @@ final class RideSessionManager {
          case .heartRate(let beatsPerMinute):
             state.heartRate = beatsPerMinute
             lastHeartRateAt = beatsPerMinute == nil ? nil : .now
+            if let beatsPerMinute {
+               heartRateRingBuffer.append(beatsPerMinute: beatsPerMinute)
+            }
 
          case .command(let request, let acknowledgement):
             apply(request, acknowledgement: acknowledgement)
@@ -543,6 +590,35 @@ final class RideSessionManager {
 
    /// Whether the radar stream is currently open.
    private(set) var isRadarLinkActive = false
+
+   // MARK: - Live Charts
+
+   func activeRideChartSamples() -> (startDate: Date, samples: [RideSample])? {
+      rideStorageManager?.activeRideChartSamples()
+   }
+
+   var activeSampleCount: Int {
+      rideStorageManager?.activeSampleCount ?? 0
+   }
+
+   func heartRateRingBeats() -> [(timestamp: Date, beatsPerMinute: Double)] {
+      heartRateRingBuffer.beats()
+   }
+
+   var heartRateRingSampleCount: Int {
+      heartRateRingBuffer.count
+   }
+
+   func activeRideRadarContext() -> (
+      startDate: Date,
+      events: [RideRadarEvent],
+      vehicleCount: Int,
+      closestPassDistance: Double?,
+      maximumClosingSpeed: Double?,
+      distanceMeters: Double
+   )? {
+      rideStorageManager?.activeRideRadarContext()
+   }
 
    /// Whether there is a radar worth drawing chrome for: a remembered pairing
    /// or the debug simulator. Views hide the tape entirely otherwise.

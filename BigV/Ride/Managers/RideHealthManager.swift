@@ -54,7 +54,10 @@ final class RideHealthManager {
       guard HKHealthStore.isHealthDataAvailable() else { return }
 
       do {
-         try await healthStore.requestAuthorization(toShare: shareTypes, read: [])
+         try await healthStore.requestAuthorization(
+            toShare: shareTypes,
+            read: RideHealthVitalsReader.readTypes
+         )
       } catch {
          DebugPrint(mode: .healthKit, "Authorization request failed: \(error.localizedDescription)")
       }

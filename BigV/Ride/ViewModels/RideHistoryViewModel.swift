@@ -23,11 +23,29 @@ final class RideHistoryViewModel {
       let elevationGainText: String
       let speedUnit: String
       let distanceUnit: String
+
+      /// Radar passes this ride recorded. Zero hides every vehicle mention.
+      let vehicleCount: Int
+
+      /// The stored sky, when the ride has one. Older rides show neither.
+      let weatherSymbolName: String?
+      let temperatureText: String?
+   }
+
+   // MARK: - Summary
+
+   /// The rider's whole logbook in three figures, for the top of the page.
+   struct Summary: Sendable, Equatable {
+      let ridesText: String
+      let distanceText: String
+      let distanceUnit: String
+      let timeText: String
    }
 
    // MARK: - State
 
    private(set) var rows: [Row] = []
+   private(set) var summary: Summary?
 
    var isEmpty: Bool { rows.isEmpty }
 
@@ -56,6 +74,7 @@ final class RideHistoryViewModel {
    func load() {
       rides = rideStorageManager.savedRides()
       rows = rides.map(Self.row)
+      summary = Self.summary(of: rides)
    }
 
    /// Rows the rider swiped, awaiting explicit confirmation.
@@ -91,7 +110,27 @@ final class RideHistoryViewModel {
          maximumSpeedText: RideFormatters.speed(ride.maximumSpeed, system: system),
          elevationGainText: RideFormatters.elevationGain(ride.elevationGain, system: system),
          speedUnit: system.speedUnit,
-         distanceUnit: system.distanceUnit
+         distanceUnit: system.distanceUnit,
+         vehicleCount: ride.vehicleCount,
+         weatherSymbolName: ride.weatherSymbolName,
+         temperatureText: ride.startTemperatureCelsius.map {
+            RideFormatters.temperatureDegrees($0)
+         }
+      )
+   }
+
+   private static func summary(of rides: [Ride]) -> Summary? {
+      guard !rides.isEmpty else { return nil }
+
+      let system = RideUnitSystem.current
+      let totalDistance = rides.reduce(0) { $0 + $1.distance }
+      let totalDuration = rides.reduce(0) { $0 + $1.duration }
+
+      return Summary(
+         ridesText: "\(rides.count)",
+         distanceText: RideFormatters.distance(totalDistance, system: system),
+         distanceUnit: system.distanceUnit,
+         timeText: RideFormatters.duration(totalDuration)
       )
    }
 }

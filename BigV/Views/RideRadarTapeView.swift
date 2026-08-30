@@ -5,9 +5,14 @@
 
 import SwiftUI
 
-/// The rear-radar rail: a vertical tape in the Garmin rear-view convention —
-/// the rider mark at the TOP, vehicles entering far away at the bottom and
-/// climbing toward the rider as they close from behind.
+/// The rear-radar rail, in the Garmin rear-view convention: the rider mark at
+/// the near end, vehicles entering far away and travelling toward the rider as
+/// they close from behind.
+///
+/// Vertical placements put the rider at the TOP and traffic climbs. Horizontal
+/// placements put the rider at the RIGHT and traffic runs in from the left. Both
+/// read the same way — the pip moves toward the mark — so a rider who learns one
+/// already knows the other.
 ///
 /// Colour follows the industry convention exactly — amber approaching, red for
 /// a fast approach, grey when empty, green reserved for the all-clear flash —
@@ -18,20 +23,25 @@ struct RideRadarTapeView: View {
    let tracks: [RideRadarTracker.Track]
    var isDimmed = false
    var unitSystem: RideUnitSystem = .current
+   var placement: RideRadarPlacement = .trailing
 
-   /// Rail width. The default is the compact strip the map and landscape
-   /// cockpit use; the portrait dashboard passes `dashboardWidth` — a touch
-   /// wider — and every glyph, tick, and font scales with it.
-   var tapeWidth: CGFloat = Self.compactWidth
+   /// Cross-axis size: the rail's width when vertical, its height when
+   /// horizontal. Every glyph, tick and font scales with it.
+   var thickness: CGFloat = Self.compactWidth
 
    static let compactWidth: CGFloat = 48
 
-   /// Portrait-dashboard ribbon: slightly wider than the compact strip, run
-   /// the full height of the upper dashboard column.
+   /// Portrait-dashboard ribbon: slightly wider than the compact strip.
    static let dashboardWidth: CGFloat = 60
 
+   /// Horizontal bar height. Shorter than the vertical rails are wide — a
+   /// top or bottom strip spends the screen's long axis on range instead.
+   static let barThickness: CGFloat = 44
+
+   private var isVertical: Bool { placement.isVertical }
+
    /// How much bigger than the compact strip this instance is drawn.
-   private var scale: CGFloat { max(1, tapeWidth / Self.compactWidth) }
+   private var scale: CGFloat { max(1, thickness / Self.compactWidth) }
 
    private var pipRadius: CGFloat { 5.5 * scale }
 
@@ -40,15 +50,29 @@ struct RideRadarTapeView: View {
    }
 
    var body: some View {
-      VStack(spacing: 4 * scale) {
-         riderMark
+      Group {
+         if isVertical {
+            VStack(spacing: 4 * scale) {
+               riderMark
 
-         tape
-            .mask(edgeFade)
+               tape
+                  .mask(edgeFade)
 
-         readout
+               readout
+            }
+            .frame(width: thickness)
+         } else {
+            HStack(spacing: 4 * scale) {
+               readout
+
+               tape
+                  .mask(edgeFade)
+
+               riderMark
+            }
+            .frame(height: thickness)
+         }
       }
-      .frame(width: tapeWidth)
       .animation(.smooth(duration: 0.25), value: tracks)
       .accessibilityElement(children: .ignore)
       .accessibilityLabel("Rear radar")
@@ -92,32 +116,38 @@ struct RideRadarTapeView: View {
    // MARK: - Drawing
 
    private func drawRail(in context: inout GraphicsContext, size: CGSize) {
-      let centerX = size.width / 2
+      let lineWidth = max(1, scale * 0.75)
 
-      // Centerline the pips ride up.
+      // Centerline the pips travel along.
       var lane = Path()
-      lane.move(to: CGPoint(x: centerX, y: 2))
-      lane.addLine(to: CGPoint(x: centerX, y: size.height - 4))
+      lane.move(to: railPoint(along: 2, across: acrossCenter(in: size), in: size))
+      lane.addLine(to: railPoint(along: extent(of: size) - 4, across: acrossCenter(in: size), in: size))
       context.stroke(
          lane,
          with: .color(chromeColor.opacity(0.30)),
-         style: StrokeStyle(lineWidth: max(1, scale * 0.75), dash: [1.5 * scale, 5 * scale])
+         style: StrokeStyle(lineWidth: lineWidth, dash: [1.5 * scale, 5 * scale])
       )
 
       // Range ticks: the near-field boundary earns the strong one.
       for (distance, emphasis) in [(40.0, 0.5), (90.0, 0.28), (140.0, 0.28)] {
-         let y = pipY(forDistance: distance, height: size.height)
+         let along = alongPosition(forDistance: distance, extent: extent(of: size))
+         let center = acrossCenter(in: size)
+
          var tick = Path()
-         tick.move(to: CGPoint(x: centerX - 7 * scale, y: y))
-         tick.addLine(to: CGPoint(x: centerX + 7 * scale, y: y))
-         context.stroke(tick, with: .color(chromeColor.opacity(emphasis)), lineWidth: max(1, scale * 0.75))
+         tick.move(to: railPoint(along: along, across: center - 7 * scale, in: size))
+         tick.addLine(to: railPoint(along: along, across: center + 7 * scale, in: size))
+         context.stroke(tick, with: .color(chromeColor.opacity(emphasis)), lineWidth: lineWidth)
       }
    }
 
    private func drawPip(for track: RideRadarTracker.Track, in context: inout GraphicsContext, size: CGSize) {
-      let center = CGPoint(
-         x: RideRadarTapeGeometry.laneX(lateralOffset: track.lateralHook, width: size.width),
-         y: pipY(forDistance: track.distanceMeters, height: size.height)
+      let center = railPoint(
+         along: alongPosition(forDistance: track.distanceMeters, extent: extent(of: size)),
+         across: RideRadarTapeGeometry.laneX(
+            lateralOffset: track.lateralHook,
+            width: crossExtent(of: size)
+         ),
+         in: size
       )
       let color = tierColor(track.tier)
 
@@ -138,12 +168,39 @@ struct RideRadarTapeView: View {
       }
    }
 
-   /// Rear-view mapping: distance zero (the rider) at the top of the tape, max
-   /// range at the bottom — a closing vehicle's pip rises toward the rider.
-   private func pipY(forDistance distance: Double, height: CGFloat) -> CGFloat {
+   // MARK: - Axis Mapping
+   //
+   // Everything below works in tape space: `along` runs from the rider mark
+   // (distance zero) out to max range, `across` is the lane offset. Only
+   // `railPoint` knows which way that maps onto the screen, so the rear-view
+   // convention is written once instead of once per placement.
+
+   private func extent(of size: CGSize) -> CGFloat {
+      isVertical ? size.height : size.width
+   }
+
+   private func crossExtent(of size: CGSize) -> CGFloat {
+      isVertical ? size.width : size.height
+   }
+
+   private func acrossCenter(in size: CGSize) -> CGFloat {
+      crossExtent(of: size) / 2
+   }
+
+   /// Rear-view mapping: distance zero is the rider mark, max range is the far
+   /// end — a closing vehicle's pip travels back toward the mark.
+   private func alongPosition(forDistance distance: Double, extent: CGFloat) -> CGFloat {
       let inset = pipRadius + 5 * scale
-      let usable = Double(height) - Double(inset) * 2
+      let usable = Double(extent) - Double(inset) * 2
       return inset + CGFloat(RideRadarTapeGeometry.fraction(forDistance: distance) * usable)
+   }
+
+   /// Vertical tapes grow downward from a rider at the top; horizontal tapes
+   /// grow leftward from a rider at the right.
+   private func railPoint(along: CGFloat, across: CGFloat, in size: CGSize) -> CGPoint {
+      isVertical
+         ? CGPoint(x: across, y: along)
+         : CGPoint(x: size.width - along, y: across)
    }
 
    private func pipRect(around center: CGPoint, radius: CGFloat) -> CGRect {
@@ -162,10 +219,10 @@ struct RideRadarTapeView: View {
 
    // MARK: - Rider Mark
 
-   /// Downward chevrons: traffic below on the tape is behind the rider,
-   /// closing upward — the mark points back at what is coming.
+   /// The chevrons point back down the tape at what is coming: down on a
+   /// vertical rail, left on a horizontal one.
    private var riderMark: some View {
-      Image(systemName: .riderIcon)
+      Image(systemName: isVertical ? .riderIconVertical : .riderIconHorizontal)
          .font(.system(size: 13 * scale, weight: .bold))
          .foregroundStyle(isDimmed ? .white.opacity(0.30) : RideChromeTokens.ice)
          .accessibilityHidden(true)
@@ -180,18 +237,23 @@ struct RideRadarTapeView: View {
 
    @ViewBuilder
    private var readout: some View {
-      if let nearestDistance {
-         Text(RideFormatters.radarDistance(nearestDistance, system: unitSystem))
-            .font(readoutFont)
-            .monospacedDigit()
-            .foregroundStyle(readoutColor)
-            .lineLimit(1)
-            .minimumScaleFactor(0.7)
-      } else {
-         Text("—")
-            .font(readoutFont)
-            .foregroundStyle(.white.opacity(0.28))
+      Group {
+         if let nearestDistance {
+            Text(RideFormatters.radarDistance(nearestDistance, system: unitSystem))
+               .font(readoutFont)
+               .monospacedDigit()
+               .foregroundStyle(readoutColor)
+               .lineLimit(1)
+               .minimumScaleFactor(0.7)
+         } else {
+            Text("—")
+               .font(readoutFont)
+               .foregroundStyle(.white.opacity(0.28))
+         }
       }
+      // A horizontal readout sits inline with the rail, so it needs a reserved
+      // width or the whole tape shifts every time the distance gains a digit.
+      .frame(minWidth: isVertical ? nil : 38 * scale, alignment: .trailing)
    }
 
    private var readoutColor: Color {
@@ -218,7 +280,7 @@ struct RideRadarTapeView: View {
       }
    }
 
-   /// Fades the far end of the tape — the bottom, where vehicles first appear.
+   /// Fades the far end of the tape, where vehicles first appear.
    private var edgeFade: some View {
       LinearGradient(
          stops: [
@@ -226,8 +288,8 @@ struct RideRadarTapeView: View {
             .init(color: .white, location: 0.92),
             .init(color: .clear, location: 1)
          ],
-         startPoint: .top,
-         endPoint: .bottom
+         startPoint: isVertical ? .top : .trailing,
+         endPoint: isVertical ? .bottom : .leading
       )
    }
 
@@ -244,23 +306,43 @@ struct RideRadarTapeView: View {
    }
 }
 
-// MARK: - Side Placement
+// MARK: - Placement
 
-extension RideRadarSide {
+extension RideRadarPlacement {
 
-   /// Where the tape sits when inserted as an overlay.
+   /// Where the tape sits when laid over the cockpit.
    var overlayAlignment: Alignment {
-      self == .leading ? .leading : .trailing
-   }
-
-   /// The edge the tape pads against.
-   var paddingEdge: Edge.Set {
-      self == .leading ? .leading : .trailing
+      switch self {
+         case .leading: .leading
+         case .trailing: .trailing
+         case .top: .top
+         case .bottom: .bottom
+      }
    }
 
    /// The edge the tape slides off when the radar link drops.
    var transitionEdge: Edge {
-      self == .leading ? .leading : .trailing
+      switch self {
+         case .leading: .leading
+         case .trailing: .trailing
+         case .top: .top
+         case .bottom: .bottom
+      }
+   }
+
+   /// The edge the tape is parked on, for clearance padding.
+   var overlayEdge: Edge.Set {
+      switch self {
+         case .leading: .leading
+         case .trailing: .trailing
+         case .top: .top
+         case .bottom: .bottom
+      }
+   }
+
+   /// The tape's own cross-axis size at cockpit scale.
+   var cockpitThickness: CGFloat {
+      isVertical ? RideRadarTapeView.dashboardWidth : RideRadarTapeView.barThickness
    }
 }
 
@@ -274,10 +356,11 @@ private extension RideRadarTracker.Track {
 }
 
 private extension String {
-   static let riderIcon = "chevron.down.2"
+   static let riderIconVertical = "chevron.down.2"
+   static let riderIconHorizontal = "chevron.left.2"
 }
 
-#Preview("Traffic") {
+#Preview("Vertical") {
    ZStack {
       RideAtmosphereBackground()
 
@@ -294,15 +377,35 @@ private extension String {
          )
          .frame(height: 300)
 
-         // Dashboard-scale ribbon: the full-height trailing gutter.
          RideRadarTapeView(
             tracks: [
                .preview(id: 1, distance: 32, tier: .high),
                .preview(id: 2, distance: 78, tier: .approaching)
             ],
-            tapeWidth: RideRadarTapeView.dashboardWidth
+            thickness: RideRadarTapeView.dashboardWidth
          )
          .frame(height: 340)
+      }
+      .padding()
+   }
+}
+
+#Preview("Horizontal") {
+   ZStack {
+      RideAtmosphereBackground()
+
+      VStack(spacing: 24) {
+         RideRadarTapeView(tracks: [], placement: .top)
+
+         RideRadarTapeView(
+            tracks: [
+               .preview(id: 1, distance: 18, tier: .high),
+               .preview(id: 2, distance: 55, tier: .approaching),
+               .preview(id: 3, distance: 120, tier: .approaching)
+            ],
+            placement: .bottom,
+            thickness: RideRadarTapeView.barThickness
+         )
       }
       .padding()
    }

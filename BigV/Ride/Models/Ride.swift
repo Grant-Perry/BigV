@@ -56,6 +56,21 @@ final class Ride {
    /// ride recorded no radar passes.
    var maximumClosingSpeed: Double?
 
+   // MARK: - Weather
+
+   /// The sky this ride was ridden under, snapshotted from WeatherKit at the
+   /// first GPS fix. All optional: rides recorded before V3, or with no
+   /// connection, simply have no weather to remember.
+   var weatherSymbolName: String?
+   var weatherConditionLabel: String?
+   var startTemperatureCelsius: Double?
+   var startApparentTemperatureCelsius: Double?
+   var windSpeedKilometersPerHour: Double?
+
+   /// Conditions when the ride ended, so the detail screen can tell the story
+   /// of a temperature that moved. `nil` when the end fetch never landed.
+   var endTemperatureCelsius: Double?
+
    // MARK: - Export Links
 
    /// Identifier of the HealthKit workout written for this ride.

@@ -5,11 +5,15 @@
 
 import SwiftUI
 
-/// Bottom-third live map on the dashboard. Default open. Tap expands to the
-/// full map page. Swipe the grabber: up opens, down collapses.
+/// Bottom-third live map on the dashboard. Default open, framed close, and
+/// live: pinch, rotate and tilt all work. A double tap expands to the full map
+/// page. Swipe the grabber: up opens, down collapses.
 struct RideMapDrawer: View {
 
-   static let collapsedHeight: CGFloat = 72
+   /// Tall enough that the handle clears the control dock, which floats over
+   /// the drawer's bottom edge. Any shorter and the only way back to the map is
+   /// hidden under glass.
+   static let collapsedHeight: CGFloat = 96
    static let openHeight: CGFloat = 190
    static let controlClearance: CGFloat = 62
 
@@ -43,13 +47,13 @@ struct RideMapDrawer: View {
 
    private var grabber: some View {
       VStack(spacing: 4) {
-         Capsule()
-            .fill(.white.opacity(0.45))
-            .frame(width: 36, height: 4)
+         handleGlyph
 
+         // Collapsed, the whole strip is the handle: the control dock covers
+         // its middle, so a hit area the size of the capsule alone leaves the
+         // rider with nothing to press.
          if !isOpen {
-            Color.clear
-               .frame(height: 44)
+            Spacer(minLength: 0)
          }
       }
       .frame(maxWidth: .infinity)
@@ -69,6 +73,21 @@ struct RideMapDrawer: View {
       .accessibilityAddTraits(.isButton)
    }
 
+   /// A chevron once collapsed: a bare capsule reads as decoration when there
+   /// is no map under it to pull down.
+   @ViewBuilder
+   private var handleGlyph: some View {
+      if isOpen {
+         Capsule()
+            .fill(.white.opacity(0.45))
+            .frame(width: 36, height: 4)
+      } else {
+         Image(systemName: .showMapIcon)
+            .font(.title3.weight(.semibold))
+            .foregroundStyle(.white.opacity(0.55))
+      }
+   }
+
    // MARK: - Map
 
    private var mapBody: some View {
@@ -77,27 +96,34 @@ struct RideMapDrawer: View {
             RideMapCanvasView(
                rideMapViewModel: rideMapViewModel,
                showsCompass: false,
-               allowsInteraction: false
+               interactionModes: RideMapViewModel.drawerInteractionModes,
+               cameraBounds: rideMapViewModel.drawerCameraBounds
             )
+            // No full-bleed tap catcher: it would swallow the map's own
+            // gestures. A double tap expands, single taps stay with the map.
+            .highPriorityGesture(TapGesture(count: 2).onEnded(onExpand))
+            .simultaneousGesture(pinchToFreeZoom)
+            .accessibilityLabel("Ride map")
+            .accessibilityAction(named: "Open full map", onExpand)
          } else {
             RideDashboardTheme.graphite
          }
-
-         Color.clear
-            .contentShape(.rect)
-            .simultaneousGesture(TapGesture().onEnded(onExpand))
-            .accessibilityAddTraits(.isButton)
-            .accessibilityLabel("Ride map")
-            .accessibilityHint("Opens the full map")
 
          chrome
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
    }
 
+   /// Rides alongside MapKit's pinch rather than replacing it, purely to tell
+   /// the view model the rider has taken the zoom over.
+   private var pinchToFreeZoom: some Gesture {
+      MagnifyGesture(minimumScaleDelta: 0.01)
+         .onChanged { _ in rideMapViewModel.riderTookOverDrawerZoom() }
+   }
+
    // MARK: - Chrome
 
-   /// Overlay on top of the expand tap layer so the FAB consumes its own hits.
+   /// Layered above the canvas so the FAB consumes its own hits.
    /// Recentring only: address search is a tab now, not map furniture.
    private var chrome: some View {
       recenterButton
@@ -140,4 +166,5 @@ struct RideMapDrawer: View {
 
 private extension String {
    static let recenterIcon = "location.fill.viewfinder"
+   static let showMapIcon = "chevron.compact.up"
 }

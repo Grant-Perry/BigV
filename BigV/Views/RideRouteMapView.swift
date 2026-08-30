@@ -51,49 +51,10 @@ struct RideRouteMapView: View {
 
    private func map(framing region: MKCoordinateRegion) -> some View {
       Map(initialPosition: .region(region), interactionModes: [.pan, .zoom]) {
-         MapPolyline(coordinates: route.coordinates)
-            .stroke(Color.gpBreadcrumb, style: .routeLine)
-
-         ForEach(radarPasses) { pass in
-            radarPassDot(for: pass)
-         }
-
-         if let start = route.startCoordinate {
-            endpoint(at: start, label: "Ride start", tint: .green)
-         }
-
-         if let end = route.endCoordinate {
-            endpoint(at: end, label: "Ride finish", tint: .red)
-         }
+         RideRouteMapLayers(route: route, radarPasses: radarPasses)
       }
       .mapStyle(.rideRoute)
       .accessibilityLabel("Route map")
-   }
-
-   /// A vehicle pass, wearing the same tier palette as the live tape: amber
-   /// for an ordinary pass, red for one that peaked high.
-   private func radarPassDot(for pass: RideRadarPassAnnotation) -> some MapContent {
-      Annotation("Vehicle pass", coordinate: pass.coordinate, anchor: .center) {
-         Circle()
-            .fill(pass.tier == .high ? RideChromeTokens.halt : RideChromeTokens.amber)
-            .stroke(.black.opacity(0.6), lineWidth: 1)
-            .frame(width: 7, height: 7)
-      }
-      .annotationTitles(.hidden)
-   }
-
-   private func endpoint(
-      at coordinate: CLLocationCoordinate2D,
-      label: String,
-      tint: Color
-   ) -> some MapContent {
-      Annotation(label, coordinate: coordinate, anchor: .center) {
-         Circle()
-            .fill(tint)
-            .stroke(.black, lineWidth: 2)
-            .frame(width: 12, height: 12)
-      }
-      .annotationTitles(.hidden)
    }
 
    // MARK: - Empty State

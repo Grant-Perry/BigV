@@ -22,20 +22,22 @@ struct RideWeatherLocationSearchView: View {
 
    var body: some View {
       NavigationStack {
-         ZStack {
-            RideAtmosphereBackground()
-               .ignoresSafeArea()
-
-            content
-         }
-         .navigationTitle("Change Location")
-         .navigationBarTitleDisplayMode(.inline)
-         .searchable(text: $searchText, prompt: "City, address, or postal code")
-         .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-               Button("Cancel", role: .cancel) { dismiss() }
+         content
+            // A background rather than a ZStack sibling: a full-bleed layer
+            // inside a stack inflates the stack past the safe area and the
+            // list loses its navigation-bar inset.
+            .background {
+               RideAtmosphereBackground()
+                  .ignoresSafeArea()
             }
-         }
+            .navigationTitle("Change Location")
+            .navigationBarTitleDisplayMode(.inline)
+            .searchable(text: $searchText, prompt: "City, address, or postal code")
+            .toolbar {
+               ToolbarItem(placement: .cancellationAction) {
+                  Button("Cancel", role: .cancel) { dismiss() }
+               }
+            }
       }
       .preferredColorScheme(.dark)
       .task(id: searchText) {

@@ -19,12 +19,6 @@ struct RideDashboardLandscapeView: View {
 
    var body: some View {
       HStack(alignment: .top, spacing: 12) {
-         // Landscape has the width to give the radar its own column, so the
-         // tape spans the full cockpit height instead of hugging the hero.
-         if rideViewModel.showsRadarTape, rideViewModel.radarSide == .leading {
-            radarColumn
-         }
-
          VStack(spacing: 8) {
             RideDashboardStatusRow(
                rideViewModel: rideViewModel,
@@ -38,17 +32,26 @@ struct RideDashboardLandscapeView: View {
                )
             }
 
-            RideSpeedHeroView(
-               value: rideViewModel.speed,
-               unit: rideViewModel.speedUnit,
-               course: rideViewModel.course,
-               heading: rideViewModel.heading,
-               headingDegrees: rideViewModel.headingDegrees,
-               isDimmed: !rideViewModel.hasGPSFix || rideViewModel.isPaused,
+            // The tape lies over the hero rather than taking a column of its
+            // own: landscape has no width to spare, and the hero is the one
+            // surface with nothing in its margins to cover.
+            RideDashboardInstrumentHero(
+               rideViewModel: rideViewModel,
                isExpanded: !isDrawerOpen
             )
             .frame(maxHeight: .infinity)
             .layoutPriority(-1)
+            .rideRadarTape(
+               placement: rideViewModel.radarPlacement,
+               tracks: rideViewModel.radarTracks,
+               isVisible: rideViewModel.showsRadarTape,
+               isDimmed: rideViewModel.isRadarDimmed,
+               unitSystem: rideViewModel.unitSystem,
+               thickness: compactTapeThickness,
+               inset: 6
+            )
+
+            RideDashboardLiveMetricSection(rideViewModel: rideViewModel)
          }
          .frame(maxWidth: .infinity, maxHeight: .infinity)
 
@@ -73,10 +76,6 @@ struct RideDashboardLandscapeView: View {
             .frame(minHeight: isDrawerOpen ? 96 : RideMapDrawer.collapsedHeight)
          }
          .frame(maxWidth: 340)
-
-         if rideViewModel.showsRadarTape, rideViewModel.radarSide == .trailing {
-            radarColumn
-         }
       }
       .padding(.horizontal, 16)
       .padding(.vertical, 8)
@@ -86,12 +85,9 @@ struct RideDashboardLandscapeView: View {
 
    // MARK: - Radar
 
-   private var radarColumn: some View {
-      RideRadarTapeView(
-         tracks: rideViewModel.radarTracks,
-         isDimmed: rideViewModel.isRadarDimmed,
-         unitSystem: rideViewModel.unitSystem
-      )
-      .padding(.vertical, 4)
+   private var compactTapeThickness: CGFloat {
+      rideViewModel.radarPlacement.isVertical
+         ? RideRadarTapeView.compactWidth
+         : RideRadarTapeView.barThickness
    }
 }

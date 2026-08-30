@@ -11,6 +11,7 @@ struct RideHistoryView: View {
 
    let rideHistoryViewModel: RideHistoryViewModel
    let rideRouteViewModel: RideRouteViewModel
+   let rideDetailViewModel: RideDetailViewModel
 
    @State private var pendingDeletion: [RideHistoryViewModel.Row] = []
 
@@ -35,7 +36,7 @@ struct RideHistoryView: View {
          .navigationTitle("Rides")
          .navigationBarTitleDisplayMode(.large)
          .navigationDestination(for: PersistentIdentifier.self) { rideID in
-            RideRouteDetailView(rideRouteViewModel: rideRouteViewModel, rideID: rideID)
+            RideRouteDetailView(rideDetailViewModel: rideDetailViewModel, rideID: rideID)
                .onDisappear { loadHeroRoute() }
          }
       }
@@ -50,6 +51,10 @@ struct RideHistoryView: View {
    private var rideList: some View {
       ScrollView {
          LazyVStack(spacing: 12) {
+            if let summary = rideHistoryViewModel.summary {
+               RideHistorySummaryStrip(summary: summary)
+            }
+
             if let latest = rideHistoryViewModel.latestRow {
                NavigationLink(value: latest.id) {
                   RideHistoryHeroCard(
@@ -61,6 +66,16 @@ struct RideHistoryView: View {
                }
                .buttonStyle(.plain)
                .contextMenu { deleteButton(for: latest) }
+            }
+
+            if !rideHistoryViewModel.olderRows.isEmpty {
+               Text("EARLIER")
+                  .font(.caption2.weight(.bold))
+                  .kerning(1.4)
+                  .foregroundStyle(.white.opacity(0.4))
+                  .frame(maxWidth: .infinity, alignment: .leading)
+                  .padding(.top, 8)
+                  .padding(.leading, 4)
             }
 
             ForEach(rideHistoryViewModel.olderRows) { row in

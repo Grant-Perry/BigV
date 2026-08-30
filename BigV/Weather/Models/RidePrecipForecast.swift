@@ -5,6 +5,15 @@
 
 import Foundation
 
+/// What a bar's height means. Height and caption must encode the same quantity
+/// or the chart lies: the hourly chart prints a percentage, so it has to be
+/// drawn from the chance, while the minute chart prints nothing and is free to
+/// draw the rate.
+nonisolated enum RidePrecipMetric: Sendable, Equatable {
+   case chance
+   case intensity
+}
+
 /// One column on the precipitation chart — an hour or a minute.
 ///
 /// The distinction that earns its keep is `isWet`: a bar can carry a nonzero
@@ -15,13 +24,39 @@ nonisolated struct RidePrecipBar: Identifiable, Equatable, Sendable {
    var id: Date { date }
 
    var date: Date
+
+   /// 0…1 probability of precipitation — the number the caption prints.
    var precipitationChance: Double
+
+   /// 0…1 normalised rate. Drives colour and the wet test, never the height of
+   /// a captioned bar.
    var precipitationIntensity: Double
 
-   /// Bar height comes from whichever of chance or intensity reads higher.
-   var barFill: Double { max(precipitationIntensity, precipitationChance) }
+   /// Millimetres forecast for the hour. A trace is not rain.
+   var precipitationAmountMillimeters: Double = 0
 
-   var isWet: Bool { precipitationIntensity > 0.08 || precipitationChance >= 0.2 }
+   var metric: RidePrecipMetric = .chance
+
+   /// Share of the plot this bar fills, on an absolute 0…1 scale. A 40% chance
+   /// draws at 40% height, so the caption and the geometry cannot disagree and
+   /// a flat afternoon reads as flat instead of being stretched to fill.
+   var barFill: Double {
+      switch metric {
+         case .chance: min(1, max(0, precipitationChance))
+         case .intensity: min(1, max(0, precipitationIntensity))
+      }
+   }
+
+   var isWet: Bool {
+      switch metric {
+         case .chance:
+            precipitationChance >= RidePrecipForecast.wetChance
+               || precipitationAmountMillimeters >= RidePrecipForecast.wetMillimeters
+
+         case .intensity:
+            precipitationIntensity >= RidePrecipForecast.wetIntensity
+      }
+   }
 }
 
 /// Turns forecast snapshots into chart bars and the sentences that caption them.
@@ -35,6 +70,18 @@ nonisolated enum RidePrecipForecast {
 
    static let hourCount = 12
    static let nextHourDuration: TimeInterval = 60 * 60
+
+   /// Below a one-in-four chance, calling an hour wet turns a mostly dry
+   /// forecast into a warning the rider will learn to ignore.
+   static let wetChance = 0.25
+
+   /// The WMO trace cutoff: under 0.2 mm nothing measurable reaches the road.
+   static let wetMillimeters = 0.2
+
+   static let wetIntensity = 0.08
+
+   /// Heavy rain in mm/hr, used as full scale when mapping an amount onto 0…1.
+   static let heavyRainMillimetersPerHour = 7.6
 
    // MARK: - Hourly
 
@@ -56,28 +103,30 @@ nonisolated enum RidePrecipForecast {
             RidePrecipBar(
                date: hour.date,
                precipitationChance: hour.precipitationChance,
-               precipitationIntensity: hourlyIntensity(hour)
+               precipitationIntensity: hourlyIntensity(hour),
+               precipitationAmountMillimeters: hourlyMillimeters(hour),
+               metric: .chance
             )
          }
    }
 
-   /// Snow and measurable rain both get a visible floor, so an hour forecast to
-   /// drop snow can never draw shorter than one with a high chance and nothing
-   /// actually falling.
+   private static func hourlyMillimeters(_ hour: RideWeatherHour) -> Double {
+      hour.precipitationAmountMillimeters + hour.snowfallAmountMillimeters
+   }
+
+   /// Forecast millimetres mapped onto 0…1 for colour and the wet test only.
+   /// Nothing here may reach the bar height: the caption prints a percentage,
+   /// and an hour holding a trace of rain must not out-draw a 60% chance.
    private static func hourlyIntensity(_ hour: RideWeatherHour) -> Double {
-      let chance = hour.precipitationChance
-      if hour.snowfallAmountMillimeters > 0 { return max(chance, 0.45) }
-
-      let inches = hour.precipitationAmountMillimeters / 25.4
-      if inches > 0 { return min(1, max(chance, 0.35 + min(inches, 0.5))) }
-
-      return chance
+      min(1, hourlyMillimeters(hour) / heavyRainMillimetersPerHour)
    }
 
    static var hourlyTitle: String { "Next \(hourCount) Hours" }
 
    static func hourlySummary(bars: [RidePrecipBar], now: Date = .now) -> String {
-      guard let firstWet = bars.first(where: \.isWet) else { return "No precipitation expected" }
+      guard let firstWet = bars.first(where: \.isWet) else {
+         return dryHourlySummary(bars: bars)
+      }
 
       let start = bars.first?.date ?? now
       if Calendar.current.isDate(firstWet.date, equalTo: start, toGranularity: .hour) {
@@ -85,6 +134,15 @@ nonisolated enum RidePrecipForecast {
       }
 
       return "Rain starting around \(hourLabel(for: firstWet.date))"
+   }
+
+   /// Naming the peak explains the short bars instead of leaving a rider to
+   /// wonder what a chart of 4% columns is trying to say.
+   private static func dryHourlySummary(bars: [RidePrecipBar]) -> String {
+      let peak = bars.map(\.precipitationChance).max() ?? 0
+      guard peak >= 0.01 else { return "No precipitation expected" }
+
+      return "No rain expected — chance peaks at \(percentLabel(peak))"
    }
 
    /// Label every other bar plus the last, so twelve columns stay readable.
@@ -127,7 +185,8 @@ nonisolated enum RidePrecipForecast {
             RidePrecipBar(
                date: $0.date,
                precipitationChance: $0.precipitationChance,
-               precipitationIntensity: $0.precipitationIntensity
+               precipitationIntensity: $0.precipitationIntensity,
+               metric: .intensity
             )
          }
       if !live.isEmpty { return live }
@@ -141,10 +200,14 @@ nonisolated enum RidePrecipForecast {
          }
          let chance = hour?.precipitationChance ?? 0
 
+         // No minute forecast here, so the only honest quantity is the hour's
+         // chance — carried as a chance rather than dressed up as a rate.
          return RidePrecipBar(
             date: date,
             precipitationChance: chance,
-            precipitationIntensity: chance
+            precipitationIntensity: 0,
+            precipitationAmountMillimeters: hour?.precipitationAmountMillimeters ?? 0,
+            metric: .chance
          )
       }
    }
@@ -185,6 +248,10 @@ nonisolated enum RidePrecipForecast {
    }
 
    // MARK: - Labels
+
+   static func percentLabel(_ fraction: Double) -> String {
+      "\(Int((min(1, max(0, fraction)) * 100).rounded()))%"
+   }
 
    static func hourLabel(for date: Date) -> String {
       date.formatted(.dateTime.hour(.defaultDigits(amPM: .abbreviated)))

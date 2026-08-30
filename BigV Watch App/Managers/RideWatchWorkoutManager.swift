@@ -37,6 +37,18 @@ import HealthKit
 /// refuses to start without it. That permission is the price of the sensor, not a
 /// statement of intent.
 ///
+/// ## The `prepare()` contract
+///
+/// `prepare()` moves a session from `.notStarted` to `.prepared` — and it does
+/// it asynchronously, while the optical sensor spins up and any Bluetooth strap
+/// connects. `startActivity(with:)` is only legal from `.prepared`. Issuing both
+/// in the same breath races the two transitions, and the session that loses is
+/// torn down by watchOS along with the app that owned it.
+///
+/// Apple fills that gap with a three second countdown. BigV has no countdown to
+/// show, so it waits on the state itself and starts the moment the sensors are
+/// warm.
+///
 /// ## Lingering sessions
 ///
 /// watchOS preserves an active session across a crash or a force-quit and
@@ -65,6 +77,10 @@ final class RideWatchWorkoutManager {
 
    private var heartRateTask: Task<Void, Never>?
    private var heartRateContinuation: AsyncStream<RideWatchHeartRateReading>.Continuation?
+
+   /// How long the sensors get to warm up before Start is called a failure.
+   /// Matches the countdown Apple puts between `prepare()` and `startActivity`.
+   private let warmUpWindow: Duration = .seconds(3)
 
    /// Starting a session requires sharing workouts; reading heart rate requires
    /// reading it. Nothing here is ever written.
@@ -115,21 +131,15 @@ final class RideWatchWorkoutManager {
    /// A parked session is resumed in place. Ending one and starting another
    /// in the same breath is exactly how watchOS decides the workout is over
    /// and throws the rider back at the watch face.
-   func startSensing() -> AsyncStream<RideWatchHeartRateReading> {
+   func startSensing() async -> AsyncStream<RideWatchHeartRateReading> {
       if let session {
          switch session.state {
             case .paused:
                return resumeParkedSession(session)
             case .running:
-               return attachHeartRateStream()
+               return attachHeartRateStream(from: .now)
             case .notStarted, .prepared:
-               let startDate = Date.now
-               session.prepare()
-               session.startActivity(with: startDate)
-               beginCollection(at: startDate)
-               isSensing = true
-               failure = nil
-               return attachHeartRateStream()
+               return await runToRunning(session)
             case .ended, .stopped:
                discardEndedSession()
             @unknown default:
@@ -137,12 +147,8 @@ final class RideWatchWorkoutManager {
          }
       }
 
-      let (stream, continuation) = makeHeartRateStream()
-
       guard HKHealthStore.isHealthDataAvailable() else {
-         failure = "Health data unavailable"
-         continuation.finish()
-         return stream
+         return closedStream(failing: "Health data unavailable")
       }
 
       let configuration = HKWorkoutConfiguration()
@@ -156,30 +162,63 @@ final class RideWatchWorkoutManager {
             healthStore: healthStore,
             workoutConfiguration: configuration
          )
-         let startDate = Date.now
 
          startRelay(for: session)
          self.session = session
          self.builder = builder
 
-         session.prepare()
-         session.startActivity(with: startDate)
-         beginCollection(at: startDate)
-
-         isSensing = true
-         failure = nil
-
-         startHeartRateStream(from: startDate, into: continuation)
-
-         DebugPrint(mode: .healthKit, "Sensor session started (no workout will be saved)")
+         return await runToRunning(session)
       } catch {
-         failure = error.localizedDescription
-         continuation.finish()
+         DebugPrint(mode: .healthKit, "Sensor session could not be created: \(error.localizedDescription)")
+         return closedStream(failing: error.localizedDescription)
+      }
+   }
 
-         DebugPrint(mode: .healthKit, "Sensor session failed to start: \(error.localizedDescription)")
+   /// Walks a session up to `.running` the way HealthKit requires, waiting out
+   /// the warm-up rather than talking over it.
+   private func runToRunning(_ session: HKWorkoutSession) async -> AsyncStream<RideWatchHeartRateReading> {
+      if session.state == .notStarted {
+         session.prepare()
+         await waitForWarmSensors(on: session)
       }
 
-      return stream
+      // The rider can hit CANCEL inside the warm-up window. Starting the
+      // activity anyway would leave a workout running behind an idle glance.
+      guard !Task.isCancelled else {
+         discardEndedSession()
+         return closedStream(failing: nil)
+      }
+
+      guard session.state == .prepared else {
+         DebugPrint(mode: .healthKit, "Sensors never warmed — stalled at \(session.state.label)")
+         discardEndedSession()
+         return closedStream(failing: "Heart rate sensor did not start")
+      }
+
+      let startDate = Date.now
+      session.startActivity(with: startDate)
+      beginCollection(at: startDate)
+
+      isSensing = true
+      failure = nil
+
+      DebugPrint(mode: .healthKit, "Sensor session started (no workout will be saved)")
+      return attachHeartRateStream(from: startDate)
+   }
+
+   /// Polls the state rather than waiting on the delegate: the state is the
+   /// contract HealthKit enforces, and a callback that never arrives must not
+   /// be able to strand Start forever.
+   private func waitForWarmSensors(on session: HKWorkoutSession) async {
+      let deadline = ContinuousClock.now + warmUpWindow
+
+      while session.state == .notStarted, ContinuousClock.now < deadline {
+         do {
+            try await Task.sleep(for: .milliseconds(50))
+         } catch {
+            return
+         }
+      }
    }
 
    /// Pauses the HealthKit session without ending it.
@@ -254,15 +293,29 @@ final class RideWatchWorkoutManager {
       failure = nil
 
       DebugPrint(mode: .healthKit, "Sensor session resumed from park")
-      return attachHeartRateStream()
+      return attachHeartRateStream(from: .now)
    }
 
-   private func attachHeartRateStream() -> AsyncStream<RideWatchHeartRateReading> {
+   private func attachHeartRateStream(from date: Date) -> AsyncStream<RideWatchHeartRateReading> {
       detachHeartRateStream()
 
       let (stream, continuation) = makeHeartRateStream()
-      startHeartRateStream(from: Date.now, into: continuation)
+      startHeartRateStream(from: date, into: continuation)
       isSensing = true
+      return stream
+   }
+
+   /// A stream that is over before it began, so the caller's `for await` exits
+   /// instead of hanging on a sensor that never came up. A `nil` reason is the
+   /// rider's own cancellation, which is not a failure to report.
+   private func closedStream(failing reason: String?) -> AsyncStream<RideWatchHeartRateReading> {
+      detachHeartRateStream()
+
+      isSensing = false
+      failure = reason
+
+      let (stream, continuation) = AsyncStream<RideWatchHeartRateReading>.makeStream()
+      continuation.finish()
       return stream
    }
 
@@ -309,6 +362,15 @@ final class RideWatchWorkoutManager {
    /// a session it thinks is still live.
    private func handle(_ event: RideWatchSensorEvent) {
       switch event {
+         case .prepared:
+            DebugPrint(mode: .healthKit, "Sensor session prepared")
+
+         case .running:
+            DebugPrint(mode: .healthKit, "Sensor session running")
+
+         case .paused:
+            DebugPrint(mode: .healthKit, "Sensor session paused")
+
          case .ended:
             DebugPrint(mode: .healthKit, "Sensor session ended by watchOS")
             discardEndedSession()

@@ -24,15 +24,17 @@ struct RideWeatherDetailSheet: View {
 
    var body: some View {
       NavigationStack {
-         ZStack {
-            RideAtmosphereBackground()
-               .ignoresSafeArea()
-
-            forecastScroll
-         }
-         .navigationTitle("Weather")
-         .navigationBarTitleDisplayMode(.inline)
-         .toolbar { forecastToolbar }
+         forecastScroll
+            // A background rather than a ZStack sibling: a full-bleed layer
+            // inside a stack inflates the stack past the safe area and the
+            // scroll view loses its navigation-bar inset.
+            .background {
+               RideAtmosphereBackground()
+                  .ignoresSafeArea()
+            }
+            .navigationTitle("Weather")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { forecastToolbar }
       }
       .preferredColorScheme(.dark)
       .task { await weatherDetailModel.load() }

@@ -39,10 +39,11 @@ struct RideDashboardMetricsGrid: View {
             identifier: "ride.tile.rideTime"
          )
 
-         tile(
+         chartableTile(
             "ELEV GAIN",
             value: rideViewModel.elevationGain,
             unit: rideViewModel.elevationUnit,
+            metric: .elevation,
             gutterAlignment: .trailing
          )
 
@@ -52,17 +53,19 @@ struct RideDashboardMetricsGrid: View {
             unit: rideViewModel.gradeUnit
          )
 
-         tile(
+         chartableTile(
             "AVG SPEED",
             value: rideViewModel.averageSpeed,
             unit: rideViewModel.speedUnit,
+            metric: .speed,
             gutterAlignment: .trailing
          )
 
-         tile(
+         chartableTile(
             "MAX SPEED",
             value: rideViewModel.maximumSpeed,
-            unit: rideViewModel.speedUnit
+            unit: rideViewModel.speedUnit,
+            metric: .speed
          )
 
          if routeGuidanceViewModel.isActive {
@@ -96,6 +99,26 @@ struct RideDashboardMetricsGrid: View {
          unit: unit,
          identifier: identifier,
          gutterAlignment: gutterAlignment,
+         isCompact: isCompact
+      )
+   }
+
+   private func chartableTile(
+      _ title: String,
+      value: String,
+      unit: String? = nil,
+      metric: RideLiveMetric,
+      identifier: String? = nil,
+      gutterAlignment: HorizontalAlignment = .leading
+   ) -> some View {
+      RideMetricTile(
+         title: title,
+         value: value,
+         unit: unit,
+         identifier: identifier,
+         gutterAlignment: gutterAlignment,
+         action: { rideViewModel.selectMetric(metric) },
+         isSelected: rideViewModel.selectedMetric == metric,
          isCompact: isCompact
       )
    }

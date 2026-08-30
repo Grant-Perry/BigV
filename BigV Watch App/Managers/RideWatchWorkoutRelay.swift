@@ -28,6 +28,10 @@ nonisolated final class RideWatchWorkoutRelay: NSObject, HKWorkoutSessionDelegat
 
    // MARK: - Session State
 
+   /// Every transition is reported, not just the terminal ones. `.prepared` is
+   /// the gate `startActivity(with:)` has to wait behind, and a session that
+   /// never reaches it is the difference between a working Start and a rider
+   /// looking at the clock face.
    func workoutSession(
       _ workoutSession: HKWorkoutSession,
       didChangeTo toState: HKWorkoutSessionState,
@@ -35,10 +39,22 @@ nonisolated final class RideWatchWorkoutRelay: NSObject, HKWorkoutSessionDelegat
       date: Date
    ) {
       switch toState {
+         case .prepared:
+            continuation.yield(.prepared)
+
+         case .running:
+            continuation.yield(.running)
+
+         case .paused:
+            continuation.yield(.paused)
+
          case .ended, .stopped:
             continuation.yield(.ended)
 
-         default:
+         case .notStarted:
+            break
+
+         @unknown default:
             break
       }
    }

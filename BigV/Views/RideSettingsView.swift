@@ -3,9 +3,12 @@
 //  BigV
 //
 
+import StoreKit
+import SwiftData
 import SwiftUI
+import UniformTypeIdentifiers
 
-/// The Settings tab, and the first thing a new rider sees.
+/// The Settings tab, and the first thing a new rider sees after onboarding.
 ///
 /// Deliberately small: the units choice drives every measurement in the app —
 /// dashboard, map, radar, history, summary and the Watch mirror — so it lives
@@ -14,8 +17,20 @@ import SwiftUI
 struct RideSettingsView: View {
 
    @Bindable var unitsSettings: RideUnitsSettings
+   @Bindable var onboardingSettings: RideOnboardingSettings
+   @Bindable var plusStore: BigVeloPlusStore
+   @Bindable var backupViewModel: RideBackupViewModel
    let onShowRadar: () -> Void
    let onFinishSetup: () -> Void
+
+   @Environment(\.openURL) private var openURL
+   @State private var isShowingRedeem = false
+   @State private var isShowingImporter = false
+   @State private var isConfirmingRestore = false
+   @State private var isConfirmingResetOnboarding = false
+
+   private let privacyURL = URL(string: "https://bigvelo.app/privacy")!
+   private let termsURL = URL(string: "https://bigvelo.app/terms")!
 
    var body: some View {
       NavigationStack {
@@ -30,6 +45,12 @@ struct RideSettingsView: View {
                temperatureCard
 
                radarCard
+
+               plusCard
+
+               backupCard
+
+               onboardingCard
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 16)
@@ -50,6 +71,43 @@ struct RideSettingsView: View {
          .rideAppFooter()
          .navigationTitle(unitsSettings.hasCompletedSetup ? "Settings" : "Ride Setup")
          .navigationBarTitleDisplayMode(.large)
+         .offerCodeRedemption(isPresented: $isShowingRedeem) { _ in
+            Task { await plusStore.refreshEntitlement() }
+         }
+         .fileImporter(
+            isPresented: $isShowingImporter,
+            allowedContentTypes: [.json],
+            allowsMultipleSelection: false
+         ) { result in
+            handleImportResult(result)
+         }
+         .confirmationDialog(
+            "Restore Backup?",
+            isPresented: $isConfirmingRestore,
+            titleVisibility: .visible
+         ) {
+            Button("Choose Backup File…") {
+               isShowingImporter = true
+            }
+            Button("Cancel", role: .cancel) {}
+         } message: {
+            Text("Preferences replace what’s here. Finished rides that aren’t already saved are added; duplicates are skipped. End any active ride first.")
+         }
+         .confirmationDialog(
+            "Reset Onboarding?",
+            isPresented: $isConfirmingResetOnboarding,
+            titleVisibility: .visible
+         ) {
+            Button("Reset Onboarding", role: .destructive) {
+               onboardingSettings.resetOnboarding()
+            }
+            Button("Cancel", role: .cancel) {}
+         } message: {
+            Text("Shows the kit, radar, rides story and Plus screens again the next time the app comes forward.")
+         }
+         .task {
+            await plusStore.loadProducts()
+         }
       }
    }
 
@@ -155,6 +213,153 @@ struct RideSettingsView: View {
       .accessibilityIdentifier("setup.button.radar")
    }
 
+   // MARK: - Plus
+
+   private var plusCard: some View {
+      VStack(alignment: .leading, spacing: 12) {
+         cardHeader("BIGVELO+")
+
+         HStack {
+            Text(plusStore.isPlus ? "Unlocked" : "Not subscribed")
+               .font(.subheadline.weight(.semibold))
+               .foregroundStyle(plusStore.isPlus ? RideChromeTokens.go : .white)
+
+            Spacer()
+
+            if plusStore.isPlus {
+               Image(systemName: "checkmark.seal.fill")
+                  .foregroundStyle(RideChromeTokens.go)
+            }
+         }
+
+         Text("Radar, Watch HR, record, History and Health stay free. Plus is for deeper surfaces later.")
+            .font(.caption2)
+            .foregroundStyle(.white.opacity(0.45))
+
+         HStack(spacing: 12) {
+            Button("Restore") {
+               Task { await plusStore.restore() }
+            }
+            .buttonStyle(.bordered)
+
+            Button("Redeem Code") {
+               isShowingRedeem = true
+            }
+            .buttonStyle(.bordered)
+
+            Spacer()
+         }
+         .tint(RideChromeTokens.ice)
+
+         #if DEBUG
+         Toggle("Force Plus (Debug)", isOn: $plusStore.forcePlusInDebug)
+            .font(.caption)
+            .foregroundStyle(.white.opacity(0.7))
+            .tint(RideChromeTokens.ember)
+         #endif
+
+         HStack(spacing: 16) {
+            Button("Privacy") { openURL(privacyURL) }
+            Button("Terms") { openURL(termsURL) }
+         }
+         .font(.caption.weight(.semibold))
+         .foregroundStyle(.white.opacity(0.55))
+
+         if let message = plusStore.lastErrorMessage {
+            Text(message)
+               .font(.caption2)
+               .foregroundStyle(RideChromeTokens.halt)
+         }
+      }
+      .padding(14)
+      .rideGlassCard()
+   }
+
+   // MARK: - Backup
+
+   private var backupCard: some View {
+      VStack(alignment: .leading, spacing: 12) {
+         cardHeader("BACKUP")
+
+         Text("Save finished rides and preferences to a file, or bring them back on this phone or another.")
+            .font(.caption2)
+            .foregroundStyle(.white.opacity(0.45))
+
+         HStack(spacing: 12) {
+            Button {
+               backupViewModel.exportBackup()
+            } label: {
+               Label("Backup", systemImage: "arrow.up.doc")
+            }
+            .buttonStyle(.bordered)
+            .disabled(backupViewModel.isBusy)
+            .accessibilityIdentifier("settings.button.backup")
+
+            Button {
+               isConfirmingRestore = true
+            } label: {
+               Label("Restore", systemImage: "arrow.down.doc")
+            }
+            .buttonStyle(.bordered)
+            .disabled(backupViewModel.isBusy)
+            .accessibilityIdentifier("settings.button.restore")
+
+            Spacer()
+         }
+         .tint(RideChromeTokens.ice)
+
+         if let url = backupViewModel.shareURL {
+            ShareLink(
+               item: url,
+               preview: SharePreview("BigVelo Backup", image: Image(systemName: "bicycle"))
+            ) {
+               Label("Share Backup File…", systemImage: "square.and.arrow.up")
+                  .font(.subheadline.weight(.semibold))
+            }
+            .accessibilityIdentifier("settings.button.shareBackup")
+         }
+
+         if let message = backupViewModel.statusMessage {
+            Text(message)
+               .font(.caption2)
+               .foregroundStyle(.white.opacity(0.55))
+         }
+      }
+      .padding(14)
+      .rideGlassCard()
+   }
+
+   // MARK: - Onboarding Reset
+
+   private var onboardingCard: some View {
+      Button {
+         isConfirmingResetOnboarding = true
+      } label: {
+         HStack(spacing: 12) {
+            Image(systemName: "arrow.counterclockwise")
+               .font(.title3.weight(.semibold))
+               .foregroundStyle(RideChromeTokens.ember)
+
+            VStack(alignment: .leading, spacing: 2) {
+               Text("Reset Onboarding")
+                  .font(.subheadline.weight(.semibold))
+                  .foregroundStyle(.white)
+
+               Text("Show the kit, radar, story and Plus screens again")
+                  .font(.caption)
+                  .foregroundStyle(.white.opacity(0.55))
+            }
+
+            Spacer()
+         }
+         .padding(14)
+         .contentShape(.rect)
+      }
+      .buttonStyle(.plain)
+      .rideGlassCard()
+      .accessibilityIdentifier("settings.button.resetOnboarding")
+   }
+
    // MARK: - First Run
 
    /// Pinned rather than scrolled, and only ever shown once. Afterwards the tab
@@ -192,9 +397,45 @@ struct RideSettingsView: View {
          .kerning(1.2)
          .foregroundStyle(.white.opacity(0.45))
    }
+
+   private func handleImportResult(_ result: Result<[URL], Error>) {
+      switch result {
+         case .success(let urls):
+            guard let url = urls.first else { return }
+            backupViewModel.importBackup(from: url)
+         case .failure(let error):
+            backupViewModel.reportFailure(error.localizedDescription)
+      }
+   }
 }
 
 #Preview {
-   RideSettingsView(unitsSettings: RideUnitsSettings(), onShowRadar: {}, onFinishSetup: {})
-      .preferredColorScheme(.dark)
+   let container = try! ModelContainer(
+      for: Schema([Ride.self, RideSample.self, RideRadarEvent.self]),
+      configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+   )
+   let storage = RideStorageManager(modelContext: container.mainContext)
+   let units = RideUnitsSettings()
+   let onboarding = RideOnboardingSettings()
+   let radar = RideRadarSettings()
+   let backup = RideBackupViewModel(
+      backupManager: RideBackupManager(
+         rideStorageManager: storage,
+         unitsSettings: units,
+         radarSettings: radar,
+         onboardingSettings: onboarding
+      ),
+      isRideInProgress: { false },
+      onHistoryChanged: {}
+   )
+
+   return RideSettingsView(
+      unitsSettings: units,
+      onboardingSettings: onboarding,
+      plusStore: BigVeloPlusStore(),
+      backupViewModel: backup,
+      onShowRadar: {},
+      onFinishSetup: {}
+   )
+   .preferredColorScheme(.dark)
 }

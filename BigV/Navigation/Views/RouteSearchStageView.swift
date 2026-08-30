@@ -6,6 +6,10 @@
 import SwiftUI
 
 /// The search field and its live results.
+///
+/// Does not steal focus on appear: the tab bar has to stay reachable. The
+/// keyboard only comes up when the rider taps the field, and tapping empty
+/// chrome puts it away again so the tabs are never trapped behind it.
 struct RouteSearchStageView: View {
 
    @Bindable var routePlannerViewModel: RoutePlannerViewModel
@@ -20,7 +24,6 @@ struct RouteSearchStageView: View {
                .padding(.horizontal, 16)
                .padding(.top, 8)
          }
-         .onAppear { isFieldFocused = true }
    }
 
    @ViewBuilder
@@ -74,12 +77,7 @@ struct RouteSearchStageView: View {
    @ViewBuilder
    private var results: some View {
       if let message = routePlannerViewModel.searchStatusMessage {
-         Text(message)
-            .font(.subheadline.weight(.medium))
-            .foregroundStyle(.white.opacity(0.5))
-            .multilineTextAlignment(.center)
-            .frame(maxWidth: .infinity)
-            .padding(.top, 24)
+         statusMessage(message)
       } else if routePlannerViewModel.suggestions.isEmpty {
          hint
       } else {
@@ -90,6 +88,7 @@ struct RouteSearchStageView: View {
    private var suggestionList: some View {
       List(Array(routePlannerViewModel.suggestions.enumerated()), id: \.element.id) { index, suggestion in
          Button {
+            isFieldFocused = false
             routePlannerViewModel.select(suggestion)
          } label: {
             RouteSuggestionRowView(suggestion: suggestion)
@@ -110,10 +109,22 @@ struct RouteSearchStageView: View {
          .font(.footnote)
          .foregroundStyle(.white.opacity(0.35))
          .multilineTextAlignment(.center)
-         .frame(maxWidth: .infinity)
+         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
          .padding(.top, 24)
+         .contentShape(.rect)
+         .onTapGesture { isFieldFocused = false }
    }
 
+   private func statusMessage(_ message: String) -> some View {
+      Text(message)
+         .font(.subheadline.weight(.medium))
+         .foregroundStyle(.white.opacity(0.5))
+         .multilineTextAlignment(.center)
+         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+         .padding(.top, 24)
+         .contentShape(.rect)
+         .onTapGesture { isFieldFocused = false }
+   }
 }
 
 // MARK: - Row

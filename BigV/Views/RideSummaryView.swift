@@ -10,6 +10,7 @@ struct RideSummaryView: View {
 
    let rideViewModel: RideViewModel
    let rideRouteViewModel: RideRouteViewModel
+   let rideDetailViewModel: RideDetailViewModel
 
    var body: some View {
       VStack(spacing: 14) {
@@ -25,6 +26,8 @@ struct RideSummaryView: View {
                )
 
                RideTotalsGridView(totals: rideViewModel.totals, identifierPrefix: "summary.tile")
+
+               RideSummaryChartsSection(rideDetailViewModel: rideDetailViewModel)
             }
             .padding(.bottom, 4)
          }
@@ -40,6 +43,7 @@ struct RideSummaryView: View {
       .frame(maxWidth: .infinity, maxHeight: .infinity)
       .task(id: rideViewModel.finishedRideID) {
          rideRouteViewModel.load(rideViewModel.finishedRideID)
+         await rideDetailViewModel.load(rideViewModel.finishedRideID)
       }
    }
 
@@ -105,7 +109,8 @@ private extension String {
 #Preview {
    RideSummaryView(
       rideViewModel: RideViewModel(),
-      rideRouteViewModel: RideRouteViewModel()
+      rideRouteViewModel: RideRouteViewModel(),
+      rideDetailViewModel: RideDetailViewModel()
    )
    .preferredColorScheme(.dark)
 }

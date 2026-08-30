@@ -13,31 +13,33 @@ struct RideRadarChip: View {
    let tier: RideRadarThreatTier?
    let nearestDistance: String?
    let battery: String?
+   var isSelected: Bool = false
    let action: () -> Void
 
    var body: some View {
       Button(action: action) {
-         HStack(spacing: 6) {
+         RideSensorChip(
+            value: readout,
+            valueColor: readoutColor,
+            tint: chromeTint ?? (isSelected ? RideChromeTokens.ice.opacity(0.35) : nil)
+         ) {
             Image(systemName: .radarIcon)
                .font(.caption.weight(.semibold))
                .foregroundStyle(iconColor)
                .symbolEffect(.pulse, isActive: tier == .high)
-
-            Text(readout)
-               .font(.caption.weight(.bold))
-               .monospacedDigit()
-               .foregroundStyle(readoutColor)
          }
-         .padding(.horizontal, 12)
-         .frame(height: 36)
-         .contentShape(.capsule)
       }
       .buttonStyle(.plain)
-      .rideGlassChrome(in: Capsule(), tint: chromeTint)
+      .overlay {
+         if isSelected {
+            Capsule()
+               .strokeBorder(RideChromeTokens.ice.opacity(0.85), lineWidth: 2)
+         }
+      }
       .accessibilityElement(children: .ignore)
       .accessibilityLabel("Rear radar")
       .accessibilityValue(accessibilitySummary)
-      .accessibilityHint("Opens radar settings")
+      .accessibilityAddTraits(isSelected ? [.isSelected] : [])
       .accessibilityIdentifier("ride.chip.radar")
    }
 

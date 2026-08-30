@@ -32,4 +32,11 @@ struct RideSampleDraft: Sendable, Equatable {
 
    /// Course over ground in degrees. Negative means unknown.
    let course: Double
+
+   // MARK: - Sensors
+
+   /// Beats per minute from the wrist at the moment this sample was accepted.
+   /// `nil` whenever no Watch or strap was feeding one. Defaulted so callers
+   /// without a body sensor build the draft they always did.
+   var heartRate: Double? = nil
 }

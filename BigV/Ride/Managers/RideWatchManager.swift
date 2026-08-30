@@ -141,7 +141,12 @@ final class RideWatchManager {
 
       if linkState.allowsLiveMessages, session.isReachable {
          let failures = relayContinuation
-         session.sendMessage(payload, replyHandler: nil) { error in
+
+         // `@Sendable` keeps Swift from inferring this Objective-C closure as
+         // `@MainActor` under main-actor default isolation. WatchConnectivity
+         // invokes it on its own queue, and the isolation check that inference
+         // installs would trap the moment a mirror failed to send.
+         session.sendMessage(payload, replyHandler: nil) { @Sendable error in
             failures?.yield(.deliveryFailed("Mirror send failed: \(error.localizedDescription)"))
          }
       }

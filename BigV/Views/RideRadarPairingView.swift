@@ -17,36 +17,38 @@ struct RideRadarPairingView: View {
 
    var body: some View {
       NavigationStack {
-         ZStack {
+         ScrollView {
+            VStack(spacing: 12) {
+               if pairingViewModel.needsDisclaimer {
+                  RideRadarDisclaimerCard {
+                     pairingViewModel.acknowledgeDisclaimer()
+                  }
+               }
+
+               enableCard
+
+               if pairingViewModel.isEnabled {
+                  connectionCard
+                  alertsCard
+                  displayCard
+
+                  #if DEBUG
+                  simulatorCard
+                  #endif
+               }
+
+               footnote
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 24)
+         }
+         .scrollIndicators(.hidden)
+         // A background rather than a ZStack sibling: a full-bleed layer inside
+         // a stack inflates the stack past the safe area and the scroll view
+         // loses its navigation-bar inset, so the title lands on the first card.
+         .background {
             RideAtmosphereBackground()
                .ignoresSafeArea()
-
-            ScrollView {
-               VStack(spacing: 12) {
-                  if pairingViewModel.needsDisclaimer {
-                     RideRadarDisclaimerCard {
-                        pairingViewModel.acknowledgeDisclaimer()
-                     }
-                  }
-
-                  enableCard
-
-                  if pairingViewModel.isEnabled {
-                     connectionCard
-                     alertsCard
-                     displayCard
-
-                     #if DEBUG
-                     simulatorCard
-                     #endif
-                  }
-
-                  footnote
-               }
-               .padding(.horizontal, 16)
-               .padding(.bottom, 24)
-            }
-            .scrollIndicators(.hidden)
          }
          .navigationTitle("Rear Radar")
          .navigationBarTitleDisplayMode(.large)
@@ -252,15 +254,28 @@ struct RideRadarPairingView: View {
       VStack(alignment: .leading, spacing: 10) {
          cardHeader("RADAR TAPE")
 
-         Picker("Side", selection: $pairingViewModel.side) {
-            ForEach(RideRadarSide.allCases) { side in
-               Text(side.title).tag(side)
+         Picker("Placement", selection: $pairingViewModel.placement) {
+            ForEach(RideRadarPlacement.allCases) { placement in
+               Text(placement.title).tag(placement)
             }
          }
          .pickerStyle(.segmented)
+         .accessibilityIdentifier("radar.picker.placement")
+
+         Text(placementHint)
+            .font(.caption2)
+            .foregroundStyle(.white.opacity(0.45))
       }
       .padding(14)
       .rideGlassCard()
+   }
+
+   /// Which way to read the tape, because the two axes put the rider at
+   /// different ends and a rider glancing down needs to know which.
+   private var placementHint: String {
+      pairingViewModel.placement.isVertical
+         ? "You sit at the top. Traffic climbs toward you as it closes."
+         : "You sit at the right. Traffic runs in from the left as it closes."
    }
 
    // MARK: - Simulator

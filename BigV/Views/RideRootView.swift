@@ -16,10 +16,14 @@ struct RideRootView: View {
    let rideHistoryViewModel: RideHistoryViewModel
    let summaryRouteViewModel: RideRouteViewModel
    let historyRouteViewModel: RideRouteViewModel
+   let rideDetailViewModel: RideDetailViewModel
    let routePlannerViewModel: RoutePlannerViewModel
    let routeGuidanceViewModel: RouteGuidanceViewModel
    let rideRadarPairingViewModel: RideRadarPairingViewModel
    let rideUnitsSettings: RideUnitsSettings
+   let rideOnboardingSettings: RideOnboardingSettings
+   let plusStore: BigVeloPlusStore
+   let rideBackupViewModel: RideBackupViewModel
 
    @Environment(\.scenePhase) private var scenePhase
    @State private var selectedTab: RideTab = .dashboard
@@ -33,6 +37,7 @@ struct RideRootView: View {
                rideMapViewModel: rideMapViewModel,
                routeGuidanceViewModel: routeGuidanceViewModel,
                summaryRouteViewModel: summaryRouteViewModel,
+               rideDetailViewModel: rideDetailViewModel,
                onShowRadar: { isShowingRadarPairing = true }
             )
          }
@@ -40,7 +45,8 @@ struct RideRootView: View {
          Tab(RideTab.rides.title, systemImage: RideTab.rides.symbolName, value: .rides) {
             RideHistoryView(
                rideHistoryViewModel: rideHistoryViewModel,
-               rideRouteViewModel: historyRouteViewModel
+               rideRouteViewModel: historyRouteViewModel,
+               rideDetailViewModel: rideDetailViewModel
             )
          }
 
@@ -53,6 +59,9 @@ struct RideRootView: View {
          Tab(RideTab.settings.title, systemImage: RideTab.settings.symbolName, value: .settings) {
             RideSettingsView(
                unitsSettings: rideUnitsSettings,
+               onboardingSettings: rideOnboardingSettings,
+               plusStore: plusStore,
+               backupViewModel: rideBackupViewModel,
                onShowRadar: { isShowingRadarPairing = true },
                onFinishSetup: { selectedTab = .dashboard }
             )

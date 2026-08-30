@@ -12,7 +12,14 @@ struct RideMapCanvasView: View {
 
    @Bindable var rideMapViewModel: RideMapViewModel
    var showsCompass: Bool = true
-   var allowsInteraction: Bool = true
+
+   /// `nil` takes the view model's own follow-aware modes, which is what the
+   /// full map page wants. The drawer names its own set instead.
+   var interactionModes: MapInteractionModes?
+
+   /// Bounds are an initialiser parameter rather than a modifier, and they are
+   /// the only zoom lever a `userLocation` camera gives.
+   var cameraBounds: MapCameraBounds?
 
    var body: some View {
       GeometryReader { proxy in
@@ -31,7 +38,8 @@ struct RideMapCanvasView: View {
    private var mapCanvas: some View {
       Map(
          position: $rideMapViewModel.cameraPosition,
-         interactionModes: allowsInteraction ? rideMapViewModel.interactionModes : []
+         bounds: cameraBounds,
+         interactionModes: interactionModes ?? rideMapViewModel.interactionModes
       ) {
          if rideMapViewModel.hasPlannedRoute {
             MapPolyline(coordinates: rideMapViewModel.plannedRouteCoordinates)

@@ -5,13 +5,20 @@
 
 import Foundation
 
-// MARK: - Side
+// MARK: - Placement
 
-/// Which screen edge the radar tape rides, mirroring Garmin's column preference.
-enum RideRadarSide: String, CaseIterable, Sendable, Identifiable {
+/// Which screen edge the radar tape rides.
+///
+/// The tape is an overlay on every edge — it never reserves a gutter, because
+/// giving up cockpit width for a rail the rider only glances at is the wrong
+/// trade. Left and right run the Garmin vertical convention; top and bottom run
+/// the same scale horizontally with the rider at the right-hand end.
+enum RideRadarPlacement: String, CaseIterable, Sendable, Identifiable {
 
    case leading
    case trailing
+   case top
+   case bottom
 
    var id: String { rawValue }
 
@@ -19,7 +26,14 @@ enum RideRadarSide: String, CaseIterable, Sendable, Identifiable {
       switch self {
          case .leading: "Left"
          case .trailing: "Right"
+         case .top: "Top"
+         case .bottom: "Bottom"
       }
+   }
+
+   /// Vertical tapes read rider-at-top; horizontal tapes read rider-at-right.
+   var isVertical: Bool {
+      self == .leading || self == .trailing
    }
 }
 
@@ -78,8 +92,8 @@ final class RideRadarSettings {
       didSet { defaults.set(isEnabled, forKey: Key.enabled) }
    }
 
-   var side: RideRadarSide {
-      didSet { defaults.set(side.rawValue, forKey: Key.side) }
+   var placement: RideRadarPlacement {
+      didSet { defaults.set(placement.rawValue, forKey: Key.side) }
    }
 
    var alertHapticsEnabled: Bool {
@@ -122,7 +136,7 @@ final class RideRadarSettings {
       self.defaults = defaults
 
       isEnabled = defaults.bool(forKey: Key.enabled)
-      side = RideRadarSide(rawValue: defaults.string(forKey: Key.side) ?? "") ?? .trailing
+      placement = RideRadarPlacement(rawValue: defaults.string(forKey: Key.side) ?? "") ?? .trailing
       alertHapticsEnabled = defaults.object(forKey: Key.alertHaptics) as? Bool ?? true
       alertAudioEnabled = defaults.object(forKey: Key.alertAudio) as? Bool ?? true
       toneStyle = RideRadarToneStyle(rawValue: defaults.string(forKey: Key.alertTone) ?? "") ?? .multi

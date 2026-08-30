@@ -114,14 +114,16 @@ final class RideWatchLinkManager {
 
       guard let session, session.activationState == .activated else {
          eventContinuation?.yield(.commandUndelivered)
+         DebugPrint(mode: .sessionLifecycle, "Dropped \(command.rawValue): link not activated")
          return
       }
 
-      // Durable copy first. Start used to die with the glance when a button
-      // tap inactivated the scene; transferUserInfo still reaches the phone.
-      session.transferUserInfo(payload)
-
+      // Exactly one copy goes out. Sending the durable one alongside the live
+      // one made the phone validate every command twice — it accepted the
+      // first and answered the wrist `ignoredForPhase` for the second, about a
+      // ride it had itself just started.
       guard linkState.allowsLiveMessages, session.isReachable else {
+         session.transferUserInfo(payload)
          eventContinuation?.yield(.commandUndelivered)
          DebugPrint(mode: .sessionLifecycle, "Queued \(command.rawValue) for an unreachable phone")
          return
@@ -129,21 +131,39 @@ final class RideWatchLinkManager {
 
       let events = eventContinuation
 
-      session.sendMessage(payload, replyHandler: { reply in
-         Task { @MainActor in
-            guard let message = RideWatchMessage(payload: reply),
-                  case .commandReceipt(let receipt) = message
-            else { return }
+      // `@Sendable` is load-bearing, not decoration. `sendMessage` takes plain
+      // Objective-C closures, so under main-actor default isolation Swift infers
+      // them as `@MainActor` and emits an isolation check on entry. WatchConnectivity
+      // then calls them on its own `NSOperationQueue`, the check fails, and the app
+      // dies with `EXC_BREAKPOINT` on every single button the rider presses.
+      session.sendMessage(payload, replyHandler: { @Sendable reply in
+         // Decoded here, on WatchConnectivity's queue. `RideWatchMessage` is
+         // `nonisolated` and pure, and only the `Sendable` receipt crosses over.
+         guard let message = RideWatchMessage(payload: reply),
+               case .commandReceipt(let receipt) = message
+         else { return }
 
-            events?.yield(.receipt(receipt))
-         }
-      }, errorHandler: { _ in
+         events?.yield(.receipt(receipt))
+      }, errorHandler: { @Sendable [weak self] _ in
          Task { @MainActor in
-            events?.yield(.commandUndelivered)
+            self?.queueAfterLiveFailure(command)
          }
       })
 
       DebugPrint(mode: .sessionLifecycle, "Sent \(command.rawValue) live")
+   }
+
+   /// The live hand-off failed after we had already committed to it. The
+   /// durable queue is the only thing left that still gets the command across.
+   private func queueAfterLiveFailure(_ command: RideRemoteCommand) {
+      defer { eventContinuation?.yield(.commandUndelivered) }
+
+      guard let session, session.activationState == .activated else { return }
+
+      let request = RideRemoteCommandRequest(command: command)
+      session.transferUserInfo(RideWatchMessage.command(request).payload)
+
+      DebugPrint(mode: .sessionLifecycle, "Live \(command.rawValue) failed — queued instead")
    }
 
    func report(_ reading: RideWatchHeartRateReading) {
@@ -165,7 +185,7 @@ final class RideWatchLinkManager {
       guard linkState.allowsLiveMessages, session.isReachable else { return }
 
       let failures = relayContinuation
-      session.sendMessage(payload, replyHandler: nil) { error in
+      session.sendMessage(payload, replyHandler: nil) { @Sendable error in
          failures?.yield(.deliveryFailed("Heart rate send failed: \(error.localizedDescription)"))
       }
    }
@@ -186,7 +206,7 @@ final class RideWatchLinkManager {
       guard linkState.allowsLiveMessages, session.isReachable else { return }
 
       let failures = relayContinuation
-      session.sendMessage(payload, replyHandler: nil) { error in
+      session.sendMessage(payload, replyHandler: nil) { @Sendable error in
          failures?.yield(.deliveryFailed("Heart rate stop failed: \(error.localizedDescription)"))
       }
    }

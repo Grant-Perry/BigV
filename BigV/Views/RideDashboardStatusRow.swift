@@ -8,8 +8,13 @@ import SwiftUI
 /// GPS status and the live sensor chips — sky, heart, road behind.
 ///
 /// Navigation left this row when the tab bar arrived. What stays is only what
-/// reports on the ride itself, which is why the chips finally have the width to
-/// print a full reading instead of an ellipsis.
+/// reports on the ride itself.
+///
+/// The chips are fixed-size and the status bar is the one flexible member, so
+/// when the row runs short it is the phase word and the accuracy figure that
+/// give ground. A readable sensor beats a readable caption: "Recording" is
+/// already obvious from the rolling numbers, whereas a heart rate abbreviated
+/// to "8 B" is actively misleading.
 struct RideDashboardStatusRow: View {
 
    let rideViewModel: RideViewModel
@@ -24,6 +29,7 @@ struct RideDashboardStatusRow: View {
             issueMessage: rideViewModel.issueMessage,
             hasGPSFix: rideViewModel.hasGPSFix
          )
+         .layoutPriority(-1)
 
          // Always on the row, idle included: the sky is the first thing a
          // rider checks, and it is checked before rolling out, not during.
@@ -33,7 +39,9 @@ struct RideDashboardStatusRow: View {
             RideHeartRateChip(
                value: rideViewModel.heartRate ?? RideFormatters.placeholder,
                unit: rideViewModel.heartRateUnit,
-               beatsPerMinute: rideViewModel.heartRateBeatsPerMinute
+               beatsPerMinute: rideViewModel.heartRateBeatsPerMinute,
+               isSelected: rideViewModel.selectedMetric == .heartRate,
+               action: { rideViewModel.selectMetric(.heartRate) }
             )
          }
 
@@ -45,7 +53,14 @@ struct RideDashboardStatusRow: View {
                tier: rideViewModel.radarTier,
                nearestDistance: rideViewModel.radarNearestDistance,
                battery: rideViewModel.radarBattery,
-               action: onShowRadar
+               isSelected: rideViewModel.isLiveRadarTimelineVisible,
+               action: {
+                  if rideViewModel.isIdle {
+                     onShowRadar()
+                  } else {
+                     rideViewModel.toggleLiveRadarTimeline()
+                  }
+               }
             )
          }
       }

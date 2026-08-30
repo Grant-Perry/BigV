@@ -53,6 +53,21 @@ struct RideDashboardView: View {
             RideControlBar(rideViewModel: rideViewModel)
                .padding(.bottom, 10)
          }
+         // A bottom tape parks on the drawer's top edge rather than the true
+         // bottom of the cockpit: the metrics grid ends flush against the
+         // drawer, so the natural edge would lie across the speed tiles, and
+         // the true bottom belongs to START and END.
+         .rideRadarTape(
+            placement: rideViewModel.radarPlacement,
+            tracks: rideViewModel.radarTracks,
+            isVisible: rideViewModel.showsRadarTape && rideViewModel.radarPlacement == .bottom,
+            isDimmed: rideViewModel.isRadarDimmed,
+            unitSystem: rideViewModel.unitSystem,
+            inset: 10,
+            edgeInset: 8,
+            alignment: .top,
+            edge: .top
+         )
          .layoutPriority(1)
       }
       .padding(.horizontal, 16)
@@ -61,9 +76,6 @@ struct RideDashboardView: View {
    }
 
    /// Everything above the map drawer — status, guidance, hero, metrics.
-   /// The radar ribbon rides this whole column's tall edge in a reserved
-   /// gutter, so it spans from the top of the dashboard down to just above
-   /// the drawer without colliding with tiles or buttons.
    private var upperColumn: some View {
       VStack(spacing: 10) {
          RideDashboardStatusRow(
@@ -78,17 +90,27 @@ struct RideDashboardView: View {
             )
          }
 
-         RideSpeedHeroView(
-            value: rideViewModel.speed,
-            unit: rideViewModel.speedUnit,
-            course: rideViewModel.course,
-            heading: rideViewModel.heading,
-            headingDegrees: rideViewModel.headingDegrees,
-            isDimmed: !rideViewModel.hasGPSFix || rideViewModel.isPaused,
+         instrumentStack
+      }
+   }
+
+   /// The hero and the tiles, which is the surface the radar tape lies over.
+   ///
+   /// Scoped to these two rather than the whole column so the tape can never
+   /// cover the status chips at the top or the drawer's controls below, whichever
+   /// edge the rider parks it on. The tiles already hold their content away from
+   /// the left and right margins, so a vertical tape lands on empty card.
+   private var instrumentStack: some View {
+      VStack(spacing: 10) {
+         RideDashboardInstrumentHero(
+            rideViewModel: rideViewModel,
             isExpanded: !isDrawerOpen
          )
          .frame(maxHeight: .infinity)
          .layoutPriority(-1)
+
+         RideDashboardLiveMetricSection(rideViewModel: rideViewModel)
+            .layoutPriority(0)
 
          RideDashboardMetricsGrid(
             rideViewModel: rideViewModel,
@@ -96,29 +118,14 @@ struct RideDashboardView: View {
          )
          .layoutPriority(1)
       }
-      .padding(
-         rideViewModel.radarSide.paddingEdge,
-         rideViewModel.showsRadarTape ? Self.radarGutterWidth : 0
+      .rideRadarTape(
+         placement: rideViewModel.radarPlacement,
+         tracks: rideViewModel.radarTracks,
+         isVisible: rideViewModel.showsRadarTape && rideViewModel.radarPlacement != .bottom,
+         isDimmed: rideViewModel.isRadarDimmed,
+         unitSystem: rideViewModel.unitSystem
       )
-      .overlay(alignment: rideViewModel.radarSide.overlayAlignment) {
-         if rideViewModel.showsRadarTape {
-            RideRadarTapeView(
-               tracks: rideViewModel.radarTracks,
-               isDimmed: rideViewModel.isRadarDimmed,
-               unitSystem: rideViewModel.unitSystem,
-               tapeWidth: RideRadarTapeView.dashboardWidth
-            )
-            .padding(.vertical, 2)
-            .transition(.move(edge: rideViewModel.radarSide.transitionEdge).combined(with: .opacity))
-         }
-      }
-      // The gutter opening and closing is a full-width reflow of the cockpit,
-      // so it slides rather than snapping when a radar drops or reconnects.
-      .animation(.smooth(duration: 0.3), value: rideViewModel.showsRadarTape)
    }
-
-   /// Content inset on the radar side: the tape's width plus a small gap.
-   private static let radarGutterWidth: CGFloat = RideRadarTapeView.dashboardWidth + 8
 }
 
 #Preview("Portrait") {

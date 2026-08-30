@@ -8,9 +8,9 @@ import SwiftData
 import Testing
 @testable import BigV
 
-/// Proves a store written at V1 — the pre-radar shape that shipped — opens at
-/// V2 through `RideMigrationPlan` with its data intact and radar defaults in
-/// place. Runs against a real on-disk store: an in-memory container never
+/// Proves stores written at older schema versions open at the current one
+/// through `RideMigrationPlan` with their data intact and new fields at their
+/// defaults. Runs against a real on-disk store: an in-memory container never
 /// exercises migration.
 @MainActor
 struct RideSchemaMigrationTests {
@@ -26,6 +26,16 @@ struct RideSchemaMigrationTests {
       try? fileManager.removeItem(at: url)
       try? fileManager.removeItem(at: URL(filePath: url.path() + "-wal"))
       try? fileManager.removeItem(at: URL(filePath: url.path() + "-shm"))
+   }
+
+   private func openCurrent(at url: URL) throws -> ModelContext {
+      let schema = Schema(versionedSchema: RideSchemaV3.self)
+      let container = try ModelContainer(
+         for: schema,
+         migrationPlan: RideMigrationPlan.self,
+         configurations: ModelConfiguration(schema: schema, url: url)
+      )
+      return ModelContext(container)
    }
 
    // MARK: - Seeding
@@ -60,22 +70,45 @@ struct RideSchemaMigrationTests {
       try context.save()
    }
 
+   /// Writes a V2 store — radar era, pre-weather — and lets the file close.
+   private func seedV2Store(at url: URL, startDate: Date) throws {
+      let container = try ModelContainer(
+         for: Schema(versionedSchema: RideSchemaV2.self),
+         configurations: ModelConfiguration(schema: Schema(versionedSchema: RideSchemaV2.self), url: url)
+      )
+      let context = ModelContext(container)
+
+      let ride = RideSchemaV2.Ride(startDate: startDate, name: "Before weather")
+      ride.distance = 12_000
+      ride.vehicleCount = 1
+      ride.closestPassDistance = 6
+      context.insert(ride)
+
+      let event = RideSchemaV2.RideRadarEvent(
+         timestamp: startDate.addingTimeInterval(300),
+         trackID: 5,
+         minimumDistance: 6,
+         maximumClosingSpeed: 12,
+         peakTier: .high,
+         latitude: 37.3349,
+         longitude: -122.0090
+      )
+      event.ride = ride
+      context.insert(event)
+
+      try context.save()
+   }
+
    // MARK: - Migration
 
-   @Test func aV1StoreOpensAtV2WithDataIntactAndRadarDefaults() throws {
+   @Test func aV1StoreOpensAtCurrentWithDataIntactAndDefaults() throws {
       let url = makeStoreURL()
       defer { removeStore(at: url) }
 
       let startDate = Date(timeIntervalSince1970: 1_000_000)
       try seedV1Store(at: url, startDate: startDate)
 
-      let schema = Schema(versionedSchema: RideSchemaV2.self)
-      let container = try ModelContainer(
-         for: schema,
-         migrationPlan: RideMigrationPlan.self,
-         configurations: ModelConfiguration(schema: schema, url: url)
-      )
-      let context = ModelContext(container)
+      let context = try openCurrent(at: url)
 
       let ride = try #require(try context.fetch(FetchDescriptor<Ride>()).first)
       #expect(ride.startDate == startDate)
@@ -92,48 +125,67 @@ struct RideSchemaMigrationTests {
       #expect(ride.maximumClosingSpeed == nil)
       #expect(ride.radarEvents.isEmpty)
       #expect(try context.fetch(FetchDescriptor<RideRadarEvent>()).isEmpty)
+
+      // So do the weather fields.
+      #expect(ride.weatherSymbolName == nil)
+      #expect(ride.startTemperatureCelsius == nil)
+      #expect(ride.endTemperatureCelsius == nil)
    }
 
-   @Test func aMigratedStoreAcceptsRadarEvents() throws {
+   @Test func aV2StoreOpensAtCurrentWithRadarIntactAndNoWeather() throws {
       let url = makeStoreURL()
       defer { removeStore(at: url) }
 
       let startDate = Date(timeIntervalSince1970: 1_000_000)
-      try seedV1Store(at: url, startDate: startDate)
+      try seedV2Store(at: url, startDate: startDate)
 
-      let schema = Schema(versionedSchema: RideSchemaV2.self)
-      let container = try ModelContainer(
-         for: schema,
-         migrationPlan: RideMigrationPlan.self,
-         configurations: ModelConfiguration(schema: schema, url: url)
-      )
-      let context = ModelContext(container)
+      let context = try openCurrent(at: url)
 
       let ride = try #require(try context.fetch(FetchDescriptor<Ride>()).first)
-      let event = RideRadarEvent(
-         timestamp: startDate.addingTimeInterval(300),
-         trackID: 5,
-         minimumDistance: 6,
-         maximumClosingSpeed: 12,
-         peakTier: .high,
-         latitude: 37.3349,
-         longitude: -122.0090
-      )
-      event.ride = ride
-      context.insert(event)
+      #expect(ride.name == "Before weather")
+      #expect(ride.distance == 12_000)
+      #expect(ride.vehicleCount == 1)
+      #expect(ride.closestPassDistance == 6)
+
+      let event = try #require(ride.radarEvents.first)
+      #expect(event.peakTier == .high)
+      #expect(event.minimumDistance == 6)
+
+      #expect(ride.weatherSymbolName == nil)
+      #expect(ride.startTemperatureCelsius == nil)
+      #expect(ride.endTemperatureCelsius == nil)
+      #expect(ride.windSpeedKilometersPerHour == nil)
+   }
+
+   @Test func aMigratedStoreAcceptsWeather() throws {
+      let url = makeStoreURL()
+      defer { removeStore(at: url) }
+
+      let startDate = Date(timeIntervalSince1970: 1_000_000)
+      try seedV2Store(at: url, startDate: startDate)
+
+      let context = try openCurrent(at: url)
+
+      let ride = try #require(try context.fetch(FetchDescriptor<Ride>()).first)
+      ride.weatherSymbolName = "sun.max.fill"
+      ride.weatherConditionLabel = "Clear"
+      ride.startTemperatureCelsius = 18
+      ride.endTemperatureCelsius = 21
       try context.save()
 
-      let stored = try #require(try context.fetch(FetchDescriptor<RideRadarEvent>()).first)
-      #expect(stored.peakTier == .high)
-      #expect(stored.ride?.persistentModelID == ride.persistentModelID)
+      let stored = try #require(try context.fetch(FetchDescriptor<Ride>()).first)
+      #expect(stored.weatherSymbolName == "sun.max.fill")
+      #expect(stored.startTemperatureCelsius == 18)
+      #expect(stored.endTemperatureCelsius == 21)
    }
 
    // MARK: - Plan Shape
 
-   @Test func thePlanWalksV1ToV2() {
-      #expect(RideMigrationPlan.schemas.count == 2)
-      #expect(RideMigrationPlan.stages.count == 1)
+   @Test func thePlanWalksV1ToV3() {
+      #expect(RideMigrationPlan.schemas.count == 3)
+      #expect(RideMigrationPlan.stages.count == 2)
       #expect(RideSchemaV1.versionIdentifier == Schema.Version(1, 0, 0))
       #expect(RideSchemaV2.versionIdentifier == Schema.Version(2, 0, 0))
+      #expect(RideSchemaV3.versionIdentifier == Schema.Version(3, 0, 0))
    }
 }

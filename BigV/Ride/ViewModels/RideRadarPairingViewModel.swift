@@ -105,9 +105,9 @@ final class RideRadarPairingViewModel {
 
    // MARK: - Preferences
 
-   var side: RideRadarSide {
-      get { rideRadarSettings.side }
-      set { rideRadarSettings.side = newValue }
+   var placement: RideRadarPlacement {
+      get { rideRadarSettings.placement }
+      set { rideRadarSettings.placement = newValue }
    }
 
    var alertHapticsEnabled: Bool {

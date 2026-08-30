@@ -17,7 +17,7 @@ struct RideWatchDashboardView: View {
          RideWatchAtmosphereBackground()
 
          ScrollView {
-            VStack(spacing: 6) {
+            VStack(spacing: 8) {
                RideWatchStatusLine(
                   statusText: rideWatchViewModel.statusText,
                   hasGPSFix: rideWatchViewModel.hasGPSFix,
@@ -27,24 +27,46 @@ struct RideWatchDashboardView: View {
                   radarTier: rideWatchViewModel.radarTier
                )
 
-               glance
-
-               RideWatchControlStack(
-                  controls: rideWatchViewModel.controls,
-                  onSend: rideWatchViewModel.send
-               )
-
+               // Sits with the status line rather than below the card. Trouble
+               // the rider needs to read must not be parked in the one strip
+               // the pinned remote covers.
                if let noticeText = rideWatchViewModel.noticeText {
                   Text(noticeText)
                      .font(.system(size: 10, weight: .medium))
                      .foregroundStyle(RideChromeTokens.ember)
-                     .multilineTextAlignment(.center)
-                     .frame(maxWidth: .infinity)
+                     .multilineTextAlignment(.leading)
+                     .frame(maxWidth: .infinity, alignment: .leading)
                }
+
+               glance
             }
-            .padding(.horizontal, 4)
+            .padding(.horizontal, 6)
          }
          .scrollBounceBehavior(.basedOnSize)
+         // The remote is pinned, never scrolled. A rider reaching for PAUSE
+         // mid-descent cannot be asked to go looking for it first, and an
+         // inset — rather than a bottom pad — is what keeps the glance clear
+         // of it however tall the card grows.
+         .safeAreaInset(edge: .bottom) {
+            RideWatchControlStack(
+               controls: rideWatchViewModel.controls,
+               onSend: rideWatchViewModel.send
+            )
+            .padding(.top, 10)
+            .background {
+               // A glance taller than the screen scrolls under the remote. The
+               // fade makes that read as depth instead of a collision.
+               LinearGradient(
+                  colors: [
+                     RideChromeTokens.void.opacity(0),
+                     RideChromeTokens.void.opacity(0.88)
+                  ],
+                  startPoint: .top,
+                  endPoint: .bottom
+               )
+               .ignoresSafeArea()
+            }
+         }
       }
       .task { await rideWatchViewModel.activate() }
       .onAppear { rideWatchViewModel.noteScene(isActive: scenePhase == .active) }
@@ -98,8 +120,8 @@ struct RideWatchDashboardView: View {
             )
          }
       }
-      .padding(.horizontal, 10)
-      .padding(.vertical, 8)
+      .padding(.horizontal, 12)
+      .padding(.vertical, 10)
       .rideWatchCard()
    }
 }

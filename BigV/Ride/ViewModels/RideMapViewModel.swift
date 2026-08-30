@@ -40,6 +40,37 @@ final class RideMapViewModel {
       isFollowingRider ? [.zoom, .rotate] : .all
    }
 
+   // MARK: - Drawer Camera
+
+   /// Pinch, rotate and tilt, but never pan: the dashboard is a pager page, and
+   /// a panning map inside it swallows the horizontal swipe to the map page.
+   static let drawerInteractionModes: MapInteractionModes = [.zoom, .rotate, .pitch]
+
+   /// The drawer is a 190-point strip, so MapKit's own follow altitude reads as
+   /// a street atlas rather than the road ahead. Capping the camera distance is
+   /// the only way to frame a `userLocation` camera closer.
+   static let drawerCloseDistance: CLLocationDistance = 250
+
+   /// Lifted the first time the rider pinches, so the cap only ever sets the
+   /// default framing and never fights a gesture. Re-centring restores it.
+   private(set) var isDrawerZoomFree = false
+
+   var drawerCameraBounds: MapCameraBounds {
+      MapCameraBounds(
+         minimumDistance: 40,
+         maximumDistance: isDrawerZoomFree ? nil : Self.drawerCloseDistance
+      )
+   }
+
+   /// MapKit stays in charge of the pinch itself; this only records that the
+   /// rider now owns the drawer's zoom.
+   func riderTookOverDrawerZoom() {
+      guard !isDrawerZoomFree else { return }
+
+      isDrawerZoomFree = true
+      DebugPrint(mode: .navigation, "Drawer zoom released to rider")
+   }
+
    /// The camera to freeze on when the rider takes over. Deliberately untracked:
    /// it is written on every camera change so handing over is always possible,
    /// and storing an untracked struct must never invalidate a view.
@@ -182,6 +213,7 @@ final class RideMapViewModel {
       focusedManeuverCoordinate = nil
       cameraPosition = .followRider
       isFollowingRider = true
+      isDrawerZoomFree = false
 
       DebugPrint(mode: .navigation, "Map following rider")
    }

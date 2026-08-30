@@ -29,7 +29,6 @@ struct RideWeatherChip: View {
          }
       }
       .buttonStyle(.plain)
-      .rideGlassChrome(in: Capsule())
       .accessibilityElement(children: .ignore)
       .accessibilityLabel("Weather")
       .accessibilityValue(accessibilityValue)
@@ -48,25 +47,17 @@ struct RideWeatherChip: View {
    // MARK: - Reading
 
    private func reading(_ snapshot: RideWeatherSnapshot) -> some View {
-      HStack(spacing: 6) {
+      RideSensorChip(
+         value: RideFormatters.temperatureDegrees(
+            snapshot.temperatureCelsius,
+            unit: rideWeatherModel.temperatureUnit
+         )
+      ) {
          Image(systemName: snapshot.symbolName)
             .font(.caption.weight(.semibold))
             .symbolRenderingMode(.hierarchical)
             .foregroundStyle(RideChromeTokens.ice)
-
-         Text(
-            RideFormatters.temperatureDegrees(
-               snapshot.temperatureCelsius,
-               unit: rideWeatherModel.temperatureUnit
-            )
-         )
-         .font(.caption.weight(.bold))
-         .monospacedDigit()
-         .foregroundStyle(.white)
       }
-      .padding(.horizontal, 12)
-      .frame(height: 36)
-      .contentShape(.capsule)
    }
 
    // MARK: - Degraded
@@ -75,12 +66,12 @@ struct RideWeatherChip: View {
    /// carrying a dead pill while still leaving the forecast one tap away, where
    /// the reason — and the permission prompt — live.
    private var placeholder: some View {
-      Image(systemName: rideWeatherModel.isLoading ? .pendingIcon : .absentIcon)
-         .font(.caption.weight(.semibold))
-         .symbolRenderingMode(.hierarchical)
-         .foregroundStyle(.white.opacity(0.4))
-         .frame(width: 36, height: 36)
-         .contentShape(.circle)
+      RideSensorChip {
+         Image(systemName: rideWeatherModel.isLoading ? .pendingIcon : .absentIcon)
+            .font(.caption.weight(.semibold))
+            .symbolRenderingMode(.hierarchical)
+            .foregroundStyle(.white.opacity(0.4))
+      }
    }
 
    // MARK: - Accessibility

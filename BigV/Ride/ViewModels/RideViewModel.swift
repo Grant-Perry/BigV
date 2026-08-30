@@ -5,6 +5,7 @@
 
 import Foundation
 import SwiftData
+import SwiftUI
 
 /// Presents the live ride to SwiftUI and forwards rider intent to the session.
 ///
@@ -110,17 +111,16 @@ final class RideViewModel {
    /// or the feature switched off → no empty rails anywhere.
    var isRadarAvailable: Bool { rideSessionManager.isRadarDisplayAvailable }
 
-   /// The tape only earns its gutter while the link can still produce pips. A
-   /// radar that is off, out of range, or done retrying hands the width back to
-   /// the cockpit; the status-row chip keeps carrying the OFF state, so nothing
-   /// is hidden from the rider.
+   /// The tape only earns screen while the link can still produce pips. A radar
+   /// that is off, out of range, or done retrying leaves the cockpit clear; the
+   /// status-row chip keeps carrying the OFF state, so nothing is hidden.
    var showsRadarTape: Bool { isRadarAvailable && radarConnection != .disconnected }
 
    /// The tape dims when the link is down or the ride is paused — present but
    /// visibly not live, matching the speed hero's treatment.
    var isRadarDimmed: Bool { !state.radar.isConnected || isPaused }
 
-   var radarSide: RideRadarSide { rideRadarSettings.side }
+   var radarPlacement: RideRadarPlacement { rideRadarSettings.placement }
 
    var radarTracks: [RideRadarTracker.Track] { state.radar.tracks }
    var radarTier: RideRadarThreatTier? { state.radar.aggregateTier }
@@ -203,12 +203,225 @@ final class RideViewModel {
    func pause() { rideSessionManager.pause() }
    func resume() { rideSessionManager.resume() }
    func end() { rideSessionManager.end() }
-   func reset() { rideSessionManager.reset() }
+   func reset() {
+      clearSelectedMetric()
+      clearLiveRadarTimeline()
+      rideSessionManager.reset()
+   }
 
    func startNewRide() {
+      clearSelectedMetric()
+      clearLiveRadarTimeline()
       rideSessionManager.reset()
       rideSessionManager.start()
    }
 
    func flushPendingWork() { rideSessionManager.flushPendingWork() }
+
+   // MARK: - Live Charts
+
+   private(set) var selectedMetric: RideLiveMetric?
+   private(set) var isLiveRadarTimelineVisible = false
+
+   private(set) var liveHeartRateReport: RideHeartRateReport?
+   private(set) var liveElevationReport: RideElevationReport?
+   private(set) var liveSpeedReport: RideSpeedReport?
+   private(set) var liveRadarReport: RideRadarReport?
+
+   private var liveChartTask: Task<Void, Never>?
+   private var lastLiveChartSampleCount = 0
+   private var lastLiveHeartRateRingCount = 0
+   private var lastLiveChartRefresh = Date.distantPast
+
+   /// How often open live surfaces rebuild while visible.
+   private let liveChartRefreshInterval: TimeInterval = 1.5
+
+   private var isLiveChartSurfaceVisible: Bool {
+      selectedMetric != nil || isLiveRadarTimelineVisible
+   }
+
+   /// Toggles a metric chart under the speed hero. Tap again to dismiss.
+   func selectMetric(_ metric: RideLiveMetric) {
+      if selectedMetric == metric {
+         clearSelectedMetric()
+         return
+      }
+
+      clearLiveRadarTimeline()
+      selectedMetric = metric
+      refreshLiveReports(force: true)
+      startLiveChartLoopIfNeeded()
+   }
+
+   func clearSelectedMetric() {
+      selectedMetric = nil
+      liveHeartRateReport = nil
+      liveElevationReport = nil
+      liveSpeedReport = nil
+      stopLiveChartLoopIfIdle()
+   }
+
+   /// Live traffic timeline under the speed hero while recording.
+   func toggleLiveRadarTimeline() {
+      if isLiveRadarTimelineVisible {
+         clearLiveRadarTimeline()
+         return
+      }
+
+      clearSelectedMetric()
+      isLiveRadarTimelineVisible = true
+      refreshLiveReports(force: true)
+      startLiveChartLoopIfNeeded()
+   }
+
+   func clearLiveRadarTimeline() {
+      isLiveRadarTimelineVisible = false
+      liveRadarReport = nil
+      stopLiveChartLoopIfIdle()
+   }
+
+   /// Drops live chart surfaces when the ride is no longer active.
+   func syncLiveChartLifecycle() {
+      guard state.phase == .recording || state.phase == .paused else {
+         clearSelectedMetric()
+         clearLiveRadarTimeline()
+         return
+      }
+   }
+
+   func liveMetricTint(for metric: RideLiveMetric) -> Color {
+      switch metric {
+         case .heartRate: RideDashboardTheme.pulse
+         case .elevation: RideDashboardTheme.ice
+         case .speed: RideDashboardTheme.ember
+      }
+   }
+
+   private func startLiveChartLoopIfNeeded() {
+      guard isLiveChartSurfaceVisible else { return }
+      guard liveChartTask == nil else { return }
+
+      liveChartTask = Task { @MainActor [weak self] in
+         guard let self else { return }
+         while !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(liveChartRefreshInterval))
+            guard !Task.isCancelled else { return }
+            refreshLiveReportsIfDue()
+         }
+      }
+   }
+
+   private func stopLiveChartLoopIfIdle() {
+      guard !isLiveChartSurfaceVisible else { return }
+
+      liveChartTask?.cancel()
+      liveChartTask = nil
+      lastLiveChartSampleCount = 0
+      lastLiveHeartRateRingCount = 0
+      lastLiveChartRefresh = .distantPast
+   }
+
+   private func refreshLiveReportsIfDue() {
+      let sampleCount = rideSessionManager.activeSampleCount
+      let ringCount = rideSessionManager.heartRateRingSampleCount
+      let elapsed = Date.now.timeIntervalSince(lastLiveChartRefresh)
+      guard sampleCount != lastLiveChartSampleCount
+            || ringCount != lastLiveHeartRateRingCount
+            || elapsed >= liveChartRefreshInterval
+      else { return }
+
+      refreshLiveReports(force: false)
+   }
+
+   private func refreshLiveReports(force: Bool) {
+      guard isLiveChartSurfaceVisible else { return }
+
+      let sampleCount = rideSessionManager.activeSampleCount
+      let ringCount = rideSessionManager.heartRateRingSampleCount
+      if !force,
+         sampleCount == lastLiveChartSampleCount,
+         ringCount == lastLiveHeartRateRingCount,
+         Date.now.timeIntervalSince(lastLiveChartRefresh) < liveChartRefreshInterval {
+         return
+      }
+
+      lastLiveChartSampleCount = sampleCount
+      lastLiveHeartRateRingCount = ringCount
+      lastLiveChartRefresh = .now
+
+      if selectedMetric != nil {
+         refreshMetricReports()
+      }
+
+      if isLiveRadarTimelineVisible {
+         refreshRadarReport()
+      }
+   }
+
+   private func refreshMetricReports() {
+      guard let chartData = rideSessionManager.activeRideChartSamples() else {
+         liveHeartRateReport = nil
+         liveElevationReport = nil
+         liveSpeedReport = nil
+         return
+      }
+
+      let samples = chartData.samples
+      let system = unitSystem
+
+      liveElevationReport = RideChartSeriesBuilder.elevationReport(
+         samples: samples,
+         elevationGain: state.elevationGain,
+         elevationLoss: state.elevationLoss,
+         system: system
+      )
+
+      liveSpeedReport = RideChartSeriesBuilder.speedReport(
+         samples: samples,
+         averageSpeed: state.averageSpeed,
+         maximumSpeed: state.maximumSpeed,
+         system: system
+      )
+
+      let ringBeats = rideSessionManager.heartRateRingBeats()
+      let beats: [(timestamp: Date, beatsPerMinute: Double)]
+      if ringBeats.count >= RideChartSeriesBuilder.minimumOwnHeartRateSamples {
+         beats = ringBeats
+      } else {
+         beats = samples.compactMap { sample -> (Date, Double)? in
+            guard let bpm = sample.heartRate, bpm > 0 else { return nil }
+            return (sample.timestamp, bpm)
+         }
+      }
+
+      if beats.count >= RideChartSeriesBuilder.minimumOwnHeartRateSamples {
+         liveHeartRateReport = RideChartSeriesBuilder.heartRateReport(
+            beats: beats,
+            startDate: chartData.startDate,
+            calories: nil,
+            isFromAppleHealth: false
+         )
+      } else {
+         liveHeartRateReport = nil
+      }
+   }
+
+   private func refreshRadarReport() {
+      guard let context = rideSessionManager.activeRideRadarContext() else {
+         liveRadarReport = nil
+         return
+      }
+
+      let elapsedMinutes = max(1, state.elapsedTime / 60)
+      liveRadarReport = RideChartSeriesBuilder.radarReport(
+         events: context.events,
+         startDate: context.startDate,
+         durationMinutes: elapsedMinutes,
+         vehicleCount: context.vehicleCount,
+         closestPassDistance: context.closestPassDistance,
+         maximumClosingSpeed: context.maximumClosingSpeed,
+         distanceMeters: context.distanceMeters,
+         system: unitSystem
+      )
+   }
 }

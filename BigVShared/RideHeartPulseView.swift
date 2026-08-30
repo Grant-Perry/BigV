@@ -5,10 +5,11 @@
 
 import SwiftUI
 
-/// A heart that actually beats — lub-dub at the measured rate.
+/// BigMetric-style beating heart: custom outline with a swirling ice-to-pulse gradient.
 ///
-/// Frozen on a reduced-luminance display (Watch always-on, locked iPhone) so
-/// we are not compositing 30 fps onto a dimmed screen for nobody.
+/// When a plausible BPM is present the swirl speeds up slightly and the heart
+/// scales on a lub-dub curve. Frozen on reduced luminance so always-on displays
+/// do not burn compositor time.
 struct RideHeartPulseView: View {
 
    let beatsPerMinute: Double?
@@ -16,28 +17,75 @@ struct RideHeartPulseView: View {
    var font: Font = .caption.weight(.semibold)
 
    @Environment(\.isLuminanceReduced) private var isLuminanceReduced
+   @State private var swirlPhase = false
 
    var body: some View {
       let bpm = clampedRate
-      let shouldBeat = isBeating && bpm != nil && !isLuminanceReduced
+      let shouldAnimate = isBeating && bpm != nil && !isLuminanceReduced
+      let size = iconSize
 
-      TimelineView(.animation(minimumInterval: shouldBeat ? 1.0 / 24.0 : 60, paused: !shouldBeat)) { context in
-         Image(systemName: .heartIcon)
-            .font(font)
-            .foregroundStyle(RideChromeTokens.pulse)
-            .scaleEffect(Self.scale(at: context.date, bpm: bpm ?? Self.restingRate))
-            .shadow(
-               color: RideChromeTokens.pulse.opacity(shouldBeat ? 0.55 : 0),
-               radius: shouldBeat ? 3 : 0
+      TimelineView(.animation(minimumInterval: shouldAnimate ? 1.0 / 24.0 : 60, paused: !shouldAnimate)) { context in
+         RideHeartIconShape()
+            .stroke(
+               style: StrokeStyle(
+                  lineWidth: lineWidth,
+                  lineCap: .round,
+                  lineJoin: .round,
+                  miterLimit: 0,
+                  dash: shouldAnimate ? [150, 15] : [],
+                  dashPhase: swirlPhase ? -83 : 83
+               )
             )
+            .frame(width: size, height: size)
+            .foregroundStyle(shouldAnimate ? AnyShapeStyle(heartGradient) : AnyShapeStyle(RideChromeTokens.pulse.opacity(0.85)))
+            .hueRotation(.degrees(shouldAnimate && swirlPhase ? 0 : 360))
+            .scaleEffect(shouldAnimate ? Self.lubDubScale(at: context.date, bpm: bpm ?? Self.restingRate) : 1)
+            .shadow(
+               color: RideChromeTokens.pulse.opacity(shouldAnimate ? 0.45 : 0.15),
+               radius: shouldAnimate ? 4 : 1
+            )
+      }
+      .onAppear {
+         guard !isLuminanceReduced else { return }
+         withAnimation(.linear(duration: swirlDuration(bpm: clampedRate)).repeatForever(autoreverses: false)) {
+            swirlPhase.toggle()
+         }
+      }
+      .onChange(of: clampedRate) { _, newRate in
+         guard newRate != nil, !isLuminanceReduced else { return }
+         swirlPhase = false
+         withAnimation(.linear(duration: swirlDuration(bpm: newRate)).repeatForever(autoreverses: false)) {
+            swirlPhase.toggle()
+         }
       }
       .accessibilityHidden(true)
    }
 
+   // MARK: - Style
+
+   private var heartGradient: AngularGradient {
+      AngularGradient(
+         colors: [RideChromeTokens.ice, RideChromeTokens.pulse, RideChromeTokens.ice],
+         center: .center,
+         startAngle: .degrees(swirlPhase ? 360 : 0),
+         endAngle: .degrees(swirlPhase ? 720 : 360)
+      )
+   }
+
+   private var iconSize: CGFloat {
+      switch font {
+         case .largeTitle, .title, .title2, .title3: 28
+         case .headline, .subheadline: 22
+         default: 18
+      }
+   }
+
+   private var lineWidth: CGFloat {
+      max(2.5, iconSize * 0.12)
+   }
+
    // MARK: - Rate
 
-   /// Anything outside the sensor's plausible band is treated as rest, not a
-   /// strobe and not a flatline.
    private var clampedRate: Double? {
       guard let beatsPerMinute, RideWatchHeartRateReading.plausibleRange.contains(beatsPerMinute) else {
          return nil
@@ -45,23 +93,27 @@ struct RideHeartPulseView: View {
       return beatsPerMinute
    }
 
-   // MARK: - Waveform
+   private func swirlDuration(bpm: Double?) -> TimeInterval {
+      guard let bpm else { return 2.5 }
+      // Faster pulse → slightly faster swirl, clamped so it never strobes.
+      return min(3.0, max(1.6, 120.0 / bpm))
+   }
 
-   /// Systole then a smaller diastole, then rest. Matches what a rider feels,
-   /// not a sine wave that never quite looks like a heart.
-   private static func scale(at date: Date, bpm: Double) -> CGFloat {
+   // MARK: - Lub-dub
+
+   private static func lubDubScale(at date: Date, bpm: Double) -> CGFloat {
       let cycle = 60.0 / bpm
       let phase = date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: cycle) / cycle
 
       switch phase {
          case ..<0.12:
-            return 1.0 + 0.22 * Self.easeOut(phase / 0.12)
+            return 1.0 + 0.18 * easeOut(phase / 0.12)
          case ..<0.22:
-            return 1.22 - 0.22 * Self.easeIn((phase - 0.12) / 0.10)
+            return 1.18 - 0.18 * easeIn((phase - 0.12) / 0.10)
          case ..<0.32:
-            return 1.0 + 0.10 * Self.easeOut((phase - 0.22) / 0.10)
+            return 1.0 + 0.08 * easeOut((phase - 0.22) / 0.10)
          case ..<0.42:
-            return 1.10 - 0.10 * Self.easeIn((phase - 0.32) / 0.10)
+            return 1.08 - 0.08 * easeIn((phase - 0.32) / 0.10)
          default:
             return 1.0
       }
@@ -76,10 +128,6 @@ struct RideHeartPulseView: View {
    }
 
    private static let restingRate: Double = 72
-}
-
-private extension String {
-   static let heartIcon = "heart.fill"
 }
 
 #Preview {

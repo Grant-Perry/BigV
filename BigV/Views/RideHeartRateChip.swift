@@ -12,30 +12,40 @@ struct RideHeartRateChip: View {
    let value: String
    let unit: String
    var beatsPerMinute: Double?
+   var isSelected: Bool = false
+   var action: (() -> Void)?
 
    var body: some View {
-      HStack(spacing: 6) {
+      Group {
+         if let action {
+            Button(action: action) {
+               chipContent
+            }
+            .buttonStyle(.plain)
+         } else {
+            chipContent
+         }
+      }
+      .overlay {
+         if isSelected {
+            Capsule()
+               .strokeBorder(RideChromeTokens.ice.opacity(0.85), lineWidth: 2)
+         }
+      }
+   }
+
+   private var chipContent: some View {
+      RideSensorChip(value: value, tint: isSelected ? RideChromeTokens.ice.opacity(0.35) : nil) {
          RideHeartPulseView(
             beatsPerMinute: beatsPerMinute,
             isBeating: beatsPerMinute != nil,
             font: .caption.weight(.semibold)
          )
-
-         Text(value)
-            .font(.caption.weight(.bold))
-            .monospacedDigit()
-            .foregroundStyle(.white)
-
-         Text(unit)
-            .font(.caption2.weight(.semibold))
-            .foregroundStyle(.white.opacity(0.45))
       }
-      .padding(.horizontal, 12)
-      .frame(height: 36)
-      .rideGlassChrome(in: Capsule())
       .accessibilityElement(children: .ignore)
       .accessibilityLabel("Heart rate")
       .accessibilityValue("\(value) \(unit)")
+      .accessibilityAddTraits(isSelected ? [.isSelected] : [])
       .accessibilityIdentifier("ride.chip.heartRate")
    }
 }
@@ -43,7 +53,7 @@ struct RideHeartRateChip: View {
 #Preview {
    ZStack {
       RideAtmosphereBackground()
-      RideHeartRateChip(value: "142", unit: "BPM", beatsPerMinute: 142)
+      RideHeartRateChip(value: "142", unit: "BPM", beatsPerMinute: 142, isSelected: true, action: {})
          .padding()
    }
 }

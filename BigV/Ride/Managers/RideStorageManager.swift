@@ -80,9 +80,18 @@ final class RideStorageManager {
 
       apply(state, to: ride)
       ride.endDate = state.endDate ?? .now
+      ride.averageHeartRate = Self.averageHeartRate(of: ride.samples)
       save(reason: "ride finalized")
 
       return ride
+   }
+
+   /// Mean of every sample that carried a pulse. `nil` when no Watch or strap
+   /// fed one, so the detail screen never shows a zero heart.
+   private static func averageHeartRate(of samples: [RideSample]) -> Double? {
+      let beats = samples.compactMap(\.heartRate).filter { $0 > 0 }
+      guard !beats.isEmpty else { return nil }
+      return beats.reduce(0, +) / Double(beats.count)
    }
 
    /// Drops the in-progress ride without finalizing it. Used when the session
@@ -116,6 +125,7 @@ final class RideStorageManager {
          grade: draft.grade,
          course: draft.course
       )
+      sample.heartRate = draft.heartRate
       sample.ride = ride
       modelContext.insert(sample)
 
@@ -172,6 +182,45 @@ final class RideStorageManager {
       save(reason: "flush")
    }
 
+   // MARK: - Active Ride Charts
+
+   /// Samples for the ride being recorded, sorted oldest-first.
+   ///
+   /// Only used while a live metric chart is open; never called on every GPS tick
+   /// unless the cockpit has a metric selected.
+   func activeRideChartSamples() -> (startDate: Date, samples: [RideSample])? {
+      guard let ride = activeRide else { return nil }
+
+      let samples = ride.samples.sorted { $0.timestamp < $1.timestamp }
+      return (ride.startDate, samples)
+   }
+
+   /// Cheap signal for throttling live chart rebuilds.
+   var activeSampleCount: Int {
+      activeRide?.samples.count ?? 0
+   }
+
+   /// Radar passes on the ride being recorded, for the live traffic timeline.
+   func activeRideRadarContext() -> (
+      startDate: Date,
+      events: [RideRadarEvent],
+      vehicleCount: Int,
+      closestPassDistance: Double?,
+      maximumClosingSpeed: Double?,
+      distanceMeters: Double
+   )? {
+      guard let ride = activeRide else { return nil }
+
+      return (
+         ride.startDate,
+         ride.radarEvents.sorted { $0.timestamp < $1.timestamp },
+         ride.vehicleCount,
+         ride.closestPassDistance,
+         ride.maximumClosingSpeed,
+         ride.distance
+      )
+   }
+
    // MARK: - History
 
    func savedRides() -> [Ride] {
@@ -206,11 +255,109 @@ final class RideStorageManager {
       save(reason: "ride deleted")
    }
 
+   // MARK: - Backup Import
+
+   /// Inserts a finished ride from a Settings backup. Caller is responsible for
+   /// duplicate checks; this path always inserts.
+   func importFinishedRide(_ record: RideBackupPayload.RideRecord) {
+      let ride = Ride(startDate: record.startDate, name: record.name)
+      ride.endDate = record.endDate
+      ride.duration = record.duration
+      ride.movingTime = record.movingTime
+      ride.distance = record.distance
+      ride.averageSpeed = record.averageSpeed
+      ride.maximumSpeed = record.maximumSpeed
+      ride.elevationGain = record.elevationGain
+      ride.elevationLoss = record.elevationLoss
+      ride.activeEnergy = record.activeEnergy
+      ride.averageHeartRate = record.averageHeartRate
+      ride.averageCadence = record.averageCadence
+      ride.averagePower = record.averagePower
+      ride.vehicleCount = record.vehicleCount
+      ride.closestPassDistance = record.closestPassDistance
+      ride.maximumClosingSpeed = record.maximumClosingSpeed
+      ride.weatherSymbolName = record.weatherSymbolName
+      ride.weatherConditionLabel = record.weatherConditionLabel
+      ride.startTemperatureCelsius = record.startTemperatureCelsius
+      ride.startApparentTemperatureCelsius = record.startApparentTemperatureCelsius
+      ride.windSpeedKilometersPerHour = record.windSpeedKilometersPerHour
+      ride.endTemperatureCelsius = record.endTemperatureCelsius
+
+      modelContext.insert(ride)
+
+      for sampleRecord in record.samples {
+         let sample = RideSample(
+            timestamp: sampleRecord.timestamp,
+            latitude: sampleRecord.latitude,
+            longitude: sampleRecord.longitude,
+            altitude: sampleRecord.altitude,
+            speed: sampleRecord.speed,
+            distance: sampleRecord.distance,
+            grade: sampleRecord.grade,
+            course: sampleRecord.course
+         )
+         sample.heartRate = sampleRecord.heartRate
+         sample.cadence = sampleRecord.cadence
+         sample.power = sampleRecord.power
+         sample.ride = ride
+         modelContext.insert(sample)
+      }
+
+      for eventRecord in record.radarEvents {
+         let tier = RideRadarThreatTier(rawValue: eventRecord.peakTierRawValue) ?? .approaching
+         let event = RideRadarEvent(
+            timestamp: eventRecord.timestamp,
+            trackID: eventRecord.trackID,
+            minimumDistance: eventRecord.minimumDistance,
+            maximumClosingSpeed: eventRecord.maximumClosingSpeed,
+            peakTier: tier,
+            latitude: eventRecord.latitude,
+            longitude: eventRecord.longitude
+         )
+         event.ride = ride
+         modelContext.insert(event)
+      }
+
+      save(reason: "backup import")
+   }
+
    // MARK: - Export Links
 
    func linkHealthKitWorkout(_ identifier: UUID, to ride: Ride) {
       ride.healthKitWorkoutID = identifier
       save(reason: "HealthKit link")
+   }
+
+   // MARK: - Weather
+
+   /// Stamps the sky onto the ride being recorded. Arrives whenever the
+   /// WeatherKit fetch lands, so a ride that ends first is stamped through
+   /// `applyEndWeather` instead and this becomes a no-op.
+   func applyStartWeather(_ snapshot: RideWeatherSnapshot) {
+      guard let ride = activeRide else { return }
+
+      ride.weatherSymbolName = snapshot.symbolName
+      ride.weatherConditionLabel = snapshot.conditionLabel
+      ride.startTemperatureCelsius = snapshot.temperatureCelsius
+      ride.startApparentTemperatureCelsius = snapshot.apparentTemperatureCelsius
+      ride.windSpeedKilometersPerHour = snapshot.windSpeedKilometersPerHour
+      save(reason: "start weather")
+   }
+
+   /// Stamps end-of-ride conditions onto an already-finalized ride, and fills
+   /// any start fields a failed or unfinished start fetch left empty.
+   func applyEndWeather(_ snapshot: RideWeatherSnapshot, to ride: Ride) {
+      ride.endTemperatureCelsius = snapshot.temperatureCelsius
+
+      if ride.weatherSymbolName == nil {
+         ride.weatherSymbolName = snapshot.symbolName
+         ride.weatherConditionLabel = snapshot.conditionLabel
+         ride.startTemperatureCelsius = snapshot.temperatureCelsius
+         ride.startApparentTemperatureCelsius = snapshot.apparentTemperatureCelsius
+         ride.windSpeedKilometersPerHour = snapshot.windSpeedKilometersPerHour
+      }
+
+      save(reason: "end weather")
    }
 
    // MARK: - Totals

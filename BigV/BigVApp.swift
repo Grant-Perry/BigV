@@ -19,6 +19,9 @@ struct BigVApp: App {
 
    @State private var rideViewModel: RideViewModel
    @State private var rideUnitsSettings: RideUnitsSettings
+   @State private var rideOnboardingSettings: RideOnboardingSettings
+   @State private var bigVeloPlusStore: BigVeloPlusStore
+   @State private var rideBackupViewModel: RideBackupViewModel
    @State private var rideMapViewModel: RideMapViewModel
    @State private var rideHistoryViewModel: RideHistoryViewModel
    @State private var rideRadarPairingViewModel: RideRadarPairingViewModel
@@ -28,6 +31,10 @@ struct BigVApp: App {
    /// finished ride's map can never be overwritten by browsing history.
    @State private var summaryRouteViewModel: RideRouteViewModel
    @State private var historyRouteViewModel: RideRouteViewModel
+
+   /// The history detail screen's full report: charts, weather, traffic and
+   /// the Apple Health read-back that enriches older rides.
+   @State private var rideDetailViewModel: RideDetailViewModel
    @State private var routePlannerViewModel: RoutePlannerViewModel
    @State private var routeGuidanceViewModel: RouteGuidanceViewModel
 
@@ -73,7 +80,8 @@ struct BigVApp: App {
          routeGuidanceManager: routeGuidanceManager,
          rideWatchManager: RideWatchManager(),
          rideRadarManager: rideRadarManager,
-         rideRadarAnnouncer: rideRadarAnnouncer
+         rideRadarAnnouncer: rideRadarAnnouncer,
+         rideWeatherStamper: RideWeatherStamper(rideStorageManager: rideStorageManager)
       )
 
       // Opened here, not per ride: START from the wrist has to reach an idle phone,
@@ -82,14 +90,17 @@ struct BigVApp: App {
       rideSessionManager.activateRadarLink()
 
       sharedModelContainer = modelContainer
-      _rideViewModel = State(
-         initialValue: RideViewModel(
-            rideSessionManager: rideSessionManager,
-            rideRadarSettings: rideRadarSettings,
-            rideUnitsSettings: rideUnitsSettings
-         )
+
+      let rideViewModel = RideViewModel(
+         rideSessionManager: rideSessionManager,
+         rideRadarSettings: rideRadarSettings,
+         rideUnitsSettings: rideUnitsSettings
       )
+      _rideViewModel = State(initialValue: rideViewModel)
       _rideUnitsSettings = State(initialValue: rideUnitsSettings)
+      let rideOnboardingSettings = RideOnboardingSettings()
+      _rideOnboardingSettings = State(initialValue: rideOnboardingSettings)
+      _bigVeloPlusStore = State(initialValue: BigVeloPlusStore())
 
       // Weather is owned here, not by the status row: a ride runs for hours,
       // and the chip must survive every dashboard rebuild without refetching.
@@ -125,8 +136,27 @@ struct BigVApp: App {
       _routeGuidanceViewModel = State(
          initialValue: RouteGuidanceViewModel(routeGuidanceManager: routeGuidanceManager)
       )
-      _rideHistoryViewModel = State(
-         initialValue: RideHistoryViewModel(rideStorageManager: rideStorageManager)
+
+      let rideHistoryViewModel = RideHistoryViewModel(rideStorageManager: rideStorageManager)
+      _rideHistoryViewModel = State(initialValue: rideHistoryViewModel)
+
+      // Backup needs the same storage and preference objects the rest of the
+      // graph already owns — export/import never opens a second SwiftData stack.
+      _rideBackupViewModel = State(
+         initialValue: RideBackupViewModel(
+            backupManager: RideBackupManager(
+               rideStorageManager: rideStorageManager,
+               unitsSettings: rideUnitsSettings,
+               radarSettings: rideRadarSettings,
+               onboardingSettings: rideOnboardingSettings
+            ),
+            isRideInProgress: {
+               rideViewModel.isRecording
+                  || rideViewModel.isPaused
+                  || rideViewModel.isAcquiringGPS
+            },
+            onHistoryChanged: { rideHistoryViewModel.load() }
+         )
       )
       _summaryRouteViewModel = State(
          initialValue: RideRouteViewModel(rideStorageManager: rideStorageManager)
@@ -134,24 +164,42 @@ struct BigVApp: App {
       _historyRouteViewModel = State(
          initialValue: RideRouteViewModel(rideStorageManager: rideStorageManager)
       )
+      _rideDetailViewModel = State(
+         initialValue: RideDetailViewModel(
+            rideStorageManager: rideStorageManager,
+            vitalsReader: RideHealthVitalsReader()
+         )
+      )
    }
 
    // MARK: - Scene
 
    var body: some Scene {
       WindowGroup {
-         RideRootView(
-            rideViewModel: rideViewModel,
-            rideMapViewModel: rideMapViewModel,
-            rideHistoryViewModel: rideHistoryViewModel,
-            summaryRouteViewModel: summaryRouteViewModel,
-            historyRouteViewModel: historyRouteViewModel,
-            routePlannerViewModel: routePlannerViewModel,
-            routeGuidanceViewModel: routeGuidanceViewModel,
-            rideRadarPairingViewModel: rideRadarPairingViewModel,
-            rideUnitsSettings: rideUnitsSettings
-         )
+         RideLaunchGate(
+            plusStore: bigVeloPlusStore,
+            onboardingSettings: rideOnboardingSettings
+         ) {
+            RideRootView(
+               rideViewModel: rideViewModel,
+               rideMapViewModel: rideMapViewModel,
+               rideHistoryViewModel: rideHistoryViewModel,
+               summaryRouteViewModel: summaryRouteViewModel,
+               historyRouteViewModel: historyRouteViewModel,
+               rideDetailViewModel: rideDetailViewModel,
+               routePlannerViewModel: routePlannerViewModel,
+               routeGuidanceViewModel: routeGuidanceViewModel,
+               rideRadarPairingViewModel: rideRadarPairingViewModel,
+               rideUnitsSettings: rideUnitsSettings,
+               rideOnboardingSettings: rideOnboardingSettings,
+               plusStore: bigVeloPlusStore,
+               rideBackupViewModel: rideBackupViewModel
+            )
+         }
          .environment(rideWeatherModel)
+         .task {
+            await bigVeloPlusStore.loadProducts()
+         }
       }
       .modelContainer(sharedModelContainer)
    }
@@ -159,7 +207,7 @@ struct BigVApp: App {
    // MARK: - Store
 
    private static func makeModelContainer() -> ModelContainer {
-      let schema = Schema(versionedSchema: RideSchemaV2.self)
+      let schema = Schema(versionedSchema: RideSchemaV3.self)
       let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
       do {

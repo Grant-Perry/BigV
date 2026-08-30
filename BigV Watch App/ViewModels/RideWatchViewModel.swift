@@ -45,10 +45,14 @@ final class RideWatchViewModel {
 
    private var hasAdoptedPhase = false
 
-   /// Sensor start waits until the glance is frontmost. `startActivity()` inside
-   /// a button action is how watchOS tosses the rider at the clock.
+   /// Sensor start waits until the glance is frontmost, so a launch that is
+   /// still inactive never mints a session behind the rider's back.
    private var wantsSensing = false
    private var isSceneActive = false
+
+   /// Distinguishes the live sensor run from one that has already been replaced,
+   /// so a stream finishing late cannot free a slot it no longer owns.
+   private var sensorGeneration = 0
 
    /// The alert pulse from the last radar-bearing snapshot, so wrist haptics
    /// fire on edges only. `nil` until the first radar snapshot lands — that
@@ -58,7 +62,6 @@ final class RideWatchViewModel {
    private var activationTask: Task<Void, Never>?
    private var linkTask: Task<Void, Never>?
    private var sensorTask: Task<Void, Never>?
-   private var senseStartTask: Task<Void, Never>?
    private var noticeTask: Task<Void, Never>?
 
    // MARK: - Lifecycle
@@ -87,20 +90,10 @@ final class RideWatchViewModel {
    }
 
    private func activateOnce() async {
-      await rideWatchWorkoutManager.reclaimOrphanedSession()
-      await rideWatchWorkoutManager.requestAuthorization()
-
-      // Never mint a workout session from launch while idle. An idle session
-      // sits in Health as an in-progress ride and is the first thing that
-      // makes the phone's end-of-ride write fail. Mid-ride recovery still
-      // starts: a reclaimed session, or the first active phase from the phone.
-      //
-      // Also do not call `startActivity()` from this `.task` itself. The
-      // scene is often still inactive during launch, and watchOS then dumps
-      // the glance.
-      wantsSensing = rideWatchWorkoutManager.isSensing || phase.isActive
-      startSensingIfFrontmost()
-
+      // The link comes up first and never queues behind HealthKit. Authorization
+      // is a round trip to `healthd`, and a permission sheet on the first run,
+      // and a Start tapped inside that window used to find no `WCSession` at
+      // all — which is why the wrist stayed mute until the app was relaunched.
       let events = rideWatchLinkManager.activate()
 
       linkTask?.cancel()
@@ -110,6 +103,16 @@ final class RideWatchViewModel {
             self.handle(event)
          }
       }
+
+      await rideWatchWorkoutManager.reclaimOrphanedSession()
+      await rideWatchWorkoutManager.requestAuthorization()
+
+      // Never mint a workout session from launch while idle. An idle session
+      // sits in Health as an in-progress ride and is the first thing that
+      // makes the phone's end-of-ride write fail. Mid-ride recovery still
+      // starts: a reclaimed session, or the first active phase from the phone.
+      wantsSensing = rideWatchWorkoutManager.isSensing || phase.isActive
+      startSensingIfFrontmost()
    }
 
    // MARK: - Intent
@@ -227,28 +230,30 @@ final class RideWatchViewModel {
 
    // MARK: - Controls
 
+   /// Titles are spoken, not drawn — the controls are transport glyphs — so they
+   /// read as VoiceOver sentences rather than the shouted caps a button wore.
    var controls: [RideWatchControl] {
       switch phase {
          case .idle:
-            [RideWatchControl(command: .start, title: "START", role: .go)]
+            [RideWatchControl(command: .start, title: "Start ride", glyph: .play, role: .go)]
 
          case .acquiringGPS:
-            [RideWatchControl(command: .end, title: "CANCEL", role: .stop)]
+            [RideWatchControl(command: .end, title: "Cancel", glyph: .cancel, role: .stop)]
 
          case .recording:
             [
-               RideWatchControl(command: .pause, title: "PAUSE", role: .hold),
-               RideWatchControl(command: .end, title: "END", role: .stop)
+               RideWatchControl(command: .pause, title: "Pause", glyph: .pause, role: .hold),
+               RideWatchControl(command: .end, title: "End ride", glyph: .stop, role: .stop)
             ]
 
          case .paused:
             [
-               RideWatchControl(command: .resume, title: "RESUME", role: .go),
-               RideWatchControl(command: .end, title: "END", role: .stop)
+               RideWatchControl(command: .resume, title: "Resume", glyph: .play, role: .go),
+               RideWatchControl(command: .end, title: "End ride", glyph: .stop, role: .stop)
             ]
 
          case .finished:
-            [RideWatchControl(command: .start, title: "NEW RIDE", role: .go)]
+            [RideWatchControl(command: .start, title: "New ride", glyph: .play, role: .go)]
       }
    }
 
@@ -324,8 +329,6 @@ final class RideWatchViewModel {
          startSensingIfFrontmost()
       } else {
          wantsSensing = false
-         senseStartTask?.cancel()
-         senseStartTask = nil
 
          guard sensorTask != nil || rideWatchWorkoutManager.isSensing else { return }
 
@@ -334,34 +337,40 @@ final class RideWatchViewModel {
       }
    }
 
-   /// Only start the HealthKit session while the glance is actually on screen.
-   /// `startActivity()` from a button or from a launch `.task` is how watchOS
-   /// decides the app is not frontmost and throws the rider at the clock.
+   /// Only engage the sensor while the glance is on screen. A launch that is
+   /// still inactive gets picked up by `noteScene(isActive:)` the moment the
+   /// scene settles, so nothing is lost by declining here.
    private func startSensingIfFrontmost() {
       guard wantsSensing, sensorTask == nil, isSceneActive else { return }
-
-      senseStartTask?.cancel()
-      senseStartTask = Task { [weak self] in
-         await Task.yield()
-         guard let self, !Task.isCancelled else { return }
-         guard self.wantsSensing, self.isSceneActive, self.sensorTask == nil else { return }
-         self.startSensing()
-      }
+      startSensing()
    }
 
    private func startSensing() {
+      sensorGeneration += 1
+      let generation = sensorGeneration
+
       sensorTask = Task { [weak self] in
          guard let self else { return }
 
          // One more recover before minting a session. A leftover system
          // session plus a new `startActivity()` is a guaranteed trip to the clock.
          await self.rideWatchWorkoutManager.reclaimOrphanedSession()
-         let readings = self.rideWatchWorkoutManager.startSensing()
+         let readings = await self.rideWatchWorkoutManager.startSensing()
 
          for await reading in readings {
             self.apply(reading)
          }
+
+         self.releaseSensorTask(generation)
       }
+   }
+
+   /// The stream ends when the sensor never came up, or when watchOS took the
+   /// session away. Freeing the slot is what lets the next Start try again
+   /// instead of finding one already claimed.
+   private func releaseSensorTask(_ generation: Int) {
+      guard generation == sensorGeneration else { return }
+      sensorTask = nil
    }
 
    private func parkSensing() {
