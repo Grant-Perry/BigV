@@ -15,10 +15,16 @@ struct RouteCandidateRowView: View {
    let travelTimeText: String
    let advisories: [String]
    let isSelected: Bool
+   var climbSummary: String?
+   var isLoadingElevation = false
 
    var body: some View {
       VStack(alignment: .leading, spacing: 6) {
          header
+
+         if climbSummary != nil || isLoadingElevation {
+            climbLine
+         }
 
          if !advisories.isEmpty {
             advisoryList
@@ -70,6 +76,30 @@ struct RouteCandidateRowView: View {
       }
    }
 
+   // MARK: - Climbs
+
+   /// The route's vertical story, or the loading whisper while Open-Meteo
+   /// answers. Absent entirely when enrichment failed — no stuck spinners.
+   @ViewBuilder
+   private var climbLine: some View {
+      if let climbSummary {
+         HStack(spacing: 5) {
+            Image(systemName: .climbIcon)
+               .font(.caption2)
+               .foregroundStyle(RideDashboardTheme.ember.opacity(0.85))
+
+            Text(climbSummary)
+               .font(.caption.weight(.medium))
+               .monospacedDigit()
+               .foregroundStyle(.white.opacity(0.65))
+         }
+      } else {
+         Text("Loading elevation…")
+            .font(.caption2)
+            .foregroundStyle(.white.opacity(0.35))
+      }
+   }
+
    // MARK: - Advisories
 
    private var advisoryList: some View {
@@ -94,6 +124,7 @@ struct RouteCandidateRowView: View {
 
 private extension String {
    static let advisoryIcon = "exclamationmark.triangle.fill"
+   static let climbIcon = "mountain.2.fill"
 }
 
 #Preview {

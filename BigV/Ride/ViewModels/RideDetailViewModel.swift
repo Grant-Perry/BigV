@@ -31,6 +31,7 @@ final class RideDetailViewModel {
    private(set) var heartRate: RideHeartRateReport?
    private(set) var weather: RideDetailWeatherReport?
    private(set) var radar: RideRadarReport?
+   private(set) var laps: RideLapsReport?
 
    // MARK: - Dependencies
 
@@ -73,6 +74,7 @@ final class RideDetailViewModel {
       weather = Self.weatherReport(for: ride)
       radar = RideChartSeriesBuilder.radarReport(for: ride, system: system)
       heartRate = RideChartSeriesBuilder.heartRateReport(for: ride, samples: samples)
+      laps = RideLapsReportBuilder.report(for: ride, system: system)
       isLoaded = true
 
       await enrichFromHealth(ride)
@@ -93,6 +95,7 @@ final class RideDetailViewModel {
       heartRate = nil
       weather = nil
       radar = nil
+      laps = nil
    }
 
    // MARK: - Apple Health Enrichment

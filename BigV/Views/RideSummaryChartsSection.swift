@@ -13,6 +13,10 @@ struct RideSummaryChartsSection: View {
    var body: some View {
       if rideDetailViewModel.isLoaded {
          VStack(spacing: 12) {
+            if let laps = rideDetailViewModel.laps {
+               RideLapsCard(report: laps)
+            }
+
             if let elevation = rideDetailViewModel.elevation {
                RideElevationCard(report: elevation)
             }

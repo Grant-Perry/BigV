@@ -15,7 +15,7 @@ import Foundation
 /// directions response, a GPX file or a trail API, so guidance consumes one shape
 /// and never learns which provider is behind it. Distances are meters and times
 /// are seconds, matching `RideState`.
-struct PlannedRoute: Identifiable, Sendable {
+nonisolated struct PlannedRoute: Identifiable, Sendable {
 
    // MARK: - Identity
 
@@ -45,6 +45,16 @@ struct PlannedRoute: Identifiable, Sendable {
    /// Provider-supplied route conditions, already localized.
    let advisories: [String]
 
+   // MARK: - Elevation
+
+   /// Altitude along the route, in the provider's distance space. Empty until
+   /// a GPX file supplies altitudes or Open-Meteo enrichment lands; a route is
+   /// fully rideable without it, the climb surfaces just stay hidden.
+   var elevationProfile: [RouteElevationSample] = []
+
+   /// The climbs `ClimbDetector` found in the profile, in route order.
+   var climbs: [PlannedClimb] = []
+
    // MARK: - Derived
 
    /// Two points are the minimum that can make a line.
@@ -54,4 +64,16 @@ struct PlannedRoute: Identifiable, Sendable {
    var endCoordinate: CLLocationCoordinate2D? { coordinates.last }
 
    var hasAdvisories: Bool { !advisories.isEmpty }
+
+   /// Two samples are the minimum that can make a slope.
+   var hasElevationProfile: Bool { elevationProfile.count > 1 }
+
+   /// Total meters of ascent over the whole route. `nil` without a profile, so
+   /// no view can mistake "unknown" for "flat".
+   var totalAscent: Double? {
+      guard hasElevationProfile else { return nil }
+      return zip(elevationProfile, elevationProfile.dropFirst()).reduce(0) {
+         $0 + max(0, $1.1.altitude - $1.0.altitude)
+      }
+   }
 }

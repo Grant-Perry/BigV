@@ -57,23 +57,35 @@ final class RoutePlannerViewModel {
 
    private(set) var isPlanning = false
 
+   /// Whether Open-Meteo elevation is still in flight for the candidates. The
+   /// preview shows "Loading elevation…" from this rather than from each row,
+   /// because every candidate is enriched by the same pass.
+   private(set) var isEnrichingElevation = false
+
+   /// Set when a chosen GPX file could not become a route, cleared by the next
+   /// import or search.
+   private(set) var gpxImportFailureMessage: String?
+
    // MARK: - Dependencies
 
    private let routeSearchService: RouteSearchService
    private let plannedRouteProvider: any PlannedRouteProviding
    private let currentLocationProbe: CurrentLocationProbe
    private let plannedRouteManager: PlannedRouteManager
+   private let routeElevationEnricher: RouteElevationEnricher
 
    init(
       routeSearchService: RouteSearchService = RouteSearchService(),
       plannedRouteProvider: any PlannedRouteProviding = MapKitCyclingRoutePlanner(),
       currentLocationProbe: CurrentLocationProbe = CurrentLocationProbe(),
-      plannedRouteManager: PlannedRouteManager = PlannedRouteManager()
+      plannedRouteManager: PlannedRouteManager = PlannedRouteManager(),
+      routeElevationEnricher: RouteElevationEnricher = RouteElevationEnricher()
    ) {
       self.routeSearchService = routeSearchService
       self.plannedRouteProvider = plannedRouteProvider
       self.currentLocationProbe = currentLocationProbe
       self.plannedRouteManager = plannedRouteManager
+      self.routeElevationEnricher = routeElevationEnricher
    }
 
    // MARK: - Private State
@@ -85,6 +97,12 @@ final class RoutePlannerViewModel {
    private var searchTask: Task<Void, Never>?
    private var planTask: Task<Void, Never>?
    private var biasTask: Task<Void, Never>?
+   private var enrichTask: Task<Void, Never>?
+
+   /// Enrichment for a route the rider already committed to. Deliberately not
+   /// cancelled by `end()`: confirming a route leaves the planner tab, and the
+   /// profile should still land on the active route moments later.
+   private var activationEnrichTask: Task<Void, Never>?
 
    /// Long enough that a rider typing a street name does not fire a request per
    /// character, short enough to still feel like it is keeping up.
@@ -147,6 +165,9 @@ final class RoutePlannerViewModel {
 
       biasTask?.cancel()
       biasTask = nil
+
+      enrichTask?.cancel()
+      enrichTask = nil
 
       eventsTask?.cancel()
       eventsTask = nil
@@ -217,6 +238,7 @@ final class RoutePlannerViewModel {
       guard let route = selectedCandidate, let destination else { return }
 
       plannedRouteManager.activate(route, to: destination)
+      enrichActiveRouteIfNeeded(route)
       discardPlanning()
       queryText = ""
       suggestions = []
@@ -225,6 +247,73 @@ final class RoutePlannerViewModel {
 
    func cancelPreview() {
       discardPlanning()
+   }
+
+   // MARK: - GPX Import
+
+   /// Turns a picked GPX file into a single-candidate preview.
+   ///
+   /// Same stage flow as a search: the imported route lands in `candidates`,
+   /// the stage flips to preview, and Follow Route works unchanged. The
+   /// destination pin is the track's own endpoint.
+   func importGPXRoute(from url: URL) {
+      searchTask?.cancel()
+      routeSearchService.cancel()
+      discardPlanning()
+      suggestions = []
+      searchFailure = nil
+      gpxImportFailureMessage = nil
+
+      let ticket = generation.issue()
+      isPlanning = true
+
+      planTask = Task { [weak self] in
+         await self?.importGPX(url, ticket: ticket)
+      }
+   }
+
+   private func importGPX(_ url: URL, ticket: UInt64) async {
+      let route: PlannedRoute?
+
+      // Parsed off the main actor: a season of track points is real work, and
+      // the planning spinner is already on screen.
+      do {
+         route = try await Task.detached(priority: .userInitiated) {
+            try GPXRouteImporter.route(from: Self.readImportedFile(url))
+         }.value
+      } catch {
+         route = nil
+         DebugPrint(mode: .navigation, "GPX import failed: \(error)")
+      }
+
+      guard generation.isCurrent(ticket) else { return }
+
+      guard let route, let endCoordinate = route.endCoordinate else {
+         isPlanning = false
+         gpxImportFailureMessage = "That file doesn't contain a rideable track."
+         return
+      }
+
+      destination = RouteDestination(
+         name: route.name.isEmpty ? "GPX Route" : route.name,
+         coordinate: endCoordinate
+      )
+      candidates = [route]
+      selectedCandidateID = route.id
+      previewRegion = RideRouteBounds.region(for: route.coordinates)
+      isPlanning = false
+
+      // A track with no <ele> is enriched like any Apple route.
+      enrichCandidates(ticket: ticket)
+   }
+
+   /// Reads a document-picker URL under its security scope.
+   private nonisolated static func readImportedFile(_ url: URL) throws -> Data {
+      let isScoped = url.startAccessingSecurityScopedResource()
+      defer {
+         if isScoped { url.stopAccessingSecurityScopedResource() }
+      }
+      return try Data(contentsOf: url)
    }
 
    func clearActiveRoute() {
@@ -261,8 +350,66 @@ final class RoutePlannerViewModel {
          selectedCandidateID = routes.first?.id
          previewRegion = RideRouteBounds.region(for: routes.flatMap(\.coordinates))
          isPlanning = false
+         enrichCandidates(ticket: ticket)
       } catch {
          apply(planningFailure: error, ticket: ticket)
+      }
+   }
+
+   // MARK: - Elevation
+
+   /// Attaches Open-Meteo profiles to every candidate at once.
+   ///
+   /// Candidates are replaced in place by id as each profile lands, so the row
+   /// the rider is reading grows its gain figure without the list reordering.
+   /// Fail-soft throughout: a candidate that cannot be enriched previews and
+   /// rides exactly as before, minus the climb figures.
+   private func enrichCandidates(ticket: UInt64) {
+      enrichTask?.cancel()
+
+      let routes = candidates.filter { !$0.hasElevationProfile }
+      guard !routes.isEmpty else { return }
+
+      isEnrichingElevation = true
+      let enricher = routeElevationEnricher
+
+      enrichTask = Task { [weak self] in
+         await withTaskGroup(of: PlannedRoute.self) { group in
+            for route in routes {
+               group.addTask { await enricher.enriched(route) }
+            }
+
+            for await enriched in group {
+               guard !Task.isCancelled else { return }
+               self?.replaceCandidate(with: enriched, ticket: ticket)
+            }
+         }
+
+         guard let self, self.generation.isCurrent(ticket) else { return }
+         self.isEnrichingElevation = false
+      }
+   }
+
+   private func replaceCandidate(with enriched: PlannedRoute, ticket: UInt64) {
+      guard generation.isCurrent(ticket),
+            let index = candidates.firstIndex(where: { $0.id == enriched.id })
+      else { return }
+
+      candidates[index] = enriched
+   }
+
+   /// Backfills the profile onto a route confirmed before enrichment landed.
+   private func enrichActiveRouteIfNeeded(_ route: PlannedRoute) {
+      guard !route.hasElevationProfile else { return }
+
+      let enricher = routeElevationEnricher
+      let manager = plannedRouteManager
+
+      activationEnrichTask?.cancel()
+      activationEnrichTask = Task {
+         let enriched = await enricher.enriched(route)
+         guard !Task.isCancelled else { return }
+         manager.attachElevation(from: enriched)
       }
    }
 
@@ -288,6 +435,8 @@ final class RoutePlannerViewModel {
       generation.retireAll()
       planTask?.cancel()
       planTask = nil
+      enrichTask?.cancel()
+      enrichTask = nil
       plannedRouteProvider.cancel()
 
       candidates = []
@@ -296,6 +445,7 @@ final class RoutePlannerViewModel {
       destination = nil
       planningFailure = nil
       isPlanning = false
+      isEnrichingElevation = false
    }
 }
 
@@ -323,6 +473,13 @@ extension RoutePlannerViewModel {
 
    func isSelected(_ route: PlannedRoute) -> Bool {
       route.id == selectedCandidate?.id
+   }
+
+   /// "+853 FT · 2 climbs", once elevation has landed. `nil` says nothing is
+   /// known yet — the row shows the loading whisper off `isEnrichingElevation`.
+   func climbSummaryText(for route: PlannedRoute) -> String? {
+      guard route.hasElevationProfile, let ascent = route.totalAscent else { return nil }
+      return PlannedRouteFormatters.climbSummary(ascent: ascent, climbCount: route.climbs.count)
    }
 }
 

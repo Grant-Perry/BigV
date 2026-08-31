@@ -46,6 +46,25 @@ final class PlannedRouteManager {
       )
    }
 
+   /// Attaches elevation to the active route in place, if it is still the one
+   /// the enrichment was fetched for.
+   ///
+   /// Deliberately not a re-activation: guidance keys on the route's identity
+   /// and re-preparing the engine mid-ride would restart every cue latch. The
+   /// geometry does not change here — only the profile riding alongside it.
+   func attachElevation(from enriched: PlannedRoute) {
+      guard var route = activeRoute, route.id == enriched.id else { return }
+
+      route.elevationProfile = enriched.elevationProfile
+      route.climbs = enriched.climbs
+      activeRoute = route
+
+      DebugPrint(
+         mode: .navigation,
+         "Attached elevation to active route: \(enriched.elevationProfile.count) samples, \(enriched.climbs.count) climb(s)"
+      )
+   }
+
    func clear() {
       guard activeRoute != nil else { return }
 

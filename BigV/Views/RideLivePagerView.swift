@@ -15,13 +15,15 @@ struct RideLivePagerView: View {
    let routeGuidanceViewModel: RouteGuidanceViewModel
    let onShowRadar: () -> Void
 
+   @Environment(RideClimbModel.self) private var rideClimbModel
    @State private var selectedPage: RidePage = .dashboard
    @State private var isMapPageMounted = false
 
    /// The radar page exists only when a radar does — no rider without one
-   /// should ever swipe onto an empty road.
+   /// should ever swipe onto an empty road. The climb page is always present:
+   /// freeride still detects climbs, and an empty page teaches the swipe.
    private var pages: [RidePage] {
-      rideViewModel.isRadarAvailable ? RidePage.allCases : [.dashboard, .map]
+      rideViewModel.isRadarAvailable ? RidePage.allCases : [.dashboard, .climb, .map]
    }
 
    var body: some View {
@@ -46,6 +48,12 @@ struct RideLivePagerView: View {
             selectedPage = .dashboard
          }
       }
+      // A categorized climb starting pulls the dashboard onto the climb page.
+      // Only the dashboard: a rider reading the map or the radar chose to.
+      .onChange(of: rideClimbModel.climbStartPulse) { _, _ in
+         guard rideClimbModel.isAutoSwitchEnabled, selectedPage == .dashboard else { return }
+         withAnimation { selectedPage = .climb }
+      }
    }
 
    // MARK: - Bottom Strip
@@ -67,22 +75,22 @@ struct RideLivePagerView: View {
 
    /// Drawer tap layers and MapKit pans can eat TabView's own drag. This
    /// recovers a clear horizontal swipe without disabling map zoom / explore pan.
-   private var swipeToMap: some Gesture {
+   private var swipeToClimb: some Gesture {
       DragGesture(minimumDistance: 40)
          .onEnded { value in
             guard RidePageSwipe.isForward(value) else { return }
-            selectedPage = .map
+            selectedPage = .climb
          }
    }
 
-   private var swipeToDashboard: some Gesture {
+   private var swipeOffMap: some Gesture {
       DragGesture(minimumDistance: 40)
          .onEnded { value in
             if RidePageSwipe.isBack(value) {
                // Following: no map pan, so the whole page can page back.
                // Exploring: only a leading-edge swipe, so a map pan stays a pan.
                if rideMapViewModel.isFollowingRider || RidePageSwipe.startsAtLeadingEdge(value) {
-                  selectedPage = .dashboard
+                  selectedPage = .climb
                }
                return
             }
@@ -110,7 +118,10 @@ struct RideLivePagerView: View {
                onExpandMap: { selectedPage = .map },
                onShowRadar: onShowRadar
             )
-            .simultaneousGesture(swipeToMap)
+            .simultaneousGesture(swipeToClimb)
+
+         case .climb:
+            RideClimbPageView()
 
          case .map:
             Group {
@@ -124,7 +135,7 @@ struct RideLivePagerView: View {
                   Color.clear
                }
             }
-            .simultaneousGesture(swipeToDashboard)
+            .simultaneousGesture(swipeOffMap)
 
          case .radar:
             RideRadarPageView(
@@ -186,5 +197,7 @@ private enum RidePageSwipe {
       onShowRadar: {}
    )
    .environment(RideWeatherModel(unitsSettings: RideUnitsSettings()))
+   .environment(RideClimbModel())
+   .environment(RideBackToStartModel())
    .preferredColorScheme(.dark)
 }

@@ -15,7 +15,7 @@ import Foundation
 /// slower to render.
 ///
 /// Pure math with no framework side effects so it can be tested in isolation.
-enum RideRouteDownsampler {
+nonisolated enum RideRouteDownsampler {
 
    // MARK: - Configuration
 

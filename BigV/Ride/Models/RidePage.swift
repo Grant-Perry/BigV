@@ -12,6 +12,7 @@ import Foundation
 enum RidePage: Int, CaseIterable, Identifiable, Sendable {
 
    case dashboard
+   case climb
    case map
    case radar
 
@@ -21,6 +22,7 @@ enum RidePage: Int, CaseIterable, Identifiable, Sendable {
    var title: String {
       switch self {
          case .dashboard: "Dashboard"
+         case .climb: "Climb"
          case .map: "Map"
          case .radar: "Radar"
       }

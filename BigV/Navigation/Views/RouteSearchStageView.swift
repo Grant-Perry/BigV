@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// The search field and its live results.
 ///
@@ -15,6 +16,14 @@ struct RouteSearchStageView: View {
    @Bindable var routePlannerViewModel: RoutePlannerViewModel
 
    @FocusState private var isFieldFocused: Bool
+   @State private var isShowingGPXImporter = false
+
+   /// GPX has no system UTType; files usually arrive typed by extension, with
+   /// plain XML as the fallback some apps export.
+   private static let gpxTypes: [UTType] = [
+      UTType(filenameExtension: "gpx") ?? .xml,
+      .xml
+   ]
 
    var body: some View {
       resultsColumn
@@ -23,6 +32,15 @@ struct RouteSearchStageView: View {
             searchField
                .padding(.horizontal, 16)
                .padding(.top, 8)
+         }
+         .fileImporter(
+            isPresented: $isShowingGPXImporter,
+            allowedContentTypes: Self.gpxTypes,
+            allowsMultipleSelection: false
+         ) { result in
+            if case .success(let urls) = result, let url = urls.first {
+               routePlannerViewModel.importGPXRoute(from: url)
+            }
          }
    }
 
@@ -33,9 +51,37 @@ struct RouteSearchStageView: View {
             RoutePlanningFailureView(failure: planningFailure)
          }
 
+         if let gpxFailure = routePlannerViewModel.gpxImportFailureMessage {
+            statusMessage(gpxFailure)
+               .frame(maxHeight: 60)
+         }
+
          results
+
+         gpxImportButton
       }
       .padding(.horizontal, 16)
+   }
+
+   // MARK: - GPX Import
+
+   /// One-shot import: the file becomes the previewed route, not a library
+   /// entry. Sits under the results so search stays the primary way in.
+   private var gpxImportButton: some View {
+      Button {
+         isFieldFocused = false
+         isShowingGPXImporter = true
+      } label: {
+         Label("Import GPX Route", systemImage: "square.and.arrow.down")
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.white.opacity(0.75))
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+      }
+      .buttonStyle(.plain)
+      .rideGlassChrome(in: .capsule)
+      .padding(.bottom, 10)
+      .accessibilityIdentifier("planner.button.importGPX")
    }
 
    // MARK: - Field

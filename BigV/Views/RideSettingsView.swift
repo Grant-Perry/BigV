@@ -20,6 +20,8 @@ struct RideSettingsView: View {
    @Bindable var onboardingSettings: RideOnboardingSettings
    @Bindable var plusStore: BigVeloPlusStore
    @Bindable var backupViewModel: RideBackupViewModel
+   @Bindable var climbSettings: RideClimbSettings
+   @Bindable var lapSettings: RideLapSettings
    let onShowRadar: () -> Void
    let onFinishSetup: () -> Void
 
@@ -45,6 +47,8 @@ struct RideSettingsView: View {
                temperatureCard
 
                radarCard
+
+               ridingCard
 
                plusCard
 
@@ -211,6 +215,54 @@ struct RideSettingsView: View {
       .buttonStyle(.plain)
       .rideGlassCard()
       .accessibilityIdentifier("setup.button.radar")
+   }
+
+   // MARK: - Riding
+
+   /// Climb auto-switch and auto-lap, together: both are about what the
+   /// cockpit does on its own while the rider keeps their hands on the bars.
+   private var ridingCard: some View {
+      VStack(alignment: .leading, spacing: 12) {
+         cardHeader("RIDING")
+
+         Toggle(isOn: $climbSettings.autoSwitchEnabled) {
+            VStack(alignment: .leading, spacing: 2) {
+               Text("Climb Page Auto-Switch")
+                  .font(.subheadline.weight(.semibold))
+                  .foregroundStyle(.white)
+
+               Text("Jump to the climb page when a categorized climb starts")
+                  .font(.caption)
+                  .foregroundStyle(.white.opacity(0.55))
+            }
+         }
+         .tint(RideChromeTokens.ember)
+         .accessibilityIdentifier("settings.toggle.climbAutoSwitch")
+
+         VStack(alignment: .leading, spacing: 6) {
+            Text("Auto-Lap")
+               .font(.subheadline.weight(.semibold))
+               .foregroundStyle(.white)
+
+            Picker("Auto-Lap", selection: $lapSettings.autoLapUnits) {
+               ForEach(RideLapSettings.autoLapChoices, id: \.self) { choice in
+                  Text(autoLapLabel(for: choice)).tag(choice)
+               }
+            }
+            .pickerStyle(.segmented)
+            .accessibilityIdentifier("settings.picker.autoLap")
+
+            Text("Cut a lap automatically every so many \(unitsSettings.system == .imperial ? "miles" : "kilometers"). The LAP button works either way.")
+               .font(.caption2)
+               .foregroundStyle(.white.opacity(0.4))
+         }
+      }
+      .padding(14)
+      .rideGlassCard()
+   }
+
+   private func autoLapLabel(for choice: Double) -> String {
+      choice == 0 ? "Off" : choice.formatted(.number.precision(.fractionLength(0)))
    }
 
    // MARK: - Plus
@@ -434,6 +486,8 @@ struct RideSettingsView: View {
       onboardingSettings: onboarding,
       plusStore: BigVeloPlusStore(),
       backupViewModel: backup,
+      climbSettings: RideClimbSettings(),
+      lapSettings: RideLapSettings(),
       onShowRadar: {},
       onFinishSetup: {}
    )

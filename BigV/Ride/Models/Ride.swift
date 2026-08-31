@@ -56,6 +56,13 @@ final class Ride {
    /// ride recorded no radar passes.
    var maximumClosingSpeed: Double?
 
+   // MARK: - Lap Totals
+
+   /// Lightweight counts so the history list can badge a ride without
+   /// faulting its lap rows in.
+   var lapCount: Int = 0
+   var climbSplitCount: Int = 0
+
    // MARK: - Weather
 
    /// The sky this ride was ridden under, snapshotted from WeatherKit at the
@@ -85,6 +92,14 @@ final class Ride {
 
    @Relationship(deleteRule: .cascade, inverse: \RideRadarEvent.ride)
    var radarEvents: [RideRadarEvent] = []
+
+   // MARK: - Laps
+
+   @Relationship(deleteRule: .cascade, inverse: \RideLap.ride)
+   var laps: [RideLap] = []
+
+   @Relationship(deleteRule: .cascade, inverse: \RideClimbSplit.ride)
+   var climbSplits: [RideClimbSplit] = []
 
    // MARK: - Initialization
 

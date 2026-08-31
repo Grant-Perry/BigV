@@ -45,6 +45,10 @@ struct RideState: Sendable, Equatable {
    /// Current grade as a percentage.
    var grade: Double = 0
 
+   /// Vertical speed in meters/hour — VAM. Signed; zero until the telemetry
+   /// engine's altitude window has enough history.
+   var verticalSpeed: Double = 0
+
    // MARK: - Orientation
 
    /// Course over ground in degrees. Negative means unknown.

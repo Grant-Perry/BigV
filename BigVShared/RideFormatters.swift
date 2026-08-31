@@ -123,6 +123,15 @@ nonisolated enum RideFormatters {
       percent.formatted(.number.precision(.fractionLength(1)).sign(strategy: .always(includingZero: false)))
    }
 
+   // MARK: - Vertical Speed
+
+   /// VAM in whole meters/hour — the unit the number is defined in, worldwide;
+   /// no bike computer converts it. Descent reads as zero: VAM is a climbing
+   /// figure and a negative one is noise, not information.
+   static func verticalSpeed(_ metersPerHour: Double) -> String {
+      max(0, metersPerHour).formatted(.number.precision(.fractionLength(0)))
+   }
+
    // MARK: - Accuracy
 
    static func accuracy(_ meters: Double, system: RideUnitSystem = .current) -> String {

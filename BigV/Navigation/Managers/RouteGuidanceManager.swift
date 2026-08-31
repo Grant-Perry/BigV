@@ -76,6 +76,7 @@ final class RouteGuidanceManager {
 
    private let plannedRouteManager: PlannedRouteManager
    private let plannedRouteProvider: any PlannedRouteProviding
+   private let routeElevationEnricher: RouteElevationEnricher
    private let announcer: RouteGuidanceSpeechAnnouncer
    private let defaults: UserDefaults
    private let configuration: Configuration
@@ -100,11 +101,17 @@ final class RouteGuidanceManager {
    private var rerouteFailureCount = 0
    private var lastRerouteAttemptAt: Date?
 
+   /// Open-Meteo for a freshly rerouted line. Separate from the reroute task:
+   /// guidance must resume the instant the new route lands, with the profile
+   /// arriving alongside whenever it does.
+   private var elevationTask: Task<Void, Never>?
+
    // MARK: - Initialization
 
    init(
       plannedRouteManager: PlannedRouteManager = PlannedRouteManager(),
       plannedRouteProvider: any PlannedRouteProviding = MapKitCyclingRoutePlanner(),
+      routeElevationEnricher: RouteElevationEnricher = RouteElevationEnricher(),
       announcer: RouteGuidanceSpeechAnnouncer = RouteGuidanceSpeechAnnouncer(),
       configuration: Configuration = .default,
       engineConfiguration: RouteGuidanceEngine.Configuration = .default,
@@ -112,6 +119,7 @@ final class RouteGuidanceManager {
    ) {
       self.plannedRouteManager = plannedRouteManager
       self.plannedRouteProvider = plannedRouteProvider
+      self.routeElevationEnricher = routeElevationEnricher
       self.announcer = announcer
       self.defaults = defaults
       self.configuration = configuration
@@ -363,6 +371,7 @@ final class RouteGuidanceManager {
          plannedRouteManager.activate(replacement, to: destination)
          begin(replacement, greeting: "Route updated.")
          refreshPhase()
+         enrichElevation(for: replacement)
       } catch {
          guard rerouteGeneration.isCurrent(ticket) else { return }
          apply(rerouteFailure: error)
@@ -394,5 +403,27 @@ final class RouteGuidanceManager {
       rerouteGeneration.retireAll()
       plannedRouteProvider.cancel()
       isRerouting = false
+   }
+
+   // MARK: - Elevation
+
+   /// Backfills the profile onto a rerouted line, so remaining climb survives
+   /// a detour.
+   ///
+   /// Attached in place through `PlannedRouteManager` rather than by
+   /// re-activating: the engine keys on the route's identity, and a stale
+   /// enrichment is dropped there by the id check rather than raced here.
+   private func enrichElevation(for route: PlannedRoute) {
+      guard !route.hasElevationProfile else { return }
+
+      let enricher = routeElevationEnricher
+      let manager = plannedRouteManager
+
+      elevationTask?.cancel()
+      elevationTask = Task {
+         let enriched = await enricher.enriched(route)
+         guard !Task.isCancelled else { return }
+         manager.attachElevation(from: enriched)
+      }
    }
 }

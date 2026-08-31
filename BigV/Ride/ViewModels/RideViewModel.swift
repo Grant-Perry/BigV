@@ -72,6 +72,12 @@ final class RideViewModel {
    var elevationLoss: String { totals.elevationLoss }
    var elevationUnit: String { unitSystem.elevationUnit }
 
+   /// Current altitude, or the placeholder until the engine trusts a fix.
+   var altitude: String {
+      guard let altitude = state.altitude else { return RideFormatters.placeholder }
+      return RideFormatters.elevation(altitude, system: unitSystem)
+   }
+
    var averageSpeed: String { totals.averageSpeed }
    var maximumSpeed: String { totals.maximumSpeed }
 
@@ -203,6 +209,9 @@ final class RideViewModel {
    func pause() { rideSessionManager.pause() }
    func resume() { rideSessionManager.resume() }
    func end() { rideSessionManager.end() }
+
+   /// Cuts a lap by hand. The session ignores presses outside recording.
+   func lap() { rideSessionManager.recordLap() }
    func reset() {
       clearSelectedMetric()
       clearLiveRadarTimeline()

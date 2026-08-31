@@ -140,6 +140,8 @@ struct RideDashboardView: View {
       )
    }
    .environment(RideWeatherModel(unitsSettings: RideUnitsSettings()))
+   .environment(RideClimbModel())
+   .environment(RideBackToStartModel())
    .preferredColorScheme(.dark)
 }
 
@@ -155,5 +157,7 @@ struct RideDashboardView: View {
       )
    }
    .environment(RideWeatherModel(unitsSettings: RideUnitsSettings()))
+   .environment(RideClimbModel())
+   .environment(RideBackToStartModel())
    .preferredColorScheme(.dark)
 }

@@ -56,5 +56,7 @@ struct RideCockpitView: View {
       onShowRadar: {}
    )
    .environment(RideWeatherModel(unitsSettings: RideUnitsSettings()))
+   .environment(RideClimbModel())
+   .environment(RideBackToStartModel())
    .preferredColorScheme(.dark)
 }

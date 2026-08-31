@@ -16,6 +16,8 @@ struct RideDashboardMetricsGrid: View {
    let routeGuidanceViewModel: RouteGuidanceViewModel
    var isCompact: Bool = false
 
+   @Environment(RideClimbModel.self) private var rideClimbModel
+
    private var tileColumns: [GridItem] {
       Array(
          repeating: GridItem(.flexible(), spacing: 10),
@@ -67,6 +69,25 @@ struct RideDashboardMetricsGrid: View {
             unit: rideViewModel.speedUnit,
             metric: .speed
          )
+
+         tile(
+            "ALT",
+            value: rideViewModel.altitude,
+            unit: rideViewModel.elevationUnit,
+            identifier: "ride.tile.altitude",
+            gutterAlignment: .trailing
+         )
+
+         // Only a route with a profile can promise what is left to climb;
+         // without one the slot stays empty rather than showing a dash forever.
+         if let ascentRemaining = rideClimbModel.routeAscentRemainingText {
+            tile(
+               "ASC REMAINING",
+               value: ascentRemaining,
+               unit: rideClimbModel.elevationUnit,
+               identifier: "ride.tile.ascentRemaining"
+            )
+         }
 
          if routeGuidanceViewModel.isActive {
             tile(

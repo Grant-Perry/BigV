@@ -174,6 +174,36 @@ final class RideStorageManager {
       saveIfDue()
    }
 
+   // MARK: - Laps
+
+   /// Records one cut lap on the ride being recorded.
+   ///
+   /// Laps arrive at rider frequency — a handful per ride — but a cut is a
+   /// deliberate act the rider expects to stick, so it saves immediately
+   /// rather than riding the sample batch.
+   func appendLap(_ lap: RideLapTracker.Lap) {
+      guard let ride = activeRide else { return }
+
+      let stored = RideLap(lap: lap)
+      stored.ride = ride
+      modelContext.insert(stored)
+      ride.lapCount += 1
+
+      save(reason: "lap \(lap.index)")
+   }
+
+   /// Records one completed climb on the ride being recorded.
+   func appendClimbSplit(_ draft: RideClimbSplitDraft) {
+      guard let ride = activeRide else { return }
+
+      let split = RideClimbSplit(index: ride.climbSplitCount + 1, draft: draft)
+      split.ride = ride
+      modelContext.insert(split)
+      ride.climbSplitCount += 1
+
+      save(reason: "climb split \(split.index)")
+   }
+
    // MARK: - Flushing
 
    /// Commits anything pending. Used on pause, end and scene backgrounding.

@@ -21,6 +21,7 @@ struct RideControlBar: View {
 
             case .recording:
                control("PAUSE", icon: .pauseIcon, tint: RideDashboardTheme.pause, action: rideViewModel.pause)
+               control("LAP", icon: .lapIcon, tint: RideDashboardTheme.ice, action: rideViewModel.lap)
                control("END", icon: .endIcon, tint: RideDashboardTheme.halt, action: rideViewModel.end)
 
             case .paused:
@@ -73,6 +74,7 @@ private extension String {
    static let startIcon = "play.fill"
    static let pauseIcon = "pause.fill"
    static let endIcon = "stop.fill"
+   static let lapIcon = "flag.fill"
    static let cancelIcon = "xmark"
    static let newRideIcon = "plus"
 }

@@ -85,17 +85,27 @@ struct RoutePreviewStageView: View {
                      distanceText: routePlannerViewModel.distanceText(for: route),
                      travelTimeText: routePlannerViewModel.travelTimeText(for: route),
                      advisories: route.advisories,
-                     isSelected: routePlannerViewModel.isSelected(route)
+                     isSelected: routePlannerViewModel.isSelected(route),
+                     climbSummary: routePlannerViewModel.climbSummaryText(for: route),
+                     isLoadingElevation: routePlannerViewModel.isSelected(route)
+                        && routePlannerViewModel.isEnrichingElevation
                   )
                }
                .buttonStyle(.plain)
                .accessibilityIdentifier("planner.candidate.\(index)")
             }
+
+            // The chosen line's climbs, expandable to their profiles — the
+            // vertical half of the decision the alternates ask the rider to make.
+            if let selected = routePlannerViewModel.selectedCandidate,
+               !selected.climbs.isEmpty {
+               RouteClimbListView(route: selected)
+            }
          }
          .padding(.horizontal, 16)
       }
       .scrollIndicators(.hidden)
-      .frame(maxHeight: 210)
+      .frame(maxHeight: 250)
    }
 
    // MARK: - Actions

@@ -45,6 +45,11 @@ struct RideTelemetryEngine {
       var gradeWindowDistance: Double = 40
       var maxGradeMagnitude: Double = 25
 
+      /// Seconds of altitude history behind the VAM figure. Thirty seconds is
+      /// the convention the number is defined by — long enough to ride out GPS
+      /// altitude wobble, short enough to answer "how fast am I climbing now".
+      var verticalSpeedWindow: TimeInterval = 30
+
       /// A larger gap between samples is treated as a signal dropout.
       var maxSampleGap: TimeInterval = 10
 
@@ -82,6 +87,10 @@ struct RideTelemetryEngine {
    private(set) var elevationGain: Double = 0
    private(set) var elevationLoss: Double = 0
    private(set) var grade: Double = 0
+
+   /// Vertical speed in meters/hour — VAM. Signed: negative means descending.
+   /// Zero until the altitude window spans its configured seconds.
+   private(set) var verticalSpeed: Double = 0
    private(set) var course: Double = -1
    private(set) var horizontalAccuracy: Double?
    private(set) var hasFix = false
@@ -101,9 +110,15 @@ struct RideTelemetryEngine {
    private var distanceAnchor: CLLocation?
    private var elevationReference: Double?
    private var gradeWindow: [GradePoint] = []
+   private var verticalWindow: [VerticalPoint] = []
 
    private struct GradePoint {
       let distance: Double
+      let altitude: Double
+   }
+
+   private struct VerticalPoint {
+      let timestamp: Date
       let altitude: Double
    }
 
@@ -125,6 +140,7 @@ struct RideTelemetryEngine {
       elevationGain = 0
       elevationLoss = 0
       grade = 0
+      verticalSpeed = 0
       course = -1
       horizontalAccuracy = nil
       hasFix = false
@@ -135,6 +151,7 @@ struct RideTelemetryEngine {
       distanceAnchor = nil
       elevationReference = nil
       gradeWindow.removeAll()
+      verticalWindow.removeAll()
    }
 
    /// Zeroes the displayed speed without disturbing totals.
@@ -144,6 +161,8 @@ struct RideTelemetryEngine {
       speed = 0
       isMoving = false
       grade = 0
+      verticalSpeed = 0
+      verticalWindow.removeAll()
    }
 
    // MARK: - Ingestion
@@ -300,6 +319,37 @@ struct RideTelemetryEngine {
          elevationLoss += abs(delta)
          elevationReference = smoothed
       }
+
+      updateVerticalSpeed(at: location.timestamp, altitude: smoothed)
+   }
+
+   // MARK: - Vertical Speed
+
+   /// VAM from a time-stamped altitude window, alongside — never instead of —
+   /// the distance-based grade math. Grade answers "how steep is this road";
+   /// this answers "how many meters an hour am I actually gaining", which is
+   /// the number climbers pace efforts by.
+   private mutating func updateVerticalSpeed(at timestamp: Date, altitude: Double) {
+      verticalWindow.append(VerticalPoint(timestamp: timestamp, altitude: altitude))
+
+      let cutoff = timestamp.addingTimeInterval(-configuration.verticalSpeedWindow * 2)
+      if let staleIndex = verticalWindow.lastIndex(where: { $0.timestamp < cutoff }), staleIndex > 0 {
+         verticalWindow.removeFirst(staleIndex)
+      }
+
+      // The newest point at least a full window old anchors the measurement;
+      // until one exists there is no honest figure, so the readout stays zero.
+      guard let baseline = verticalWindow.last(where: {
+         timestamp.timeIntervalSince($0.timestamp) >= configuration.verticalSpeedWindow
+      }) else {
+         verticalSpeed = 0
+         return
+      }
+
+      let elapsed = timestamp.timeIntervalSince(baseline.timestamp)
+      guard elapsed > 0 else { return }
+
+      verticalSpeed = (altitude - baseline.altitude) / elapsed * 3_600
    }
 
    // MARK: - Grade

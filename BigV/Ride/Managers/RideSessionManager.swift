@@ -35,9 +35,11 @@ final class RideSessionManager {
    private let rideRadarManager: RideRadarManager?
    private let rideRadarAnnouncer: RideRadarAnnouncer?
    private let rideWeatherStamper: RideWeatherStamper?
+   private let rideLapSettings: RideLapSettings?
    private var telemetryEngine: RideTelemetryEngine
    private var rideClock = RideClock()
    private var radarTracker = RideRadarTracker()
+   private var lapTracker = RideLapTracker()
    private let heartRateRingBuffer = RideHeartRateRingBuffer()
 
    private var locationTask: Task<Void, Never>?
@@ -90,7 +92,8 @@ final class RideSessionManager {
       rideWatchManager: RideWatchManager? = nil,
       rideRadarManager: RideRadarManager? = nil,
       rideRadarAnnouncer: RideRadarAnnouncer? = nil,
-      rideWeatherStamper: RideWeatherStamper? = nil
+      rideWeatherStamper: RideWeatherStamper? = nil,
+      rideLapSettings: RideLapSettings? = nil
    ) {
       self.locationManager = locationManager
       self.rideStorageManager = rideStorageManager
@@ -104,6 +107,7 @@ final class RideSessionManager {
       self.rideRadarManager = rideRadarManager
       self.rideRadarAnnouncer = rideRadarAnnouncer
       self.rideWeatherStamper = rideWeatherStamper
+      self.rideLapSettings = rideLapSettings
       self.telemetryEngine = RideTelemetryEngine(configuration: configuration)
    }
 
@@ -115,6 +119,7 @@ final class RideSessionManager {
       telemetryEngine.reset()
       rideRouteRecorder.reset()
       rideClock.reset()
+      lapTracker.reset()
 
       // The radar link outlives rides: a new ride must not blank the tape or
       // drop the connection readout, only restart its pass count.
@@ -186,6 +191,7 @@ final class RideSessionManager {
       telemetryEngine.markSpeedStale()
       publishTelemetry()
       refreshElapsedTime()
+      closeFinalLapIfNeeded()
 
       let decision = RideRetentionPolicy.decision(
          distance: state.distance,
@@ -375,6 +381,7 @@ final class RideSessionManager {
             lastSampleAt = .now
             appendRoutePoint(location)
             routeGuidanceManager?.follow(location, state: state)
+            cutAutoLapsIfNeeded()
             persist(location)
 
          case .rejected(let reason):
@@ -393,6 +400,7 @@ final class RideSessionManager {
       let startDate = Date.now
       state.phase = .recording
       state.startDate = startDate
+      lapTracker.begin(at: startDate)
 
       rideStorageManager?.beginRide(startDate: startDate)
       state.hasStorageFailure = rideStorageManager?.hasFailure ?? false
@@ -450,6 +458,66 @@ final class RideSessionManager {
 
       rideStorageManager.append(draft, totals: state)
       state.hasStorageFailure = rideStorageManager.hasFailure
+   }
+
+   // MARK: - Laps
+
+   /// Cuts a lap at the rider's press of the LAP button.
+   func recordLap() {
+      guard state.phase == .recording else { return }
+
+      guard let lap = lapTracker.cut(
+         distance: state.distance,
+         elevationGain: state.elevationGain,
+         at: .now,
+         trigger: .manual
+      ) else { return }
+
+      persist(lap)
+   }
+
+   /// Records a completed climb split cut by the climb model.
+   ///
+   /// The climb model owns detection; the session manager only guards the
+   /// phase so a split can never land after END.
+   func record(climbSplit draft: RideClimbSplitDraft) {
+      guard state.phase == .recording || state.phase == .paused else { return }
+
+      rideStorageManager?.appendClimbSplit(draft)
+      DebugPrint(mode: .sessionLifecycle, "Climb split recorded: \(Int(draft.elevationGain)) m gained")
+   }
+
+   private func cutAutoLapsIfNeeded() {
+      let laps = lapTracker.autoLaps(
+         distance: state.distance,
+         elevationGain: state.elevationGain,
+         at: .now,
+         every: rideLapSettings?.autoLapDistanceMeters
+      )
+
+      for lap in laps {
+         persist(lap)
+      }
+   }
+
+   /// Closes the open lap at END — but only when the rider was actually
+   /// lapping. A ride with no cuts stays a ride, not a one-lap ride.
+   private func closeFinalLapIfNeeded() {
+      guard lapTracker.hasLaps,
+            let lap = lapTracker.cut(
+               distance: state.distance,
+               elevationGain: state.elevationGain,
+               at: state.endDate ?? .now,
+               trigger: .rideEnd
+            )
+      else { return }
+
+      persist(lap)
+   }
+
+   private func persist(_ lap: RideLapTracker.Lap) {
+      rideStorageManager?.appendLap(lap)
+      DebugPrint(mode: .sessionLifecycle, "Lap \(lap.index) cut (\(lap.trigger.rawValue))")
    }
 
    // MARK: - Route
@@ -853,6 +921,7 @@ final class RideSessionManager {
       state.elevationGain = telemetryEngine.elevationGain
       state.elevationLoss = telemetryEngine.elevationLoss
       state.grade = telemetryEngine.grade
+      state.verticalSpeed = telemetryEngine.verticalSpeed
       state.course = telemetryEngine.course
       state.horizontalAccuracy = telemetryEngine.horizontalAccuracy
       state.hasGPSFix = telemetryEngine.hasFix

@@ -28,6 +28,11 @@ struct RideRouteDetailView: View {
                   .detailCardEntrance()
             }
 
+            if let laps = rideDetailViewModel.laps {
+               RideLapsCard(report: laps)
+                  .detailCardEntrance()
+            }
+
             if let elevation = rideDetailViewModel.elevation {
                RideElevationCard(report: elevation)
                   .detailCardEntrance()

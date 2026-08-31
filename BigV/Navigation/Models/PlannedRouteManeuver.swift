@@ -12,7 +12,7 @@ import Foundation
 /// progress along the route is known as a single scalar, the next maneuver and
 /// the distance to it are a subtraction rather than a geometry search. Step
 /// geometry is deliberately not duplicated here — the route already holds it.
-struct PlannedRouteManeuver: Identifiable, Sendable {
+nonisolated struct PlannedRouteManeuver: Identifiable, Sendable {
 
    // MARK: - Identity
 

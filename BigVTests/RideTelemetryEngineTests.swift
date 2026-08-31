@@ -265,6 +265,41 @@ struct RideTelemetryEngineTests {
       #expect(engine.grade == 0)
    }
 
+   // MARK: - Vertical Speed
+
+   @Test func vamMatchesASustainedClimb() {
+      var engine = RideTelemetryEngine()
+      // 0.5 m up per one-second step is 1 800 m/h, well past the 30 s window.
+      ride(into: &engine, steps: 90, altitudePerStep: 0.5)
+
+      #expect(engine.verticalSpeed > 1_400)
+      #expect(engine.verticalSpeed < 2_200)
+   }
+
+   @Test func vamStaysZeroUntilTheWindowFills() {
+      var engine = RideTelemetryEngine()
+      // Fifteen seconds of climbing is not thirty; no honest figure exists yet.
+      ride(into: &engine, steps: 15, altitudePerStep: 0.5)
+
+      #expect(engine.verticalSpeed == 0)
+   }
+
+   @Test func vamGoesNegativeOnADescent() {
+      var engine = RideTelemetryEngine()
+      ride(into: &engine, steps: 90, altitudePerStep: -0.5)
+
+      #expect(engine.verticalSpeed < -1_400)
+   }
+
+   @Test func staleSpeedZeroesVAM() {
+      var engine = RideTelemetryEngine()
+      ride(into: &engine, steps: 90, altitudePerStep: 0.5)
+
+      engine.markSpeedStale()
+
+      #expect(engine.verticalSpeed == 0)
+   }
+
    // MARK: - Reset
 
    @Test func resetClearsEverything() {
@@ -280,5 +315,6 @@ struct RideTelemetryEngineTests {
       #expect(engine.elevationGain == 0)
       #expect(engine.hasFix == false)
       #expect(engine.altitude == nil)
+      #expect(engine.verticalSpeed == 0)
    }
 }

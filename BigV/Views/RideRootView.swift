@@ -24,7 +24,10 @@ struct RideRootView: View {
    let rideOnboardingSettings: RideOnboardingSettings
    let plusStore: BigVeloPlusStore
    let rideBackupViewModel: RideBackupViewModel
+   let rideClimbSettings: RideClimbSettings
+   let rideLapSettings: RideLapSettings
 
+   @Environment(RideClimbModel.self) private var rideClimbModel
    @Environment(\.scenePhase) private var scenePhase
    @State private var selectedTab: RideTab = .dashboard
    @State private var isShowingRadarPairing = false
@@ -62,6 +65,8 @@ struct RideRootView: View {
                onboardingSettings: rideOnboardingSettings,
                plusStore: plusStore,
                backupViewModel: rideBackupViewModel,
+               climbSettings: rideClimbSettings,
+               lapSettings: rideLapSettings,
                onShowRadar: { isShowingRadarPairing = true },
                onFinishSetup: { selectedTab = .dashboard }
             )
@@ -106,5 +111,8 @@ struct RideRootView: View {
             selectedTab = .settings
          }
       }
+      // The climb loop lives here, not on the climb page: splits must be cut
+      // even while the rider reads history or settings.
+      .task { await rideClimbModel.run() }
    }
 }

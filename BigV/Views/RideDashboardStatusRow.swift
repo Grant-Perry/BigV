@@ -20,6 +20,8 @@ struct RideDashboardStatusRow: View {
    let rideViewModel: RideViewModel
    let onShowRadar: () -> Void
 
+   @Environment(RideBackToStartModel.self) private var backToStartModel
+
    var body: some View {
       HStack(spacing: 8) {
          RideStatusBar(
@@ -63,6 +65,33 @@ struct RideDashboardStatusRow: View {
                }
             )
          }
+
+         // The way home, once there is a recorded start to go back to. A chip
+         // rather than a control-bar button: it is chosen once a ride, calmly.
+         if !rideViewModel.isIdle, backToStartModel.isAvailable {
+            backToStartChip
+         }
       }
+      .sheet(isPresented: Bindable(backToStartModel).isPresentingOptions) {
+         RideBackToStartSheet(backToStartModel: backToStartModel)
+      }
+   }
+
+   // MARK: - Back to Start
+
+   private var backToStartChip: some View {
+      Button {
+         backToStartModel.presentOptions()
+      } label: {
+         Image(systemName: "house.fill")
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.white.opacity(0.7))
+            .frame(width: 34, height: 34)
+            .contentShape(.circle)
+      }
+      .buttonStyle(.plain)
+      .rideGlassChrome(in: .circle)
+      .accessibilityLabel("Back to start")
+      .accessibilityIdentifier("ride.chip.backToStart")
    }
 }
