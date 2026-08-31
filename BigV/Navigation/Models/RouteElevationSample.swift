@@ -12,7 +12,7 @@ import Foundation
 /// `RouteGuidanceProgress.distanceAlongRoute`, which is what lets remaining
 /// climb be an integral from that scalar rather than a geometry search. Kept
 /// deliberately tiny — a profile carries hundreds of these.
-nonisolated struct RouteElevationSample: Sendable, Equatable {
+nonisolated struct RouteElevationSample: Sendable, Equatable, Codable {
 
    /// Meters from the route start.
    let distanceAlongRoute: CLLocationDistance

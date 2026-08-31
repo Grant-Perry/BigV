@@ -17,6 +17,9 @@ struct RouteSearchStageView: View {
 
    @FocusState private var isFieldFocused: Bool
    @State private var isShowingGPXImporter = false
+   @AppStorage(RouteFavoriteSectionPreferences.expandedKey)
+   private var isFavoritesExpanded = RouteFavoriteSectionPreferences.expandedDefault
+   @State private var favoritesSectionBoomTrigger = 0
 
    /// GPX has no system UTType; files usually arrive typed by extension, with
    /// plain XML as the fallback some apps export.
@@ -47,6 +50,10 @@ struct RouteSearchStageView: View {
    @ViewBuilder
    private var resultsColumn: some View {
       VStack(spacing: 12) {
+         if routePlannerViewModel.hasFavorites {
+            favoritesSection
+         }
+
          if let planningFailure = routePlannerViewModel.planningFailure {
             RoutePlanningFailureView(failure: planningFailure)
          }
@@ -61,6 +68,90 @@ struct RouteSearchStageView: View {
          gpxImportButton
       }
       .padding(.horizontal, 16)
+   }
+
+   // MARK: - Favorites
+
+   private var favoritesSection: some View {
+      VStack(alignment: .leading, spacing: 8) {
+         Button {
+            favoritesSectionBoomTrigger += 1
+            withAnimation(.easeInOut(duration: 0.2)) {
+               isFavoritesExpanded.toggle()
+            }
+         } label: {
+            HStack(spacing: 8) {
+               Text("Favorites")
+                  .font(.subheadline.weight(.bold))
+                  .foregroundStyle(.white.opacity(0.85))
+
+               Text("\(routePlannerViewModel.favorites.count)")
+                  .font(.caption.weight(.semibold))
+                  .monospacedDigit()
+                  .foregroundStyle(.white.opacity(0.45))
+
+               Spacer(minLength: 0)
+
+               StarBoomChevron(
+                  isExpanded: isFavoritesExpanded,
+                  boomTrigger: favoritesSectionBoomTrigger,
+                  foregroundColor: .white.opacity(0.55)
+               )
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .rideGlassCard(density: .hud)
+         }
+         .buttonStyle(.plain)
+         .accessibilityIdentifier("planner.section.favorites")
+
+         if isFavoritesExpanded {
+            favoritesList
+         }
+      }
+   }
+
+   private var favoritesList: some View {
+      List(routePlannerViewModel.favorites) { favorite in
+         HStack(spacing: 10) {
+            Button {
+               isFieldFocused = false
+               routePlannerViewModel.openFavorite(favorite)
+            } label: {
+               RouteFavoriteRowView(
+                  title: favorite.label,
+                  sourceLabel: routePlannerViewModel.favoriteSourceLabel(for: favorite),
+                  distanceText: routePlannerViewModel.favoriteSummaryText(for: favorite),
+                  climbSummary: climbSummary(for: favorite)
+               )
+            }
+            .buttonStyle(.plain)
+
+            FavoriteStarButton(isFavorite: true) {
+               routePlannerViewModel.removeFavorite(id: favorite.id)
+            }
+         }
+         .listRowBackground(Color.clear)
+         .listRowInsets(.init(top: 4, leading: 0, bottom: 4, trailing: 0))
+         .listRowSeparatorTint(.white.opacity(0.12))
+         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            Button(role: .destructive) {
+               routePlannerViewModel.removeFavorite(id: favorite.id)
+            } label: {
+               Label("Delete", systemImage: "trash")
+            }
+         }
+         .accessibilityIdentifier("planner.favorite.\(favorite.id.uuidString)")
+      }
+      .listStyle(.plain)
+      .scrollContentBackground(.hidden)
+      .frame(maxHeight: 220)
+   }
+
+   private func climbSummary(for favorite: SavedRouteFavorite) -> String? {
+      let route = favorite.plannedRoute
+      guard route.hasElevationProfile, let ascent = route.totalAscent else { return nil }
+      return PlannedRouteFormatters.climbSummary(ascent: ascent, climbCount: route.climbs.count)
    }
 
    // MARK: - GPX Import
@@ -174,6 +265,71 @@ struct RouteSearchStageView: View {
 }
 
 // MARK: - Row
+
+private struct RouteFavoriteRowView: View {
+
+   let title: String
+   let sourceLabel: String
+   let distanceText: String
+   let climbSummary: String?
+
+   var body: some View {
+      VStack(alignment: .leading, spacing: 4) {
+         HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(title)
+               .font(.body.weight(.semibold))
+               .foregroundStyle(.white)
+               .lineLimit(1)
+
+            Spacer(minLength: 8)
+
+            Text(distanceText)
+               .font(.caption.weight(.semibold))
+               .monospacedDigit()
+               .foregroundStyle(.white.opacity(0.55))
+         }
+
+         HStack(spacing: 6) {
+            Text(sourceLabel)
+               .font(.caption2.weight(.semibold))
+               .foregroundStyle(RideDashboardTheme.ember.opacity(0.85))
+
+            if let climbSummary {
+               Text("·")
+                  .font(.caption2)
+                  .foregroundStyle(.white.opacity(0.25))
+
+               Text(climbSummary)
+                  .font(.caption2.weight(.medium))
+                  .monospacedDigit()
+                  .foregroundStyle(.white.opacity(0.45))
+            }
+         }
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(.vertical, 6)
+      .contentShape(.rect)
+   }
+}
+
+private struct FavoriteStarButton: View {
+
+   let isFavorite: Bool
+   let action: () -> Void
+
+   @State private var boomTrigger = 0
+
+   var body: some View {
+      Button {
+         boomTrigger += 1
+         action()
+      } label: {
+         StarBoomFavoriteStar(isFavorite: isFavorite, boomTrigger: boomTrigger, font: .body.weight(.semibold))
+      }
+      .buttonStyle(.plain)
+      .accessibilityLabel(isFavorite ? "Remove favorite" : "Save favorite")
+   }
+}
 
 private struct RouteSuggestionRowView: View {
 

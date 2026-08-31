@@ -11,7 +11,7 @@ import Foundation
 /// from, and so a rider can be told who is claiming a distance or an ETA. New
 /// providers are added here and in a `PlannedRouteProviding` conformance; nothing
 /// downstream changes.
-nonisolated enum PlannedRouteSource: String, Sendable, CaseIterable {
+nonisolated enum PlannedRouteSource: String, Sendable, CaseIterable, Codable {
 
    case appleMaps
 

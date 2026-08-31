@@ -17,6 +17,8 @@ struct RoutePreviewStageView: View {
    let routePlannerViewModel: RoutePlannerViewModel
    let onConfirm: () -> Void
 
+   @State private var favoriteBoomTrigger = 0
+
    var body: some View {
       VStack(spacing: 12) {
          map
@@ -111,25 +113,58 @@ struct RoutePreviewStageView: View {
    // MARK: - Actions
 
    private var actions: some View {
-      HStack(spacing: 10) {
-         Button("Back", role: .cancel) {
-            routePlannerViewModel.cancelPreview()
-         }
-         .buttonStyle(.bordered)
-         .tint(.white.opacity(0.5))
-         .accessibilityIdentifier("planner.button.back")
+      VStack(spacing: 8) {
+         HStack(spacing: 10) {
+            Button("Back", role: .cancel) {
+               routePlannerViewModel.cancelPreview()
+            }
+            .buttonStyle(.bordered)
+            .tint(.white.opacity(0.5))
+            .accessibilityIdentifier("planner.button.back")
 
-         Button("Follow Route") {
-            routePlannerViewModel.confirm()
-            onConfirm()
+            Button {
+               favoriteBoomTrigger += 1
+               routePlannerViewModel.toggleSelectedRouteFavorite()
+            } label: {
+               StarBoomFavoriteStar(
+                  isFavorite: routePlannerViewModel.isSelectedRouteFavorite,
+                  boomTrigger: favoriteBoomTrigger
+               )
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(
+               routePlannerViewModel.isSelectedRouteFavorite ? "Remove favorite" : "Save favorite"
+            )
+            .accessibilityIdentifier("planner.button.favorite")
+
+            Button {
+               Task {
+                  if await routePlannerViewModel.confirm() {
+                     onConfirm()
+                  }
+               }
+            } label: {
+               if routePlannerViewModel.isPlanningApproach {
+                  ProgressView()
+                     .tint(.white)
+               } else {
+                  Text("Follow Route")
+               }
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(RideDashboardTheme.ember)
+            .disabled(!routePlannerViewModel.canConfirm)
+            .accessibilityIdentifier("planner.button.follow")
          }
-         .buttonStyle(.borderedProminent)
-         .tint(RideDashboardTheme.ember)
-         .disabled(!routePlannerViewModel.canConfirm)
-         .accessibilityIdentifier("planner.button.follow")
+         .font(.headline)
+         .controlSize(.large)
+
+         if routePlannerViewModel.isPlanningApproach {
+            Text("Getting you to the start…")
+               .font(.caption.weight(.medium))
+               .foregroundStyle(.white.opacity(0.55))
+         }
       }
-      .font(.headline)
-      .controlSize(.large)
       .padding(.horizontal, 16)
    }
 }

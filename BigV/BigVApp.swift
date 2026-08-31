@@ -71,6 +71,7 @@ struct BigVApp: App {
       let rideUnitsSettings = RideUnitsSettings()
       let rideClimbSettings = RideClimbSettings()
       let rideLapSettings = RideLapSettings()
+      let routeFavoriteStore = RouteFavoriteStore()
 
       // Route planning and weather both need "where is the rider" while idle,
       // and neither may open a second `CLLocationManager` to get it.
@@ -161,7 +162,8 @@ struct BigVApp: App {
             routeSearchService: RouteSearchService(),
             plannedRouteProvider: MapKitCyclingRoutePlanner(),
             currentLocationProbe: currentLocationProbe,
-            plannedRouteManager: plannedRouteManager
+            plannedRouteManager: plannedRouteManager,
+            routeFavoriteStore: routeFavoriteStore
          )
       )
       _routeGuidanceViewModel = State(

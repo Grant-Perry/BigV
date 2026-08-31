@@ -315,6 +315,11 @@ final class RouteGuidanceManager {
          return
       }
 
+      if isOffProtectedCourse {
+         phase = .rerouteUnavailable
+         return
+      }
+
       phase = rerouteFailureCount >= configuration.maximumRerouteAttempts
          ? .rerouteUnavailable
          : .offRoute
@@ -329,9 +334,11 @@ final class RouteGuidanceManager {
       guard progress.isOffRoute,
             !isRerouting,
             rerouteFailureCount < configuration.maximumRerouteAttempts,
-            let destination = plannedRouteManager.destination,
             let origin = latestFix?.coordinate
       else { return }
+
+      // Street directions to a trail's endpoint would throw the trail away.
+      guard !isOffProtectedCourse, let destination = rerouteDestination else { return }
 
       if let lastRerouteAttemptAt,
          Date.now.timeIntervalSince(lastRerouteAttemptAt) < configuration.rerouteCooldown {
@@ -348,6 +355,34 @@ final class RouteGuidanceManager {
       rerouteTask = Task { [weak self] in
          await self?.reroute(from: origin, to: destination, ticket: ticket)
       }
+   }
+
+   /// The rider left the course they meant to ride, not the lead-in to it.
+   private var isOffProtectedCourse: Bool {
+      guard plannedRouteManager.courseRoute != nil,
+            let join = plannedRouteManager.activeRoute?.approachDistance,
+            join > 1
+      else { return false }
+
+      return progress.distanceAlongRoute >= join
+   }
+
+   /// Lead-in departures reroute to the trailhead so the course can be
+   /// stitched back on. Everything else still aims at the published destination.
+   private var rerouteDestination: RouteDestination? {
+      if let course = plannedRouteManager.courseRoute,
+         let start = course.startCoordinate,
+         let join = plannedRouteManager.activeRoute?.approachDistance,
+         join > 1,
+         progress.distanceAlongRoute < join
+      {
+         return RouteDestination(
+            name: course.name.isEmpty ? "Trailhead" : course.name,
+            coordinate: start
+         )
+      }
+
+      return plannedRouteManager.destination
    }
 
    private func reroute(
@@ -368,14 +403,38 @@ final class RouteGuidanceManager {
          }
 
          isRerouting = false
-         plannedRouteManager.activate(replacement, to: destination)
-         begin(replacement, greeting: "Route updated.")
-         refreshPhase()
-         enrichElevation(for: replacement)
+
+         if let published = applyReroute(replacement) {
+            begin(published, greeting: "Route updated.")
+            refreshPhase()
+            enrichElevation(for: published)
+         } else {
+            apply(rerouteFailure: .failed)
+         }
       } catch {
          guard rerouteGeneration.isCurrent(ticket) else { return }
          apply(rerouteFailure: error)
       }
+   }
+
+   /// Publishes a reroute. A lead-in is stitched back onto the protected
+   /// course so the trail the rider asked for is not replaced by streets.
+   private func applyReroute(_ replacement: PlannedRoute) -> PlannedRoute? {
+      if let course = plannedRouteManager.courseRoute {
+         guard let stitched = PlannedRouteApproachAssembler.stitched(
+            approach: replacement,
+            course: course
+         ), let destination = plannedRouteManager.destination else {
+            return nil
+         }
+
+         plannedRouteManager.activate(stitched, to: destination, course: course)
+         return stitched
+      }
+
+      guard let destination = plannedRouteManager.destination else { return nil }
+      plannedRouteManager.activate(replacement, to: destination)
+      return replacement
    }
 
    private func apply(rerouteFailure failure: RoutePlanningFailure) {

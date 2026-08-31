@@ -57,6 +57,12 @@ final class RoutePlannerViewModel {
 
    private(set) var isPlanning = false
 
+   /// Follow Route is asking Apple for a lead-in to the trailhead.
+   private(set) var isPlanningApproach = false
+
+   /// Guards a double tap while the location probe or the lead-in is in flight.
+   private var isConfirming = false
+
    /// Whether Open-Meteo elevation is still in flight for the candidates. The
    /// preview shows "Loading elevation…" from this rather than from each row,
    /// because every candidate is enriched by the same pass.
@@ -73,19 +79,22 @@ final class RoutePlannerViewModel {
    private let currentLocationProbe: CurrentLocationProbe
    private let plannedRouteManager: PlannedRouteManager
    private let routeElevationEnricher: RouteElevationEnricher
+   private let routeFavoriteStore: RouteFavoriteStore
 
    init(
       routeSearchService: RouteSearchService = RouteSearchService(),
       plannedRouteProvider: any PlannedRouteProviding = MapKitCyclingRoutePlanner(),
       currentLocationProbe: CurrentLocationProbe = CurrentLocationProbe(),
       plannedRouteManager: PlannedRouteManager = PlannedRouteManager(),
-      routeElevationEnricher: RouteElevationEnricher = RouteElevationEnricher()
+      routeElevationEnricher: RouteElevationEnricher = RouteElevationEnricher(),
+      routeFavoriteStore: RouteFavoriteStore = RouteFavoriteStore()
    ) {
       self.routeSearchService = routeSearchService
       self.plannedRouteProvider = plannedRouteProvider
       self.currentLocationProbe = currentLocationProbe
       self.plannedRouteManager = plannedRouteManager
       self.routeElevationEnricher = routeElevationEnricher
+      self.routeFavoriteStore = routeFavoriteStore
    }
 
    // MARK: - Private State
@@ -134,7 +143,9 @@ final class RoutePlannerViewModel {
       return suggestions.isEmpty ? RouteSearchFailure.noResults.message : nil
    }
 
-   var canConfirm: Bool { selectedCandidate?.isDrawable ?? false }
+   var canConfirm: Bool {
+      (selectedCandidate?.isDrawable ?? false) && !isConfirming
+   }
 
    // MARK: - Lifecycle
 
@@ -234,15 +245,81 @@ final class RoutePlannerViewModel {
       selectedCandidateID = id
    }
 
-   func confirm() {
-      guard let route = selectedCandidate, let destination else { return }
+   /// Commits the selected route. When the rider is not already at its start,
+   /// a cycling lead-in is planned from here and stitched in front.
+   ///
+   /// Returns `false` when the rider walked away mid-request, so the tab does
+   /// not jump to the dashboard for a route that was never activated.
+   @discardableResult
+   func confirm() async -> Bool {
+      guard !isConfirming, let route = selectedCandidate, let destination else {
+         return false
+      }
 
-      plannedRouteManager.activate(route, to: destination)
-      enrichActiveRouteIfNeeded(route)
+      isConfirming = true
+      let ticket = generation.issue()
+
+      let prepared = await prepareForFollow(route, destination: destination, ticket: ticket)
+
+      isConfirming = false
+      isPlanningApproach = false
+
+      guard generation.isCurrent(ticket), let prepared else { return false }
+
+      plannedRouteManager.activate(
+         prepared.route,
+         to: destination,
+         course: prepared.course
+      )
+      enrichActiveRouteIfNeeded(prepared.route)
       discardPlanning()
       queryText = ""
       suggestions = []
       routeSearchService.cancel()
+      return true
+   }
+
+   /// The trail as-is when the rider is already there; approach plus trail
+   /// when they are not. Falls back to the trail alone if Apple has no bike
+   /// route to the start, so Follow Route never leaves them stuck.
+   private func prepareForFollow(
+      _ route: PlannedRoute,
+      destination: RouteDestination,
+      ticket: UInt64
+   ) async -> (route: PlannedRoute, course: PlannedRoute?)? {
+      guard let origin = await currentLocationProbe.coordinate(),
+            let start = route.startCoordinate,
+            RouteApproachPolicy.needsApproach(from: origin, to: start)
+      else {
+         guard generation.isCurrent(ticket) else { return nil }
+         return (route, nil)
+      }
+
+      isPlanningApproach = true
+
+      let trailhead = RouteDestination(
+         name: route.name.isEmpty ? destination.name : route.name,
+         coordinate: start
+      )
+
+      do {
+         let approaches = try await plannedRouteProvider.routes(from: origin, to: trailhead)
+         guard generation.isCurrent(ticket) else { return nil }
+
+         if let approach = approaches.first(where: \.isDrawable),
+            let stitched = PlannedRouteApproachAssembler.stitched(approach: approach, course: route) {
+            DebugPrint(
+               mode: .navigation,
+               "Stitched \(Int(approach.distance)) m approach onto \(route.name)"
+            )
+            return (stitched, route)
+         }
+      } catch {
+         DebugPrint(mode: .navigation, "Approach planning failed: \(error)")
+      }
+
+      guard generation.isCurrent(ticket) else { return nil }
+      return (route, nil)
    }
 
    func cancelPreview() {
@@ -318,6 +395,48 @@ final class RoutePlannerViewModel {
 
    func clearActiveRoute() {
       plannedRouteManager.clear()
+   }
+
+   // MARK: - Favorites
+
+   var favorites: [SavedRouteFavorite] { routeFavoriteStore.favorites }
+
+   var hasFavorites: Bool { !routeFavoriteStore.isEmpty }
+
+   var isSelectedRouteFavorite: Bool {
+      guard let route = selectedCandidate, let destination else { return false }
+      return routeFavoriteStore.isFavorite(route: route, destination: destination)
+   }
+
+   /// Opens a saved route straight into preview.
+   func openFavorite(_ favorite: SavedRouteFavorite) {
+      searchTask?.cancel()
+      routeSearchService.cancel()
+      discardPlanning()
+
+      queryText = ""
+      suggestions = []
+      searchFailure = nil
+      gpxImportFailureMessage = nil
+      planningFailure = nil
+
+      destination = favorite.routeDestination
+      candidates = [favorite.plannedRoute]
+      selectedCandidateID = favorite.plannedRoute.id
+      previewRegion = RideRouteBounds.region(for: favorite.plannedRoute.coordinates)
+      isPlanning = false
+      isEnrichingElevation = false
+   }
+
+   /// Star or unstar the route in preview. Returns the new favorite state.
+   @discardableResult
+   func toggleSelectedRouteFavorite() -> Bool {
+      guard let route = selectedCandidate, let destination else { return false }
+      return routeFavoriteStore.toggle(route: route, destination: destination)
+   }
+
+   func removeFavorite(id: SavedRouteFavorite.ID) {
+      routeFavoriteStore.remove(id: id)
    }
 
    // MARK: - Planning
@@ -445,6 +564,7 @@ final class RoutePlannerViewModel {
       destination = nil
       planningFailure = nil
       isPlanning = false
+      isPlanningApproach = false
       isEnrichingElevation = false
    }
 }
@@ -480,6 +600,19 @@ extension RoutePlannerViewModel {
    func climbSummaryText(for route: PlannedRoute) -> String? {
       guard route.hasElevationProfile, let ascent = route.totalAscent else { return nil }
       return PlannedRouteFormatters.climbSummary(ascent: ascent, climbCount: route.climbs.count)
+   }
+
+   func favoriteSummaryText(for favorite: SavedRouteFavorite) -> String {
+      PlannedRouteFormatters.distance(favorite.plannedRoute.distance)
+   }
+
+   func favoriteSourceLabel(for favorite: SavedRouteFavorite) -> String {
+      switch favorite.plannedRoute.source {
+         case .appleMaps: "Apple Maps"
+         case .gpx: "GPX"
+         case .retrace: "Retrace"
+         case .trailforks: "Trailforks"
+      }
    }
 }
 

@@ -19,6 +19,36 @@ struct RouteGuidanceManagerTests {
       RouteGuidanceTestGeography.coordinate(east: east, north: north, from: Self.origin)
    }
 
+   /// A 400 m trail starting 800 m east of the fixture origin, with a lead-in
+   /// from that origin — the shape Follow Route builds when the rider is away.
+   private func stitchedTrail() -> (route: PlannedRoute, course: PlannedRoute)? {
+      let approach = PlannedRoute(
+         id: UUID(),
+         source: .appleMaps,
+         name: "Warwick Blvd",
+         coordinates: stride(from: 0, through: 800, by: 20).map { point(east: $0) },
+         distance: 0,
+         expectedTravelTime: 180,
+         maneuvers: [],
+         advisories: []
+      )
+      let course = PlannedRoute(
+         id: UUID(),
+         source: .gpx,
+         name: "Noland Trail",
+         coordinates: stride(from: 800, through: 1_200, by: 20).map { point(east: $0) },
+         distance: 0,
+         expectedTravelTime: 90,
+         maneuvers: [],
+         advisories: []
+      )
+
+      guard let route = PlannedRouteApproachAssembler.stitched(approach: approach, course: course) else {
+         return nil
+      }
+      return (route, course)
+   }
+
    private func straightRoute(length: Double, north: Double = 0) -> PlannedRoute {
       PlannedRoute(
          id: UUID(),
@@ -384,6 +414,46 @@ struct RouteGuidanceManagerTests {
       #expect(manager.progress.isOffRoute == false)
    }
 
+   @Test func aDepartureOnTheLeadInReroutesToTheTrailhead() async throws {
+      let planner = FakeRoutePlanner()
+      let newApproach = straightRoute(length: 600, north: 90)
+      planner.result = .success([newApproach])
+
+      let plannedRouteManager = PlannedRouteManager()
+      let stitched = try #require(stitchedTrail())
+      plannedRouteManager.activate(stitched.route, to: destination, course: stitched.course)
+      let manager = makeManager(planner: planner, plannedRouteManager: plannedRouteManager)
+
+      ride(manager, from: 0, to: 200)
+      strayOffRoute(manager, east: 220, startingAtSecond: 100)
+      await settle()
+
+      #expect(planner.requestCount == 1)
+      #expect(planner.lastDestination?.coordinate.latitude == stitched.course.startCoordinate?.latitude)
+      #expect(planner.lastDestination?.coordinate.longitude == stitched.course.startCoordinate?.longitude)
+      #expect(plannedRouteManager.courseRoute?.id == stitched.course.id)
+      #expect(plannedRouteManager.activeRoute?.hasApproach == true)
+      #expect(plannedRouteManager.activeRoute?.source == .gpx)
+   }
+
+   @Test func aDepartureOnTheTrailDoesNotReplaceItWithStreets() async throws {
+      let planner = FakeRoutePlanner()
+      planner.result = .success([straightRoute(length: 900, north: 90)])
+
+      let plannedRouteManager = PlannedRouteManager()
+      let stitched = try #require(stitchedTrail())
+      plannedRouteManager.activate(stitched.route, to: destination, course: stitched.course)
+      let manager = makeManager(planner: planner, plannedRouteManager: plannedRouteManager)
+
+      ride(manager, from: 0, to: 900)
+      strayOffRoute(manager, east: 920, startingAtSecond: 200)
+      await settle()
+
+      #expect(planner.requestCount == 0)
+      #expect(plannedRouteManager.activeRoute?.id == stitched.route.id)
+      #expect(manager.phase == .rerouteUnavailable)
+   }
+
    /// A rider threading a gap in coverage generates a deviating sample every
    /// second. The cooldown is what stops that becoming a request per second.
    @Test func rerouteAttemptsAreRateLimited() async {
@@ -543,6 +613,7 @@ private final class FakeRoutePlanner: PlannedRouteProviding {
 
    private(set) var requestCount = 0
    private(set) var cancelCount = 0
+   private(set) var lastDestination: RouteDestination?
 
    private var isReleased = false
 
@@ -555,6 +626,7 @@ private final class FakeRoutePlanner: PlannedRouteProviding {
       to destination: RouteDestination
    ) async throws(RoutePlanningFailure) -> [PlannedRoute] {
       requestCount += 1
+      lastDestination = destination
 
       if holdsUntilReleased {
          while !isReleased {

@@ -10,7 +10,7 @@ import Foundation
 ///
 /// Provider-neutral on purpose: the planner takes this, not a search result, so
 /// a destination can equally come from a dropped pin or a saved favourite later.
-struct RouteDestination: Identifiable, Sendable {
+nonisolated struct RouteDestination: Identifiable, Sendable {
 
    let id: UUID
    let name: String

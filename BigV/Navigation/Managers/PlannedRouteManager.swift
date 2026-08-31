@@ -32,13 +32,23 @@ final class PlannedRouteManager {
    /// the endpoint with the name the rider searched for rather than a coordinate.
    private(set) var destination: RouteDestination?
 
+   /// The course the rider meant to ride, when `activeRoute` has a lead-in
+   /// stitched in front. Reroute uses this so a departure on the way to the
+   /// trailhead does not replace the trail with streets to its endpoint.
+   private(set) var courseRoute: PlannedRoute?
+
    var hasActiveRoute: Bool { activeRoute?.isDrawable ?? false }
 
    // MARK: - Intent
 
-   func activate(_ route: PlannedRoute, to destination: RouteDestination) {
+   func activate(
+      _ route: PlannedRoute,
+      to destination: RouteDestination,
+      course: PlannedRoute? = nil
+   ) {
       activeRoute = route
       self.destination = destination
+      courseRoute = course
 
       DebugPrint(
          mode: .navigation,
@@ -70,6 +80,7 @@ final class PlannedRouteManager {
 
       activeRoute = nil
       destination = nil
+      courseRoute = nil
 
       DebugPrint(mode: .navigation, "Cleared planned route")
    }

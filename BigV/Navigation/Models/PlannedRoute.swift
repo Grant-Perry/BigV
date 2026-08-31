@@ -55,6 +55,38 @@ nonisolated struct PlannedRoute: Identifiable, Sendable {
    /// The climbs `ClimbDetector` found in the profile, in route order.
    var climbs: [PlannedClimb] = []
 
+   /// Meters of cycling lead-in before the course the rider meant to ride.
+   /// Zero when this route is that course.
+   let approachDistance: CLLocationDistance
+
+   // MARK: - Initialization
+
+   init(
+      id: UUID,
+      source: PlannedRouteSource,
+      name: String,
+      coordinates: [CLLocationCoordinate2D],
+      distance: CLLocationDistance,
+      expectedTravelTime: TimeInterval,
+      maneuvers: [PlannedRouteManeuver],
+      advisories: [String],
+      elevationProfile: [RouteElevationSample] = [],
+      climbs: [PlannedClimb] = [],
+      approachDistance: CLLocationDistance = 0
+   ) {
+      self.id = id
+      self.source = source
+      self.name = name
+      self.coordinates = coordinates
+      self.distance = distance
+      self.expectedTravelTime = expectedTravelTime
+      self.maneuvers = maneuvers
+      self.advisories = advisories
+      self.elevationProfile = elevationProfile
+      self.climbs = climbs
+      self.approachDistance = approachDistance
+   }
+
    // MARK: - Derived
 
    /// Two points are the minimum that can make a line.
@@ -67,6 +99,9 @@ nonisolated struct PlannedRoute: Identifiable, Sendable {
 
    /// Two samples are the minimum that can make a slope.
    var hasElevationProfile: Bool { elevationProfile.count > 1 }
+
+   /// The rider is being taken to a course they are not yet on.
+   var hasApproach: Bool { approachDistance > 1 }
 
    /// Total meters of ascent over the whole route. `nil` without a profile, so
    /// no view can mistake "unknown" for "flat".

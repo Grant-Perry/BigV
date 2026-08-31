@@ -12,7 +12,7 @@ import Foundation
 ///
 /// The Edge 1050 draws these thresholds and riders already speak the language,
 /// so BigV adopts them verbatim rather than inventing a scale of its own.
-nonisolated enum ClimbCategory: Int, Sendable, Equatable, Comparable, CaseIterable {
+nonisolated enum ClimbCategory: Int, Sendable, Equatable, Comparable, CaseIterable, Codable {
 
    case uncategorized
    case four
@@ -56,7 +56,7 @@ nonisolated enum ClimbCategory: Int, Sendable, Equatable, Comparable, CaseIterab
 
 /// One detected climb on a planned route, expressed in the route's own
 /// distance space so live progress is a subtraction, never a search.
-nonisolated struct PlannedClimb: Identifiable, Sendable, Equatable {
+nonisolated struct PlannedClimb: Identifiable, Sendable, Equatable, Codable {
 
    /// Position along the route's climb list, first climb first. Stable for the
    /// life of the route, which is all the page and the splits need.
