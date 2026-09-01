@@ -29,7 +29,6 @@ struct RideSettingsView: View {
    @State private var isShowingRedeem = false
    @State private var isShowingImporter = false
    @State private var isConfirmingRestore = false
-   @State private var isConfirmingResetOnboarding = false
 
    private let privacyURL = URL(string: "https://bigvelo.app/privacy")!
    private let termsURL = URL(string: "https://bigvelo.app/terms")!
@@ -96,18 +95,6 @@ struct RideSettingsView: View {
             Button("Cancel", role: .cancel) {}
          } message: {
             Text("Preferences replace what’s here. Finished rides that aren’t already saved are added; duplicates are skipped. End any active ride first.")
-         }
-         .confirmationDialog(
-            "Reset Onboarding?",
-            isPresented: $isConfirmingResetOnboarding,
-            titleVisibility: .visible
-         ) {
-            Button("Reset Onboarding", role: .destructive) {
-               onboardingSettings.resetOnboarding()
-            }
-            Button("Cancel", role: .cancel) {}
-         } message: {
-            Text("Shows the kit, radar, rides story and Plus screens again the next time the app comes forward.")
          }
          .task {
             await plusStore.loadProducts()
@@ -198,7 +185,7 @@ struct RideSettingsView: View {
                   .font(.subheadline.weight(.semibold))
                   .foregroundStyle(.white)
 
-               Text("Pair a Garmin Varia or compatible radar")
+               Text("Varia™ rear radar compatible")
                   .font(.caption)
                   .foregroundStyle(.white.opacity(0.55))
             }
@@ -269,10 +256,10 @@ struct RideSettingsView: View {
 
    private var plusCard: some View {
       VStack(alignment: .leading, spacing: 12) {
-         cardHeader("BIGVELO+")
+         cardHeader("BIGVELO")
 
          HStack {
-            Text(plusStore.isPlus ? "Unlocked" : "Not subscribed")
+            Text(plusStore.accessHeadline)
                .font(.subheadline.weight(.semibold))
                .foregroundStyle(plusStore.isPlus ? RideChromeTokens.go : .white)
 
@@ -284,9 +271,13 @@ struct RideSettingsView: View {
             }
          }
 
-         Text("Radar, Watch HR, record, History and Health stay free. Plus is for deeper surfaces later.")
+         Text(plusStore.accessDetail)
             .font(.caption2)
             .foregroundStyle(.white.opacity(0.45))
+
+         if !plusStore.isPlus {
+            RidePlusPricingCard(plusStore: plusStore, accessibilityPrefix: "settings")
+         }
 
          HStack(spacing: 12) {
             Button("Restore") {
@@ -333,7 +324,7 @@ struct RideSettingsView: View {
       VStack(alignment: .leading, spacing: 12) {
          cardHeader("BACKUP")
 
-         Text("Save finished rides and preferences to a file, or bring them back on this phone or another.")
+         Text("A BigVelo backup is rides plus preferences, for this app. To open one ride in another app, export GPX from that ride’s story.")
             .font(.caption2)
             .foregroundStyle(.white.opacity(0.45))
 
@@ -385,7 +376,7 @@ struct RideSettingsView: View {
 
    private var onboardingCard: some View {
       Button {
-         isConfirmingResetOnboarding = true
+         onboardingSettings.resetOnboarding()
       } label: {
          HStack(spacing: 12) {
             Image(systemName: "arrow.counterclockwise")
@@ -397,7 +388,7 @@ struct RideSettingsView: View {
                   .font(.subheadline.weight(.semibold))
                   .foregroundStyle(.white)
 
-               Text("Show the kit, radar, story and Plus screens again")
+               Text("Show the kit, radar, road, story and Keep BigVelo screens again")
                   .font(.caption)
                   .foregroundStyle(.white.opacity(0.55))
             }

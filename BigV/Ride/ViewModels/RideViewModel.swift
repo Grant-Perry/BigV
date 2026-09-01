@@ -20,15 +20,34 @@ final class RideViewModel {
    private let rideSessionManager: RideSessionManager
    private let rideRadarSettings: RideRadarSettings
    private let rideUnitsSettings: RideUnitsSettings
+   let plusStore: BigVeloPlusStore?
+
+   /// Opens the keep-BigVelo sheet after a refused START (phone or Watch).
+   var isShowingAccessPaywall = false
 
    init(
       rideSessionManager: RideSessionManager = RideSessionManager(),
       rideRadarSettings: RideRadarSettings = RideRadarSettings(),
-      rideUnitsSettings: RideUnitsSettings = RideUnitsSettings()
+      rideUnitsSettings: RideUnitsSettings = RideUnitsSettings(),
+      plusStore: BigVeloPlusStore? = nil
    ) {
       self.rideSessionManager = rideSessionManager
       self.rideRadarSettings = rideRadarSettings
       self.rideUnitsSettings = rideUnitsSettings
+      self.plusStore = plusStore
+   }
+
+   var canBeginRide: Bool { plusStore?.canBeginRide ?? true }
+
+   var showsAccessLock: Bool {
+      !canBeginRide && (isIdle || isFinished)
+   }
+
+   var startDeniedPulse: Int { rideSessionManager.startDeniedPulse }
+
+   func presentAccessPaywallIfLocked() {
+      guard !canBeginRide else { return }
+      isShowingAccessPaywall = true
    }
 
    // MARK: - Units
@@ -52,8 +71,10 @@ final class RideViewModel {
 
    // MARK: - Headline
 
+   /// Always a number — a parked car still reads 0. Waiting on a fix used to
+   /// leave a dash over a compass rose, which is not a speedometer.
    var speed: String {
-      state.hasGPSFix ? RideFormatters.speed(state.speed, system: unitSystem) : RideFormatters.placeholder
+      RideFormatters.speed(state.speed, system: unitSystem)
    }
 
    var speedUnit: String { unitSystem.speedUnit }
@@ -205,7 +226,10 @@ final class RideViewModel {
 
    // MARK: - Intent
 
-   func start() { rideSessionManager.start() }
+   func start() {
+      presentAccessPaywallIfLocked()
+      rideSessionManager.start()
+   }
    func pause() { rideSessionManager.pause() }
    func resume() { rideSessionManager.resume() }
    func end() { rideSessionManager.end() }
@@ -219,6 +243,8 @@ final class RideViewModel {
    }
 
    func startNewRide() {
+      presentAccessPaywallIfLocked()
+      guard canBeginRide else { return }
       clearSelectedMetric()
       clearLiveRadarTimeline()
       rideSessionManager.reset()

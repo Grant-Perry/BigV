@@ -27,6 +27,6 @@ struct RideDashboardInstrumentHero: View {
    }
 
    private var isDimmed: Bool {
-      !rideViewModel.hasGPSFix || rideViewModel.isPaused
+      rideViewModel.isPaused
    }
 }

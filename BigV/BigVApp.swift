@@ -76,6 +76,7 @@ struct BigVApp: App {
       // Route planning and weather both need "where is the rider" while idle,
       // and neither may open a second `CLLocationManager` to get it.
       let currentLocationProbe = CurrentLocationProbe()
+      let bigVeloPlusStore = BigVeloPlusStore()
 
       // The Watch is a body sensor and a remote, so its manager is handed to the
       // session rather than to the view layer: heart rate and wrist commands go
@@ -89,7 +90,8 @@ struct BigVApp: App {
          rideRadarManager: rideRadarManager,
          rideRadarAnnouncer: rideRadarAnnouncer,
          rideWeatherStamper: RideWeatherStamper(rideStorageManager: rideStorageManager),
-         rideLapSettings: rideLapSettings
+         rideLapSettings: rideLapSettings,
+         recordingAccess: bigVeloPlusStore
       )
 
       // Opened here, not per ride: START from the wrist has to reach an idle phone,
@@ -102,13 +104,14 @@ struct BigVApp: App {
       let rideViewModel = RideViewModel(
          rideSessionManager: rideSessionManager,
          rideRadarSettings: rideRadarSettings,
-         rideUnitsSettings: rideUnitsSettings
+         rideUnitsSettings: rideUnitsSettings,
+         plusStore: bigVeloPlusStore
       )
       _rideViewModel = State(initialValue: rideViewModel)
       _rideUnitsSettings = State(initialValue: rideUnitsSettings)
       let rideOnboardingSettings = RideOnboardingSettings()
       _rideOnboardingSettings = State(initialValue: rideOnboardingSettings)
-      _bigVeloPlusStore = State(initialValue: BigVeloPlusStore())
+      _bigVeloPlusStore = State(initialValue: bigVeloPlusStore)
 
       // Weather is owned here, not by the status row: a ride runs for hours,
       // and the chip must survive every dashboard rebuild without refetching.

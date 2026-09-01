@@ -24,6 +24,10 @@ final class RideSessionManager {
    /// produced nothing worth keeping.
    private(set) var finishedRideID: PersistentIdentifier?
 
+   /// Bumps when START is refused because the trial ended. The cockpit opens
+   /// the keep-BigVelo sheet from this pulse, including Watch START.
+   private(set) var startDeniedPulse = 0
+
    // MARK: - Private Properties
 
    private let locationManager: RideLocationManager
@@ -36,6 +40,7 @@ final class RideSessionManager {
    private let rideRadarAnnouncer: RideRadarAnnouncer?
    private let rideWeatherStamper: RideWeatherStamper?
    private let rideLapSettings: RideLapSettings?
+   private let recordingAccess: (any RideRecordingAccessing)?
    private var telemetryEngine: RideTelemetryEngine
    private var rideClock = RideClock()
    private var radarTracker = RideRadarTracker()
@@ -93,7 +98,8 @@ final class RideSessionManager {
       rideRadarManager: RideRadarManager? = nil,
       rideRadarAnnouncer: RideRadarAnnouncer? = nil,
       rideWeatherStamper: RideWeatherStamper? = nil,
-      rideLapSettings: RideLapSettings? = nil
+      rideLapSettings: RideLapSettings? = nil,
+      recordingAccess: (any RideRecordingAccessing)? = nil
    ) {
       self.locationManager = locationManager
       self.rideStorageManager = rideStorageManager
@@ -108,12 +114,18 @@ final class RideSessionManager {
       self.rideRadarAnnouncer = rideRadarAnnouncer
       self.rideWeatherStamper = rideWeatherStamper
       self.rideLapSettings = rideLapSettings
+      self.recordingAccess = recordingAccess
       self.telemetryEngine = RideTelemetryEngine(configuration: configuration)
    }
 
    // MARK: - Lifecycle
 
    func start() {
+      guard recordingAccess?.canBeginRide != false else {
+         startDeniedPulse += 1
+         DebugPrint(mode: .sessionLifecycle, "Ride start refused — trial ended")
+         return
+      }
       guard !state.phase.isActive else { return }
 
       telemetryEngine.reset()

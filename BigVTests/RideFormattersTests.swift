@@ -26,6 +26,11 @@ struct RideFormattersTests {
       #expect(RideFormatters.speed(-3, system: .metric) == "0.0")
    }
 
+   @Test func restingSpeedReadsAsZero() {
+      #expect(RideFormatters.speed(0, system: .imperial) == "0.0")
+      #expect(RideFormatters.speed(0, system: .metric) == "0.0")
+   }
+
    // MARK: - Distance
 
    @Test func imperialDistanceConvertsToMiles() {

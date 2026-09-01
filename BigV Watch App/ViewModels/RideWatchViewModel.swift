@@ -144,8 +144,7 @@ final class RideWatchViewModel {
    // MARK: - Headline
 
    var speed: String {
-      guard let snapshot, snapshot.hasGPSFix else { return RideFormatters.placeholder }
-      return RideFormatters.speed(snapshot.speed, system: unitSystem)
+      RideFormatters.speed(snapshot?.speed ?? 0, system: unitSystem)
    }
 
    var speedUnit: String { unitSystem.speedUnit }

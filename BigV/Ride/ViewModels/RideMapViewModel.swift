@@ -148,8 +148,9 @@ final class RideMapViewModel {
 
    // MARK: - Readouts
 
+   /// Always a number. Sitting still is 0, not a dash — same rule as the cockpit.
    var speed: String {
-      state.hasGPSFix ? RideFormatters.speed(state.speed) : RideFormatters.placeholder
+      RideFormatters.speed(state.speed)
    }
 
    var speedUnit: String { RideUnitSystem.current.speedUnit }

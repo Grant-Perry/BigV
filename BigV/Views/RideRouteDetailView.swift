@@ -70,6 +70,21 @@ struct RideRouteDetailView: View {
       .rideAppFooter()
       .navigationTitle(rideDetailViewModel.titleText)
       .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+         if let url = rideDetailViewModel.gpxShareURL {
+            ShareLink(
+               item: url,
+               preview: SharePreview(
+                  url.lastPathComponent,
+                  image: Image(systemName: "point.bottomleft.forward.to.point.topright.scurvepath")
+               )
+            ) {
+               Image(systemName: "square.and.arrow.up")
+            }
+            .accessibilityIdentifier("detail.button.exportGPX")
+            .accessibilityLabel("Export GPX")
+         }
+      }
       .fullScreenCover(isPresented: $isShowingFullMap) {
          RideDetailFullMapView(
             route: rideDetailViewModel.route,

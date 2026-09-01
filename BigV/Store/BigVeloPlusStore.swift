@@ -6,13 +6,14 @@
 import Foundation
 import StoreKit
 
-/// StoreKit 2 entitlement for BigVelo+.
+/// StoreKit 2 entitlement for BigVelo.
 ///
-/// Radar, Watch HR, record, History and Health never read `isPlus`. This store
-/// only unlocks future Plus surfaces (nav-depth weather and similar).
+/// Thirty days from first launch are the whole product. After that, `canBeginRide`
+/// is false unless this Apple ID owns monthly, yearly or lifetime. History, saved
+/// routes and export never read this store.
 @Observable
 @MainActor
-final class BigVeloPlusStore {
+final class BigVeloPlusStore: RideRecordingAccessing {
 
    // MARK: - Products
 
@@ -26,6 +27,9 @@ final class BigVeloPlusStore {
    /// True when an active subscription or the lifetime non-consumable is owned.
    private(set) var isPlus = false
 
+   /// First launch on this device. Resetting onboarding does not move this clock.
+   private(set) var trialBeganAt: Date
+
    private(set) var isLoadingProducts = false
    private(set) var isPurchasing = false
    private(set) var lastErrorMessage: String?
@@ -38,13 +42,58 @@ final class BigVeloPlusStore {
    }
    #endif
 
+   // MARK: - Access
+
+   var accessStatus: RideAccessPolicy.Status {
+      RideAccessPolicy.status(trialBeganAt: trialBeganAt, isSubscribed: isPlus)
+   }
+
+   var canBeginRide: Bool {
+      RideAccessPolicy.canBeginRide(accessStatus)
+   }
+
+   var accessHeadline: String {
+      switch accessStatus {
+         case .subscribed:
+            return "Unlocked"
+         case .trial(let days):
+            return days == 1 ? "1 day left" : "\(days) days left"
+         case .expired:
+            return "Trial ended"
+      }
+   }
+
+   var accessDetail: String {
+      switch accessStatus {
+         case .subscribed:
+            return "The full cockpit stays on — radar, Watch heart rate, record, history and export."
+         case .trial:
+            return "Thirty days, nothing held back. After that, recording and live sensors stop unless you keep BigVelo. Past rides stay here to view and export."
+         case .expired:
+            return "Recording, live radar and Watch start are off. Open past rides, saved routes and export. Keep BigVelo to ride again."
+      }
+   }
+
    // MARK: - Private
 
    @ObservationIgnored private var updatesTask: Task<Void, Never>?
+   @ObservationIgnored private let defaults: UserDefaults
+
+   private enum Key {
+      static let trialBeganAt = "ride.access.trialBeganAt"
+   }
 
    // MARK: - Lifecycle
 
-   init() {
+   init(defaults: UserDefaults = .standard) {
+      self.defaults = defaults
+      if let stored = defaults.object(forKey: Key.trialBeganAt) as? Date {
+         trialBeganAt = stored
+      } else {
+         trialBeganAt = .now
+         defaults.set(trialBeganAt, forKey: Key.trialBeganAt)
+      }
+
       updatesTask = Task { [weak self] in
          for await update in Transaction.updates {
             await self?.handle(update)
@@ -167,9 +216,16 @@ final class BigVeloPlusStore {
       }
    }
 
-   var yearlyHasFreeTrial: Bool {
-      guard let offer = yearlyProduct?.subscription?.introductoryOffer else { return true }
-      return offer.paymentMode == .freeTrial
+   var yearlyDetail: String {
+      "\(displayPrice(for: .yearly))/yr"
+   }
+
+   var monthlyDetail: String {
+      "\(displayPrice(for: .monthly))/mo"
+   }
+
+   var lifetimeDetail: String {
+      "\(displayPrice(for: .lifetime)) once"
    }
 
    // MARK: - Private

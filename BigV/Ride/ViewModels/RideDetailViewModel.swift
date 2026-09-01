@@ -33,6 +33,10 @@ final class RideDetailViewModel {
    private(set) var radar: RideRadarReport?
    private(set) var laps: RideLapsReport?
 
+   /// Ready after load when the ride has a drawable track. Share from the
+   /// detail toolbar — this is the GPX other apps can open, not the JSON backup.
+   private(set) var gpxShareURL: URL?
+
    // MARK: - Dependencies
 
    /// Both optional so previews can build the screen with no store or Health
@@ -75,6 +79,7 @@ final class RideDetailViewModel {
       radar = RideChartSeriesBuilder.radarReport(for: ride, system: system)
       heartRate = RideChartSeriesBuilder.heartRateReport(for: ride, samples: samples)
       laps = RideLapsReportBuilder.report(for: ride, system: system)
+      gpxShareURL = Self.writeGPXFile(ride: ride, samples: samples, title: titleText)
       isLoaded = true
 
       await enrichFromHealth(ride)
@@ -96,6 +101,36 @@ final class RideDetailViewModel {
       weather = nil
       radar = nil
       laps = nil
+      gpxShareURL = nil
+   }
+
+   // MARK: - GPX
+
+   private static func writeGPXFile(
+      ride: Ride,
+      samples: [RideSample],
+      title: String
+   ) -> URL? {
+      let points = samples.map {
+         RideGPXExporter.Point(
+            timestamp: $0.timestamp,
+            latitude: $0.latitude,
+            longitude: $0.longitude,
+            altitude: $0.altitude
+         )
+      }
+      let name = ride.name.isEmpty ? title : ride.name
+
+      do {
+         let data = try RideGPXExporter.data(name: name, startDate: ride.startDate, points: points)
+         let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent(RideGPXExporter.fileName(startDate: ride.startDate))
+         try data.write(to: url, options: .atomic)
+         return url
+      } catch {
+         DebugPrint(mode: .persistence, "GPX export failed: \(error.localizedDescription)")
+         return nil
+      }
    }
 
    // MARK: - Apple Health Enrichment

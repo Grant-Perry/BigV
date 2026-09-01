@@ -7,7 +7,7 @@ import StoreKit
 import SwiftUI
 import UIKit
 
-/// Four-page first-launch pager. Page 4 is StoreKit; never a hard lock.
+/// Four-page first-launch pager. Page 4 is the 30-day trial offer; never a hard lock.
 struct RideOnboardingView: View {
 
    @Bindable var plusStore: BigVeloPlusStore
@@ -99,7 +99,19 @@ struct RideOnboardingView: View {
          .font(.headline)
          .frame(maxWidth: .infinity)
          .accessibilityIdentifier(page == .plus ? "onboarding.button.start" : "onboarding.button.continue")
+
+         if page.showsGarminAffiliationNote {
+            garminAffiliationFootnote
+         }
       }
+   }
+
+   private var garminAffiliationFootnote: some View {
+      Text("\(Text("*").baselineOffset(4)) BigVelo is not affiliated with Garmin.")
+         .font(.caption2)
+         .foregroundStyle(.white.opacity(0.55))
+         .frame(maxWidth: .infinity)
+         .accessibilityLabel("BigVelo is not affiliated with Garmin.")
    }
 
    // MARK: - Pages
@@ -113,10 +125,21 @@ struct RideOnboardingView: View {
                .font(.title.weight(.bold))
                .foregroundStyle(.white)
 
-            Text(pageID.body)
+            if let lead = pageID.lead {
+               markedVariaText(lead)
+                  .font(.body.weight(.semibold))
+                  .foregroundStyle(.white)
+                  .fixedSize(horizontal: false, vertical: true)
+            }
+
+            markedVariaText(pageID.body)
                .font(.body)
                .foregroundStyle(.white.opacity(0.82))
                .fixedSize(horizontal: false, vertical: true)
+
+            if !pageID.highlights.isEmpty {
+               highlightList(pageID.highlights)
+            }
 
             if pageID == .plus {
                plusPricingCard
@@ -126,8 +149,16 @@ struct RideOnboardingView: View {
          .frame(maxWidth: .infinity, alignment: .leading)
          .rideGlassCard(density: .standard, cornerRadius: 22)
          .padding(.horizontal, 16)
-         .padding(.bottom, 100)
+         .padding(.bottom, pageID.showsGarminAffiliationNote ? 128 : 100)
       }
+   }
+
+   /// Marks Varia™ with a superscript * without dropping the words in front of it.
+   private func markedVariaText(_ copy: String) -> Text {
+      guard let mark = copy.range(of: "Varia™") else { return Text(copy) }
+      let prefix = String(copy[..<mark.lowerBound])
+      let rest = String(copy[mark.upperBound...])
+      return Text("\(prefix)Varia™\(Text("*").font(.footnote.weight(.bold)).baselineOffset(8))\(rest)")
    }
 
    @ViewBuilder
@@ -159,94 +190,30 @@ struct RideOnboardingView: View {
       .allowsHitTesting(false)
    }
 
-   // MARK: - Plus
+   private func highlightList(_ highlights: [RideOnboardingHighlight]) -> some View {
+      VStack(alignment: .leading, spacing: 8) {
+         ForEach(highlights, id: \.self) { highlight in
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+               Image(systemName: highlight.symbol)
+                  .font(.subheadline.weight(.semibold))
+                  .foregroundStyle(RideDashboardTheme.ice)
+                  .frame(width: 22)
 
-   private var plusPricingCard: some View {
-      VStack(alignment: .leading, spacing: 10) {
-         if plusStore.isPlus {
-            Label("BigVelo+ is unlocked", systemImage: "checkmark.seal.fill")
-               .font(.subheadline.weight(.semibold))
-               .foregroundStyle(RideDashboardTheme.go)
-         }
-
-         pricingRow(
-            title: "Yearly",
-            detail: plusStore.yearlyHasFreeTrial ? "7 days free, then \(plusStore.displayPrice(for: .yearly))/yr" : plusStore.displayPrice(for: .yearly) + "/yr",
-            product: plusStore.yearlyProduct,
-            emphasized: true
-         )
-
-         pricingRow(
-            title: "Monthly",
-            detail: "\(plusStore.displayPrice(for: .monthly))/mo",
-            product: plusStore.monthlyProduct,
-            emphasized: false
-         )
-
-         pricingRow(
-            title: "Lifetime",
-            detail: "\(plusStore.displayPrice(for: .lifetime)) once",
-            product: plusStore.lifetimeProduct,
-            emphasized: false
-         )
-
-         Text("Stays free: rear radar, Watch HR, record, History, Health.")
-            .font(.caption)
-            .foregroundStyle(.white.opacity(0.55))
-
-         if let message = plusStore.lastErrorMessage {
-            Text(message)
-               .font(.caption2)
-               .foregroundStyle(RideDashboardTheme.halt)
+               Text(highlight.text)
+                  .font(.subheadline.weight(.semibold))
+                  .foregroundStyle(.white.opacity(0.92))
+            }
+            .accessibilityElement(children: .combine)
          }
       }
       .padding(.top, 4)
    }
 
-   private func pricingRow(
-      title: String,
-      detail: String,
-      product: Product?,
-      emphasized: Bool
-   ) -> some View {
-      Button {
-         guard let product else { return }
-         Task { await plusStore.purchase(product) }
-      } label: {
-         HStack {
-            VStack(alignment: .leading, spacing: 2) {
-               Text(title)
-                  .font(.subheadline.weight(.semibold))
-                  .foregroundStyle(.white)
-               Text(detail)
-                  .font(.caption)
-                  .foregroundStyle(.white.opacity(0.6))
-            }
-            Spacer()
-            if plusStore.isPurchasing {
-               ProgressView()
-                  .tint(.white)
-            } else {
-               Image(systemName: emphasized ? "sparkles" : "plus.circle")
-                  .foregroundStyle(emphasized ? RideDashboardTheme.ember : RideDashboardTheme.ice)
-            }
-         }
-         .padding(12)
-         .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-               .fill(emphasized ? RideDashboardTheme.ember.opacity(0.18) : Color.white.opacity(0.06))
-         )
-         .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-               .strokeBorder(
-                  emphasized ? RideDashboardTheme.ember.opacity(0.55) : Color.white.opacity(0.12),
-                  lineWidth: 1
-               )
-         }
-      }
-      .buttonStyle(.plain)
-      .disabled(product == nil || plusStore.isPurchasing || plusStore.isPlus)
-      .accessibilityIdentifier("onboarding.plus.\(title.lowercased())")
+   // MARK: - Plus
+
+   private var plusPricingCard: some View {
+      RidePlusPricingCard(plusStore: plusStore, accessibilityPrefix: "onboarding")
+         .padding(.top, 4)
    }
 
    private var plusActions: some View {

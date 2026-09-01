@@ -5,7 +5,11 @@
 
 import SwiftUI
 
-/// Landscape cockpit: speed stays fully on-screen, metrics and map sit trailing.
+/// Landscape cockpit: same three panes as before, content rotated.
+///
+/// The leading pane stays the large cluster slot — the map lives there now.
+/// Trailing top is the old metrics slot (speed). Trailing bottom is the old
+/// map slot (tiles). Frames are unchanged; only the children swapped.
 struct RideDashboardLandscapeView: View {
 
    let rideViewModel: RideViewModel
@@ -32,13 +36,17 @@ struct RideDashboardLandscapeView: View {
                )
             }
 
-            // The tape lies over the hero rather than taking a column of its
-            // own: landscape has no width to spare, and the hero is the one
-            // surface with nothing in its margins to cover.
-            RideDashboardInstrumentHero(
-               rideViewModel: rideViewModel,
-               isExpanded: !isDrawerOpen
+            RideMapDrawer(
+               rideMapViewModel: rideMapViewModel,
+               isMapMounted: showsDrawerMap,
+               isVertical: false,
+               onExpand: onExpandMap,
+               isOpen: $isDrawerOpen
             )
+            .overlay(alignment: .bottom) {
+               RideControlBar(rideViewModel: rideViewModel)
+                  .padding(.bottom, 10)
+            }
             .frame(maxHeight: .infinity)
             .layoutPriority(-1)
             .rideRadarTape(
@@ -56,24 +64,31 @@ struct RideDashboardLandscapeView: View {
          .frame(maxWidth: .infinity, maxHeight: .infinity)
 
          VStack(spacing: 8) {
+            ZStack {
+               RideDashboardMetricsGrid(
+                  rideViewModel: rideViewModel,
+                  routeGuidanceViewModel: routeGuidanceViewModel,
+                  isCompact: true
+               )
+               .hidden()
+               .accessibilityHidden(true)
+
+               RideDashboardInstrumentHero(
+                  rideViewModel: rideViewModel,
+                  isExpanded: false
+               )
+            }
+            .layoutPriority(1)
+
             RideDashboardMetricsGrid(
                rideViewModel: rideViewModel,
                routeGuidanceViewModel: routeGuidanceViewModel,
                isCompact: true
             )
-
-            RideMapDrawer(
-               rideMapViewModel: rideMapViewModel,
-               isMapMounted: showsDrawerMap,
-               isVertical: false,
-               onExpand: onExpandMap,
-               isOpen: $isDrawerOpen
-            )
-            .overlay(alignment: .bottom) {
-               RideControlBar(rideViewModel: rideViewModel)
-                  .padding(.bottom, 10)
-            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .frame(minHeight: isDrawerOpen ? 96 : RideMapDrawer.collapsedHeight)
+            .clipped()
+            .layoutPriority(-1)
          }
          .frame(maxWidth: 340)
       }

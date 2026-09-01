@@ -43,6 +43,47 @@ struct RideCockpitView: View {
          RideAtmosphereBackground(scene: rideViewModel.isFinished ? .summary : .dashboard)
             .ignoresSafeArea()
       }
+      .safeAreaInset(edge: .top, spacing: 0) {
+         if rideViewModel.showsAccessLock {
+            accessLockBanner
+         }
+      }
+      .sheet(isPresented: accessPaywallBinding) {
+         if let plusStore = rideViewModel.plusStore {
+            RideAccessPaywallView(plusStore: plusStore) {
+               rideViewModel.isShowingAccessPaywall = false
+            }
+            .presentationDetents([.medium, .large])
+         }
+      }
+      .onChange(of: rideViewModel.startDeniedPulse) { _, _ in
+         rideViewModel.presentAccessPaywallIfLocked()
+      }
+   }
+
+   private var accessPaywallBinding: Binding<Bool> {
+      Binding(
+         get: { rideViewModel.isShowingAccessPaywall },
+         set: { rideViewModel.isShowingAccessPaywall = $0 }
+      )
+   }
+
+   private var accessLockBanner: some View {
+      Button {
+         rideViewModel.presentAccessPaywallIfLocked()
+      } label: {
+         Text("Trial ended — view and export rides, or keep BigVelo to ride again.")
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.white)
+            .multilineTextAlignment(.leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(12)
+            .background(RideDashboardTheme.ember.opacity(0.88), in: .rect(cornerRadius: 12))
+      }
+      .buttonStyle(.plain)
+      .padding(.horizontal, 16)
+      .padding(.top, 8)
+      .accessibilityIdentifier("dashboard.banner.accessLock")
    }
 }
 
