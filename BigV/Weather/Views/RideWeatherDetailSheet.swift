@@ -36,7 +36,7 @@ struct RideWeatherDetailSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { forecastToolbar }
       }
-      .preferredColorScheme(.dark)
+      .rideAppearance()
       .task { await weatherDetailModel.load() }
       .sheet(isPresented: $isShowingLocationSearch) {
          RideWeatherLocationSearchView { coordinate, label in

@@ -36,7 +36,7 @@ struct RouteCandidateRowView: View {
       .rideGlassCard(density: isSelected ? .standard : .hud)
       .overlay(
          RoundedRectangle(cornerRadius: RideDashboardTheme.cardRadius, style: .continuous)
-            .stroke(isSelected ? RideDashboardTheme.ember : .white.opacity(0.10), lineWidth: 2)
+            .stroke(isSelected ? RideDashboardTheme.ember : RideDashboardTheme.ink(0.10), lineWidth: 2)
       )
       .contentShape(.rect)
       .accessibilityElement(children: .combine)
@@ -50,12 +50,12 @@ struct RouteCandidateRowView: View {
          VStack(alignment: .leading, spacing: 2) {
             Text(title)
                .font(.subheadline.weight(.bold))
-               .foregroundStyle(isSelected ? PlannedRouteStyle.line : .white.opacity(0.85))
+               .foregroundStyle(isSelected ? PlannedRouteStyle.line : RideDashboardTheme.ink(0.85))
 
             if let detail {
                Text(detail)
                   .font(.caption)
-                  .foregroundStyle(.white.opacity(0.45))
+                  .foregroundStyle(RideDashboardTheme.ink(0.45))
                   .lineLimit(1)
             }
          }
@@ -66,12 +66,12 @@ struct RouteCandidateRowView: View {
             Text(travelTimeText)
                .font(.title3.weight(.semibold))
                .monospacedDigit()
-               .foregroundStyle(.white)
+               .foregroundStyle(RideDashboardTheme.ink)
 
             Text(distanceText)
                .font(.caption.weight(.medium))
                .monospacedDigit()
-               .foregroundStyle(.white.opacity(0.55))
+               .foregroundStyle(RideDashboardTheme.ink(0.55))
          }
       }
    }
@@ -91,12 +91,12 @@ struct RouteCandidateRowView: View {
             Text(climbSummary)
                .font(.caption.weight(.medium))
                .monospacedDigit()
-               .foregroundStyle(.white.opacity(0.65))
+               .foregroundStyle(RideDashboardTheme.ink(0.65))
          }
       } else {
          Text("Loading elevation…")
             .font(.caption2)
-            .foregroundStyle(.white.opacity(0.35))
+            .foregroundStyle(RideDashboardTheme.ink(0.35))
       }
    }
 

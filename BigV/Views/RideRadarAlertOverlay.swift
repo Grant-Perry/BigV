@@ -38,14 +38,14 @@ struct RideRadarAlertOverlay: View {
          }
          .onChange(of: clearPulse) { _, _ in
             guard isEnabled else { return }
-            flash(color: RideChromeTokens.go, holdFor: 0.6)
+            flash(color: RideDashboardTheme.go, holdFor: 0.6)
          }
    }
 
    private var tierColor: Color {
       switch tier {
-         case .high: RideChromeTokens.halt
-         case .approaching, nil: RideChromeTokens.amber
+         case .high: RideDashboardTheme.halt
+         case .approaching, nil: RideDashboardTheme.amber
       }
    }
 

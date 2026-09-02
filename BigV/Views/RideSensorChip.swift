@@ -20,7 +20,7 @@ struct RideSensorChip<Glyph: View>: View {
    /// The reading. `nil` draws a glyph-only chip — a sensor that is present but
    /// has nothing to say yet.
    var value: String?
-   var valueColor: Color = .white
+   var valueColor: Color = RideDashboardTheme.ink
    var tint: Color?
    @ViewBuilder let glyph: Glyph
 
@@ -55,25 +55,25 @@ struct RideSensorChip<Glyph: View>: View {
             Image(systemName: "cloud.sun.fill")
                .font(.caption.weight(.semibold))
                .symbolRenderingMode(.hierarchical)
-               .foregroundStyle(RideChromeTokens.ice)
+               .foregroundStyle(RideDashboardTheme.ice)
          }
 
          RideSensorChip(value: "142") {
             Image(systemName: "heart.fill")
                .font(.caption.weight(.semibold))
-               .foregroundStyle(RideChromeTokens.pulse)
+               .foregroundStyle(RideDashboardTheme.pulse)
          }
 
-         RideSensorChip(value: "42 ft", valueColor: RideChromeTokens.amber, tint: RideChromeTokens.amber.opacity(0.25)) {
+         RideSensorChip(value: "42 ft", valueColor: RideDashboardTheme.amber, tint: RideDashboardTheme.amber.opacity(0.25)) {
             Image(systemName: "car.rear.waves.up")
                .font(.caption.weight(.semibold))
-               .foregroundStyle(RideChromeTokens.amber)
+               .foregroundStyle(RideDashboardTheme.amber)
          }
 
          RideSensorChip {
             Image(systemName: "cloud.slash")
                .font(.caption.weight(.semibold))
-               .foregroundStyle(.white.opacity(0.4))
+               .foregroundStyle(RideDashboardTheme.ink(0.4))
          }
       }
       .padding()

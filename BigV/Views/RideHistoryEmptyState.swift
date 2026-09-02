@@ -28,17 +28,17 @@ struct RideHistoryEmptyState: View {
 
             Image(systemName: .bicycleIcon)
                .font(.system(size: 46, weight: .light))
-               .foregroundStyle(.white.opacity(0.88))
+               .foregroundStyle(RideDashboardTheme.ink(0.88))
          }
 
          VStack(spacing: 8) {
             Text("The garage is empty")
                .font(.title2.weight(.semibold))
-               .foregroundStyle(.white)
+               .foregroundStyle(RideDashboardTheme.ink)
 
             Text("Finish a ride. It lands here as the first wall.")
                .font(.subheadline)
-               .foregroundStyle(.white.opacity(0.5))
+               .foregroundStyle(RideDashboardTheme.ink(0.5))
                .multilineTextAlignment(.center)
          }
       }

@@ -35,9 +35,9 @@ struct RideRouteMapView: View {
             .strokeBorder(
                LinearGradient(
                   colors: [
-                     Color.white.opacity(0.24),
+                     RideDashboardTheme.ink(0.24),
                      RideDashboardTheme.ice.opacity(0.14),
-                     Color.white.opacity(0.04)
+                     RideDashboardTheme.ink(0.04)
                   ],
                   startPoint: .topLeading,
                   endPoint: .bottomTrailing
@@ -71,13 +71,13 @@ struct RideRouteMapView: View {
                .font(.caption.weight(.medium))
          }
       }
-      .foregroundStyle(.white.opacity(0.4))
+      .foregroundStyle(RideDashboardTheme.ink(0.4))
       .frame(maxWidth: .infinity, maxHeight: .infinity)
       .background(Self.wash)
    }
 
    private static let wash = LinearGradient(
-      colors: [.white.opacity(0.10), .white.opacity(0.03)],
+      colors: [RideDashboardTheme.ink(0.10), RideDashboardTheme.ink(0.03)],
       startPoint: .topLeading,
       endPoint: .bottomTrailing
    )

@@ -159,7 +159,7 @@ private struct RidePageIndicatorView: View {
       HStack(spacing: 6) {
          ForEach(pages) { page in
             Capsule()
-               .fill(page == selectedPage ? RideDashboardTheme.ice.opacity(0.9) : .white.opacity(0.22))
+               .fill(page == selectedPage ? RideDashboardTheme.ice.opacity(0.9) : RideDashboardTheme.ink(0.22))
                .frame(width: page == selectedPage ? 18 : 6, height: 6)
          }
       }
@@ -199,5 +199,6 @@ private enum RidePageSwipe {
    .environment(RideWeatherModel(unitsSettings: RideUnitsSettings()))
    .environment(RideClimbModel())
    .environment(RideBackToStartModel())
+   .environment(RideAppearanceSettings())
    .preferredColorScheme(.dark)
 }

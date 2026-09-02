@@ -58,7 +58,7 @@ struct RideRadarPairingView: View {
             }
          }
       }
-      .preferredColorScheme(.dark)
+      .rideAppearance()
       .onDisappear { pairingViewModel.endScan() }
    }
 
@@ -69,14 +69,14 @@ struct RideRadarPairingView: View {
          VStack(alignment: .leading, spacing: 2) {
             Text("Rear Radar")
                .font(.subheadline.weight(.semibold))
-               .foregroundStyle(.white)
+               .foregroundStyle(RideDashboardTheme.ink)
 
             Text("Warns you about vehicles approaching from behind")
                .font(.caption)
-               .foregroundStyle(.white.opacity(0.55))
+               .foregroundStyle(RideDashboardTheme.ink(0.55))
          }
       }
-      .tint(RideChromeTokens.go)
+      .tint(RideDashboardTheme.go)
       .padding(14)
       .rideGlassCard()
       .accessibilityIdentifier("radar.toggle.enabled")
@@ -94,12 +94,12 @@ struct RideRadarPairingView: View {
             VStack(alignment: .leading, spacing: 1) {
                Text(pairingViewModel.connectedName ?? pairingViewModel.connectionText)
                   .font(.subheadline.weight(.semibold))
-                  .foregroundStyle(.white)
+                  .foregroundStyle(RideDashboardTheme.ink)
 
                if pairingViewModel.connectedName != nil {
                   Text(pairingViewModel.connectionText)
                      .font(.caption)
-                     .foregroundStyle(.white.opacity(0.55))
+                     .foregroundStyle(RideDashboardTheme.ink(0.55))
                }
             }
 
@@ -108,18 +108,18 @@ struct RideRadarPairingView: View {
             if pairingViewModel.isConnecting {
                Button("Cancel") { pairingViewModel.cancelConnecting() }
                   .font(.caption.weight(.semibold))
-                  .tint(RideChromeTokens.amber)
+                  .tint(RideDashboardTheme.amber)
             } else if let battery = pairingViewModel.batteryText {
                Label(battery, systemImage: "battery.75percent")
                   .font(.caption.weight(.semibold))
-                  .foregroundStyle(.white.opacity(0.7))
+                  .foregroundStyle(RideDashboardTheme.ink(0.7))
             }
          }
 
          if let issue = pairingViewModel.issueMessage {
             Text(issue)
                .font(.caption)
-               .foregroundStyle(RideChromeTokens.amber)
+               .foregroundStyle(RideDashboardTheme.amber)
                .fixedSize(horizontal: false, vertical: true)
          }
 
@@ -142,7 +142,7 @@ struct RideRadarPairingView: View {
                   .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
-            .tint(RideChromeTokens.halt)
+            .tint(RideDashboardTheme.halt)
             .accessibilityIdentifier("radar.button.forget")
          }
       }
@@ -152,10 +152,10 @@ struct RideRadarPairingView: View {
 
    private var statusDot: some View {
       Circle()
-         .fill(pairingViewModel.isConnected ? RideChromeTokens.go : RideChromeTokens.amber)
+         .fill(pairingViewModel.isConnected ? RideDashboardTheme.go : RideDashboardTheme.amber)
          .frame(width: 9, height: 9)
          .shadow(
-            color: (pairingViewModel.isConnected ? RideChromeTokens.go : RideChromeTokens.amber).opacity(0.6),
+            color: (pairingViewModel.isConnected ? RideDashboardTheme.go : RideDashboardTheme.amber).opacity(0.6),
             radius: 4
          )
    }
@@ -168,17 +168,17 @@ struct RideRadarPairingView: View {
          VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                ProgressView()
-                  .tint(RideChromeTokens.ice)
+                  .tint(RideDashboardTheme.ice)
 
                Text("Searching for radars…")
                   .font(.caption)
-                  .foregroundStyle(.white.opacity(0.6))
+                  .foregroundStyle(RideDashboardTheme.ink(0.6))
 
                Spacer()
 
                Button("Stop") { pairingViewModel.endScan() }
                   .font(.caption.weight(.semibold))
-                  .tint(RideChromeTokens.ice)
+                  .tint(RideDashboardTheme.ice)
             }
 
             ForEach(pairingViewModel.discoveries) { discovery in
@@ -192,12 +192,12 @@ struct RideRadarPairingView: View {
                         .font(.subheadline.weight(.medium))
                      Spacer()
                      Image(systemName: "plus.circle.fill")
-                        .foregroundStyle(RideChromeTokens.ice)
+                        .foregroundStyle(RideDashboardTheme.ice)
                   }
-                  .foregroundStyle(.white)
+                  .foregroundStyle(RideDashboardTheme.ink)
                   .padding(.vertical, 8)
                   .padding(.horizontal, 10)
-                  .background(.white.opacity(0.06), in: .rect(cornerRadius: 10))
+                  .background(RideDashboardTheme.ink(0.06), in: .rect(cornerRadius: 10))
                }
                .buttonStyle(.plain)
             }
@@ -214,7 +214,7 @@ struct RideRadarPairingView: View {
             .frame(maxWidth: .infinity)
          }
          .buttonStyle(.bordered)
-         .tint(RideChromeTokens.ice)
+         .tint(RideDashboardTheme.ice)
          .accessibilityIdentifier("radar.button.scan")
       }
    }
@@ -242,8 +242,8 @@ struct RideRadarPairingView: View {
          Toggle("Screen edge flash", isOn: $pairingViewModel.overlayEnabled)
       }
       .font(.subheadline)
-      .foregroundStyle(.white)
-      .tint(RideChromeTokens.go)
+      .foregroundStyle(RideDashboardTheme.ink)
+      .tint(RideDashboardTheme.go)
       .padding(14)
       .rideGlassCard()
    }
@@ -264,7 +264,7 @@ struct RideRadarPairingView: View {
 
          Text(placementHint)
             .font(.caption2)
-            .foregroundStyle(.white.opacity(0.45))
+            .foregroundStyle(RideDashboardTheme.ink(0.45))
       }
       .padding(14)
       .rideGlassCard()
@@ -289,14 +289,14 @@ struct RideRadarPairingView: View {
             VStack(alignment: .leading, spacing: 2) {
                Text("Simulated traffic")
                   .font(.subheadline.weight(.semibold))
-                  .foregroundStyle(.white)
+                  .foregroundStyle(RideDashboardTheme.ink)
 
                Text("Scripted vehicles instead of a radio — for demos and review")
                   .font(.caption)
-                  .foregroundStyle(.white.opacity(0.55))
+                  .foregroundStyle(RideDashboardTheme.ink(0.55))
             }
          }
-         .tint(RideChromeTokens.ember)
+         .tint(RideDashboardTheme.ember)
       }
       .padding(14)
       .rideGlassCard()
@@ -310,25 +310,25 @@ struct RideRadarPairingView: View {
       Text(title)
          .font(.caption2.weight(.bold))
          .kerning(1.2)
-         .foregroundStyle(.white.opacity(0.45))
+         .foregroundStyle(RideDashboardTheme.ink(0.45))
    }
 
    private func detailRow(_ label: String, _ value: String) -> some View {
       HStack {
          Text(label)
             .font(.caption)
-            .foregroundStyle(.white.opacity(0.55))
+            .foregroundStyle(RideDashboardTheme.ink(0.55))
          Spacer()
          Text(value)
             .font(.caption.weight(.semibold))
-            .foregroundStyle(.white.opacity(0.85))
+            .foregroundStyle(RideDashboardTheme.ink(0.85))
       }
    }
 
    private var footnote: some View {
       Text("Works with Garmin Varia™ and compatible Bluetooth cycling radars. BigVelo is not affiliated with Garmin. Radar improves awareness of traffic behind you; it is not a substitute for attentive riding.")
          .font(.caption2)
-         .foregroundStyle(.white.opacity(0.35))
+         .foregroundStyle(RideDashboardTheme.ink(0.35))
          .multilineTextAlignment(.center)
          .padding(.horizontal, 8)
          .padding(.top, 4)
@@ -346,11 +346,11 @@ private struct RideRadarDisclaimerCard: View {
       VStack(alignment: .leading, spacing: 10) {
          Label("Ride Aware", systemImage: "exclamationmark.triangle.fill")
             .font(.subheadline.weight(.bold))
-            .foregroundStyle(RideChromeTokens.amber)
+            .foregroundStyle(RideDashboardTheme.amber)
 
          Text("Radar can improve your awareness of vehicles approaching from behind, but it does not detect everything and cannot prevent a collision. Always ride attentively and follow local road laws.")
             .font(.caption)
-            .foregroundStyle(.white.opacity(0.75))
+            .foregroundStyle(RideDashboardTheme.ink(0.75))
 
          Button(action: onAcknowledge) {
             Text("I Understand")
@@ -358,7 +358,7 @@ private struct RideRadarDisclaimerCard: View {
                .frame(maxWidth: .infinity)
          }
          .buttonStyle(.borderedProminent)
-         .tint(RideChromeTokens.amber)
+         .tint(RideDashboardTheme.amber)
          .accessibilityIdentifier("radar.button.disclaimer")
       }
       .padding(14)

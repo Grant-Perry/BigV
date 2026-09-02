@@ -25,13 +25,13 @@ struct RideLiveHeartRateReadout: View {
             Text(value)
                .font(.system(size: 44, weight: .bold, design: .rounded))
                .monospacedDigit()
-               .foregroundStyle(isDimmed ? .white.opacity(0.35) : .white)
+               .foregroundStyle(isDimmed ? RideDashboardTheme.ink(0.35) : RideDashboardTheme.ink)
                .lineLimit(1)
                .minimumScaleFactor(0.7)
 
             Text(unit)
                .font(.subheadline.weight(.bold))
-               .foregroundStyle(isDimmed ? .white.opacity(0.28) : RideDashboardTheme.pulse.opacity(0.85))
+               .foregroundStyle(isDimmed ? RideDashboardTheme.ink(0.28) : RideDashboardTheme.pulse.opacity(0.85))
          }
 
          Spacer(minLength: 0)

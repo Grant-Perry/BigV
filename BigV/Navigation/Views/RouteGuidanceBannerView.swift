@@ -40,7 +40,7 @@ struct RouteGuidanceBannerView: View {
             if routeGuidanceViewModel.canPresentTurnList {
                Image(systemName: routeGuidanceViewModel.isTurnListPresented ? .collapseIcon : .expandIcon)
                   .font(.caption.weight(.bold))
-                  .foregroundStyle(.white.opacity(0.45))
+                  .foregroundStyle(RideDashboardTheme.ink(0.45))
                   .padding(.top, 4)
                   .onTapGesture(perform: toggleTurnList)
             }
@@ -100,7 +100,7 @@ struct RouteGuidanceBannerView: View {
          if let detail = routeGuidanceViewModel.statusDetail {
             Text(detail)
                .font(.footnote.weight(.medium))
-               .foregroundStyle(.white.opacity(0.7))
+               .foregroundStyle(RideDashboardTheme.ink(0.7))
                .lineLimit(2)
          }
       }
@@ -119,14 +119,14 @@ struct RouteGuidanceBannerView: View {
 
          Text(routeGuidanceViewModel.instruction ?? "Following route")
             .font(.system(size: 19, weight: .semibold))
-            .foregroundStyle(.white)
+            .foregroundStyle(RideDashboardTheme.ink)
             .lineLimit(2)
             .accessibilityIdentifier("guidance.instruction")
 
          if let following = routeGuidanceViewModel.followingInstruction {
             Text(following)
                .font(.caption.weight(.medium))
-               .foregroundStyle(.white.opacity(0.55))
+               .foregroundStyle(RideDashboardTheme.ink(0.55))
                .lineLimit(1)
          }
 
@@ -170,12 +170,12 @@ struct RouteGuidanceBannerView: View {
          Text(title)
             .font(.caption2.weight(.semibold))
             .kerning(0.8)
-            .foregroundStyle(.white.opacity(0.45))
+            .foregroundStyle(RideDashboardTheme.ink(0.45))
 
          Text(value)
             .font(.caption.weight(.bold))
             .monospacedDigit()
-            .foregroundStyle(.white.opacity(0.9))
+            .foregroundStyle(RideDashboardTheme.ink(0.9))
       }
       .accessibilityElement(children: .combine)
       .accessibilityLabel(title)

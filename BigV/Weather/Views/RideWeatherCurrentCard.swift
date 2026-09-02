@@ -28,7 +28,7 @@ struct RideWeatherCurrentCard: View {
       .clipShape(.rect(cornerRadius: RideDashboardTheme.cardRadius, style: .continuous))
       .overlay {
          RoundedRectangle(cornerRadius: RideDashboardTheme.cardRadius, style: .continuous)
-            .strokeBorder(.white.opacity(0.14), lineWidth: 1)
+            .strokeBorder(RideDashboardTheme.ink(0.14), lineWidth: 1)
       }
       .accessibilityElement(children: .contain)
    }
@@ -44,7 +44,7 @@ struct RideWeatherCurrentCard: View {
             Annotation(weatherDetailModel.placeLabel, coordinate: weatherDetailModel.coordinate) {
                Image(systemName: "mappin.circle.fill")
                   .font(.title2)
-                  .foregroundStyle(RideChromeTokens.halt)
+                  .foregroundStyle(RideDashboardTheme.halt)
                   .shadow(radius: 2)
             }
          }
@@ -70,8 +70,8 @@ struct RideWeatherCurrentCard: View {
    private var scrim: some View {
       LinearGradient(
          colors: [
-            .black.opacity(0.62),
-            .black.opacity(0.32),
+            RideDashboardTheme.veil(0.62),
+            RideDashboardTheme.veil(0.32),
             RideDashboardTheme.midnight.opacity(0.55)
          ],
          startPoint: .topLeading,
@@ -88,18 +88,18 @@ struct RideWeatherCurrentCard: View {
             HStack(spacing: 6) {
                Text(weatherDetailModel.placeLabel)
                   .font(.title2.weight(.bold))
-                  .foregroundStyle(.white)
+                  .foregroundStyle(RideDashboardTheme.ink)
                   .lineLimit(2)
                   .minimumScaleFactor(0.8)
 
                Image(systemName: "chevron.down")
                   .font(.caption.weight(.bold))
-                  .foregroundStyle(.white.opacity(0.7))
+                  .foregroundStyle(RideDashboardTheme.ink(0.7))
 
                if weatherDetailModel.isFollowingDevice {
                   Image(systemName: "location.fill")
                      .font(.caption.weight(.semibold))
-                     .foregroundStyle(RideChromeTokens.ice)
+                     .foregroundStyle(RideDashboardTheme.ice)
                }
             }
          }
@@ -110,7 +110,7 @@ struct RideWeatherCurrentCard: View {
          if let condition = weatherDetailModel.current?.conditionLabel, !condition.isEmpty {
             Text(condition)
                .font(.subheadline.weight(.medium))
-               .foregroundStyle(.white.opacity(0.82))
+               .foregroundStyle(RideDashboardTheme.ink(0.82))
          }
       }
    }
@@ -123,13 +123,13 @@ struct RideWeatherCurrentCard: View {
          conditions(current)
       } else if weatherDetailModel.isLoading {
          ProgressView()
-            .tint(.white)
+            .tint(RideDashboardTheme.ink)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.vertical, 24)
       } else if let failureMessage = weatherDetailModel.failureMessage {
          Text(failureMessage)
             .font(.subheadline.weight(.medium))
-            .foregroundStyle(.white.opacity(0.85))
+            .foregroundStyle(RideDashboardTheme.ink(0.85))
             .padding(.vertical, 12)
       }
    }
@@ -146,11 +146,11 @@ struct RideWeatherCurrentCard: View {
                )
                .font(.system(size: 56, weight: .thin))
                .monospacedDigit()
-               .foregroundStyle(.white)
+               .foregroundStyle(RideDashboardTheme.ink)
 
                Text(weatherDetailModel.temperatureUnit.suffix)
                   .font(.title3.weight(.light))
-                  .foregroundStyle(.white.opacity(0.72))
+                  .foregroundStyle(RideDashboardTheme.ink(0.72))
             }
 
             highLow(for: current)
@@ -158,7 +158,7 @@ struct RideWeatherCurrentCard: View {
             if let feels = current.apparentTemperatureCelsius {
                Text("Feels like \(formatted(feels))")
                   .font(.subheadline.weight(.medium))
-                  .foregroundStyle(.white.opacity(0.78))
+                  .foregroundStyle(RideDashboardTheme.ink(0.78))
             }
          }
 
@@ -167,7 +167,7 @@ struct RideWeatherCurrentCard: View {
          Image(systemName: current.symbolName)
             .font(.system(size: 68, weight: .thin))
             .symbolRenderingMode(.hierarchical)
-            .foregroundStyle(.white.opacity(0.92))
+            .foregroundStyle(RideDashboardTheme.ink(0.92))
             .padding(.top, 4)
       }
    }
@@ -180,11 +180,11 @@ struct RideWeatherCurrentCard: View {
       if let high, let low {
          HStack(spacing: 6) {
             Text(formatted(low))
-               .foregroundStyle(.white.opacity(0.62))
+               .foregroundStyle(RideDashboardTheme.ink(0.62))
 
             Text(formatted(high))
                .fontWeight(.bold)
-               .foregroundStyle(.white)
+               .foregroundStyle(RideDashboardTheme.ink)
          }
          .font(.subheadline.monospacedDigit())
       }

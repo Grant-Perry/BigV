@@ -42,7 +42,7 @@ struct RideClimbFreerideCard: View {
             Text("SO FAR")
                .font(.system(size: 9, weight: .bold))
                .kerning(0.8)
-               .foregroundStyle(.white.opacity(0.4))
+               .foregroundStyle(RideDashboardTheme.ink(0.4))
          }
 
          HStack(spacing: 8) {
@@ -60,14 +60,14 @@ struct RideClimbFreerideCard: View {
          Text(value ?? RideFormatters.placeholder)
             .font(.system(size: 22, weight: .heavy, design: .rounded))
             .monospacedDigit()
-            .foregroundStyle(.white)
+            .foregroundStyle(RideDashboardTheme.ink)
             .minimumScaleFactor(0.6)
             .lineLimit(1)
 
          Text(label)
             .font(.system(size: 9, weight: .bold))
             .kerning(0.8)
-            .foregroundStyle(.white.opacity(0.45))
+            .foregroundStyle(RideDashboardTheme.ink(0.45))
       }
       .frame(maxWidth: .infinity)
    }
@@ -78,15 +78,15 @@ struct RideClimbFreerideCard: View {
       VStack(spacing: 10) {
          Image(systemName: "mountain.2")
             .font(.system(size: 34, weight: .light))
-            .foregroundStyle(.white.opacity(0.25))
+            .foregroundStyle(RideDashboardTheme.ink(0.25))
 
          Text("Need a route to see what's left")
             .font(.system(size: 15, weight: .semibold, design: .rounded))
-            .foregroundStyle(.white.opacity(0.7))
+            .foregroundStyle(RideDashboardTheme.ink(0.7))
 
          Text("Plan a route or import a GPX and the profile ahead appears here. Climbs you ride are still detected and split automatically.")
             .font(.footnote)
-            .foregroundStyle(.white.opacity(0.45))
+            .foregroundStyle(RideDashboardTheme.ink(0.45))
             .multilineTextAlignment(.center)
       }
       .frame(maxWidth: .infinity)

@@ -27,7 +27,7 @@ struct RideLapsCard: View {
 
             if !report.lapRows.isEmpty, !report.climbRows.isEmpty {
                Rectangle()
-                  .fill(.white.opacity(0.08))
+                  .fill(RideDashboardTheme.ink(0.08))
                   .frame(height: 1)
             }
 
@@ -56,19 +56,19 @@ struct RideLapsCard: View {
          Text(row.timeText)
             .font(.system(size: 13, weight: .bold, design: .rounded))
             .monospacedDigit()
-            .foregroundStyle(.white)
+            .foregroundStyle(RideDashboardTheme.ink)
 
          Text(row.distanceText)
             .font(.system(size: 12, weight: .semibold, design: .rounded))
             .monospacedDigit()
-            .foregroundStyle(.white.opacity(0.6))
+            .foregroundStyle(RideDashboardTheme.ink(0.6))
 
          Spacer()
 
          Text(row.detailText)
             .font(.system(size: 11, weight: .semibold, design: .rounded))
             .monospacedDigit()
-            .foregroundStyle(.white.opacity(0.5))
+            .foregroundStyle(RideDashboardTheme.ink(0.5))
             .lineLimit(1)
             .minimumScaleFactor(0.8)
       }

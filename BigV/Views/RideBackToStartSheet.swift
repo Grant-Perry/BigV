@@ -37,9 +37,9 @@ struct RideBackToStartSheet: View {
 
          if backToStartModel.isPlanning {
             ProgressView("Finding the way back…")
-               .tint(.white.opacity(0.7))
+               .tint(RideDashboardTheme.ink(0.7))
                .font(.footnote)
-               .foregroundStyle(.white.opacity(0.6))
+               .foregroundStyle(RideDashboardTheme.ink(0.6))
          }
 
          if let failureMessage = backToStartModel.failureMessage {
@@ -70,11 +70,11 @@ struct RideBackToStartSheet: View {
          Text("BACK TO START")
             .font(.caption.weight(.bold))
             .kerning(1.6)
-            .foregroundStyle(.white.opacity(0.7))
+            .foregroundStyle(RideDashboardTheme.ink(0.7))
 
          Text("Guidance takes over as soon as you choose.")
             .font(.caption)
-            .foregroundStyle(.white.opacity(0.45))
+            .foregroundStyle(RideDashboardTheme.ink(0.45))
       }
       .padding(.top, 8)
    }
@@ -98,18 +98,18 @@ struct RideBackToStartSheet: View {
             VStack(alignment: .leading, spacing: 2) {
                Text(title)
                   .font(.subheadline.weight(.bold))
-                  .foregroundStyle(.white)
+                  .foregroundStyle(RideDashboardTheme.ink)
 
                Text(detail)
                   .font(.caption)
-                  .foregroundStyle(.white.opacity(0.55))
+                  .foregroundStyle(RideDashboardTheme.ink(0.55))
             }
 
             Spacer()
 
             Image(systemName: "chevron.right")
                .font(.caption.weight(.semibold))
-               .foregroundStyle(.white.opacity(0.3))
+               .foregroundStyle(RideDashboardTheme.ink(0.3))
          }
          .padding(14)
          .contentShape(.rect)

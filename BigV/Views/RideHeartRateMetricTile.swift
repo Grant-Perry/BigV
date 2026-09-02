@@ -33,7 +33,7 @@ struct RideHeartRateMetricTile: View {
       .overlay {
          if isSelected {
             RoundedRectangle(cornerRadius: RideDashboardTheme.cardRadius, style: .continuous)
-               .strokeBorder(RideChromeTokens.ice.opacity(0.85), lineWidth: 2)
+               .strokeBorder(RideDashboardTheme.ice.opacity(0.85), lineWidth: 2)
          }
       }
    }
@@ -45,7 +45,7 @@ struct RideHeartRateMetricTile: View {
             .kerning(isCompact ? 0.5 : 1)
             .lineLimit(1)
             .minimumScaleFactor(0.8)
-            .foregroundStyle(.white.opacity(isSelected ? 0.75 : 0.55))
+            .foregroundStyle(RideDashboardTheme.ink(isSelected ? 0.75 : 0.55))
             .frame(maxWidth: .infinity, alignment: .leading)
 
          HStack(alignment: .center, spacing: isCompact ? 6 : 8) {
@@ -59,13 +59,16 @@ struct RideHeartRateMetricTile: View {
                Text(value)
                   .font(.system(size: isCompact ? 26 : 34, weight: .semibold, design: .rounded))
                   .monospacedDigit()
-                  .foregroundStyle(.white)
+                  .foregroundStyle(RideDashboardTheme.ink)
                   .lineLimit(1)
                   .minimumScaleFactor(0.6)
 
+               // The unit never wraps; the numeral scales down instead.
                Text(unit)
                   .font(.caption.weight(.semibold))
-                  .foregroundStyle(.white.opacity(0.45))
+                  .lineLimit(1)
+                  .fixedSize()
+                  .foregroundStyle(RideDashboardTheme.ink(0.45))
             }
          }
          .frame(maxWidth: .infinity, alignment: .leading)

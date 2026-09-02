@@ -25,7 +25,7 @@ struct RideDetailCardHeader: View {
          Text(title)
             .font(.caption.weight(.bold))
             .kerning(1.2)
-            .foregroundStyle(.white.opacity(0.75))
+            .foregroundStyle(RideDashboardTheme.ink(0.75))
 
          Spacer(minLength: 8)
 
@@ -33,7 +33,7 @@ struct RideDetailCardHeader: View {
             Text(detail)
                .font(.caption.weight(.semibold))
                .monospacedDigit()
-               .foregroundStyle(.white.opacity(0.55))
+               .foregroundStyle(RideDashboardTheme.ink(0.55))
                .lineLimit(1)
                .minimumScaleFactor(0.8)
          }
@@ -50,14 +50,14 @@ struct RideDetailFootnoteStat: View {
    let label: String
    let value: String
    var unit: String?
-   var tint: Color = .white
+   var tint: Color = RideDashboardTheme.ink
 
    var body: some View {
       VStack(alignment: .leading, spacing: 1) {
          Text(label)
             .font(.caption2.weight(.semibold))
             .kerning(0.8)
-            .foregroundStyle(.white.opacity(0.45))
+            .foregroundStyle(RideDashboardTheme.ink(0.45))
             .lineLimit(1)
 
          HStack(alignment: .firstTextBaseline, spacing: 2) {
@@ -71,7 +71,7 @@ struct RideDetailFootnoteStat: View {
             if let unit {
                Text(unit)
                   .font(.caption2.weight(.semibold))
-                  .foregroundStyle(.white.opacity(0.4))
+                  .foregroundStyle(RideDashboardTheme.ink(0.4))
             }
          }
       }

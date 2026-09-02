@@ -76,13 +76,13 @@ struct RideDetailLineChart: View {
    private var averageRule: some ChartContent {
       if let averageY {
          RuleMark(y: .value("Average", averageY))
-            .foregroundStyle(.white.opacity(0.3))
+            .foregroundStyle(RideDashboardTheme.ink(0.3))
             .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
             .annotation(position: .top, alignment: .trailing, spacing: 2) {
                Text("AVG")
                   .font(.system(size: 8, weight: .bold))
                   .kerning(0.8)
-                  .foregroundStyle(.white.opacity(0.4))
+                  .foregroundStyle(RideDashboardTheme.ink(0.4))
             }
       }
    }
@@ -124,7 +124,7 @@ struct RideDetailLineChart: View {
             .foregroundStyle(tint)
             .padding(.horizontal, 5)
             .padding(.vertical, 2)
-            .background(.black.opacity(0.55), in: .capsule)
+            .background(RideDashboardTheme.veil(0.55), in: .capsule)
       }
    }
 
@@ -134,7 +134,7 @@ struct RideDetailLineChart: View {
    private var scrubMarks: some ChartContent {
       if let selected = selectedPoint {
          RuleMark(x: .value("Selected", selected.x))
-            .foregroundStyle(.white.opacity(0.22))
+            .foregroundStyle(RideDashboardTheme.ink(0.22))
             .lineStyle(StrokeStyle(lineWidth: 1))
 
          PointMark(
@@ -158,16 +158,16 @@ struct RideDetailLineChart: View {
          Text(yCalloutLabel(point.y))
             .font(.system(size: 13, weight: .bold, design: .rounded))
             .monospacedDigit()
-            .foregroundStyle(.white)
+            .foregroundStyle(RideDashboardTheme.ink)
 
          Text(xCalloutLabel(point.x))
             .font(.system(size: 9, weight: .semibold))
             .monospacedDigit()
-            .foregroundStyle(.white.opacity(0.55))
+            .foregroundStyle(RideDashboardTheme.ink(0.55))
       }
       .padding(.horizontal, 8)
       .padding(.vertical, 4)
-      .background(.black.opacity(0.75), in: .rect(cornerRadius: 8, style: .continuous))
+      .background(RideDashboardTheme.veil(0.75), in: .rect(cornerRadius: 8, style: .continuous))
       .overlay {
          RoundedRectangle(cornerRadius: 8, style: .continuous)
             .strokeBorder(tint.opacity(0.5), lineWidth: 1)
@@ -204,14 +204,14 @@ struct RideDetailLineChart: View {
    private var compactAxis: some AxisContent {
       AxisMarks(values: .automatic(desiredCount: 4)) { value in
          AxisGridLine()
-            .foregroundStyle(.white.opacity(0.06))
+            .foregroundStyle(RideDashboardTheme.ink(0.06))
 
          AxisValueLabel {
             if let number = value.as(Double.self) {
                Text(number.formatted(.number.precision(.fractionLength(0...1))))
                   .font(.system(size: 9, weight: .medium))
                   .monospacedDigit()
-                  .foregroundStyle(.white.opacity(0.35))
+                  .foregroundStyle(RideDashboardTheme.ink(0.35))
             }
          }
       }

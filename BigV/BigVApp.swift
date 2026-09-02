@@ -29,6 +29,7 @@ struct BigVApp: App {
    @State private var rideClimbModel: RideClimbModel
    @State private var rideClimbSettings: RideClimbSettings
    @State private var rideLapSettings: RideLapSettings
+   @State private var rideAppearanceSettings: RideAppearanceSettings
    @State private var rideBackToStartModel: RideBackToStartModel
 
    /// The summary and history detail each get their own route view model so a
@@ -124,6 +125,7 @@ struct BigVApp: App {
       )
       _rideClimbSettings = State(initialValue: rideClimbSettings)
       _rideLapSettings = State(initialValue: rideLapSettings)
+      _rideAppearanceSettings = State(initialValue: RideAppearanceSettings())
 
       // Climbs are owned here for the same reason weather is: the page, the
       // dashboard tile and the split recorder all read one model that outlives
@@ -231,9 +233,11 @@ struct BigVApp: App {
                plusStore: bigVeloPlusStore,
                rideBackupViewModel: rideBackupViewModel,
                rideClimbSettings: rideClimbSettings,
-               rideLapSettings: rideLapSettings
+               rideLapSettings: rideLapSettings,
+               rideAppearanceSettings: rideAppearanceSettings
             )
          }
+         .environment(rideAppearanceSettings)
          .environment(rideWeatherModel)
          .environment(rideClimbModel)
          .environment(rideBackToStartModel)

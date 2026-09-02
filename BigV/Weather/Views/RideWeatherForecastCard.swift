@@ -56,12 +56,12 @@ struct RideWeatherForecastCard: View {
          HStack(spacing: 5) {
             Text(mode == .hourly ? "Hourly Forecast" : "3-Day Forecast")
                .font(.subheadline.weight(.bold))
-               .foregroundStyle(.white)
+               .foregroundStyle(RideDashboardTheme.ink)
                .contentTransition(.opacity)
 
             Image(systemName: "chevron.up.chevron.down")
                .font(.system(size: 11, weight: .bold))
-               .foregroundStyle(.white.opacity(0.35))
+               .foregroundStyle(RideDashboardTheme.ink(0.35))
 
             Spacer(minLength: 0)
          }
@@ -98,24 +98,24 @@ struct RideWeatherForecastCard: View {
       VStack(spacing: 6) {
          Text(hour.date.formatted(.dateTime.hour(.defaultDigits(amPM: .abbreviated))))
             .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(.white.opacity(0.5))
+            .foregroundStyle(RideDashboardTheme.ink(0.5))
             .lineLimit(1)
             .minimumScaleFactor(0.7)
 
          Image(systemName: hour.symbolName)
             .font(.system(size: 20))
             .symbolRenderingMode(.hierarchical)
-            .foregroundStyle(.white)
+            .foregroundStyle(RideDashboardTheme.ink)
             .frame(height: 22)
 
          Text(RideFormatters.temperatureDegrees(hour.temperatureCelsius, unit: unit))
             .font(.system(size: 15, weight: .semibold).monospacedDigit())
-            .foregroundStyle(.white)
+            .foregroundStyle(RideDashboardTheme.ink)
 
          if hour.precipitationChance > 0.05 {
             Text(percent(hour.precipitationChance))
                .font(.system(size: 10, weight: .semibold).monospacedDigit())
-               .foregroundStyle(RideChromeTokens.ice)
+               .foregroundStyle(RideDashboardTheme.ice)
          } else {
             Color.clear.frame(height: 12)
          }
@@ -151,28 +151,28 @@ struct RideWeatherForecastCard: View {
       VStack(spacing: 4) {
          Text(dayLabel(for: day.calendarDayStart))
             .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(.white)
+            .foregroundStyle(RideDashboardTheme.ink)
             .lineLimit(1)
             .minimumScaleFactor(0.8)
 
          Image(systemName: day.symbolName)
             .font(.system(size: 22))
             .symbolRenderingMode(.hierarchical)
-            .foregroundStyle(.white)
+            .foregroundStyle(RideDashboardTheme.ink)
             .frame(height: 24)
 
          Text(day.precipitationChance >= 0.05 ? percent(day.precipitationChance) : "—")
             .font(.system(size: 10, weight: .medium).monospacedDigit())
-            .foregroundStyle(.white.opacity(day.precipitationChance >= 0.05 ? 0.55 : 0.3))
+            .foregroundStyle(RideDashboardTheme.ink(day.precipitationChance >= 0.05 ? 0.55 : 0.3))
 
          HStack(spacing: 4) {
             Text(RideFormatters.temperatureDegrees(day.lowCelsius, unit: unit))
                .font(.system(size: 15, weight: .regular).monospacedDigit())
-               .foregroundStyle(.white.opacity(0.55))
+               .foregroundStyle(RideDashboardTheme.ink(0.55))
 
             Text(RideFormatters.temperatureDegrees(day.highCelsius, unit: unit))
                .font(.system(size: 18, weight: .bold).monospacedDigit())
-               .foregroundStyle(.white)
+               .foregroundStyle(RideDashboardTheme.ink)
          }
       }
       .frame(maxWidth: .infinity)
@@ -191,7 +191,7 @@ struct RideWeatherForecastCard: View {
    private func unavailable(_ message: String) -> some View {
       Text(message)
          .font(.subheadline)
-         .foregroundStyle(.white.opacity(0.45))
+         .foregroundStyle(RideDashboardTheme.ink(0.45))
          .frame(maxWidth: .infinity, alignment: .leading)
          .padding(.horizontal, 14)
          .padding(.vertical, 8)

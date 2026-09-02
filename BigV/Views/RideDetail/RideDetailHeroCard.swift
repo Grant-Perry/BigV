@@ -27,7 +27,7 @@ struct RideDetailHeroCard: View {
       HStack(alignment: .firstTextBaseline) {
          Text(header.dateText)
             .font(.caption.weight(.semibold))
-            .foregroundStyle(.white.opacity(0.6))
+            .foregroundStyle(RideDashboardTheme.ink(0.6))
             .lineLimit(1)
             .minimumScaleFactor(0.8)
 
@@ -48,13 +48,13 @@ struct RideDetailHeroCard: View {
          Text(header.distance)
             .font(.system(size: 56, weight: .bold, design: .rounded))
             .monospacedDigit()
-            .foregroundStyle(.white)
+            .foregroundStyle(RideDashboardTheme.ink)
             .lineLimit(1)
             .minimumScaleFactor(0.6)
 
          Text(header.distanceUnit)
             .font(.headline.weight(.semibold))
-            .foregroundStyle(.white.opacity(0.45))
+            .foregroundStyle(RideDashboardTheme.ink(0.45))
       }
       .accessibilityElement(children: .combine)
       .accessibilityLabel("Distance")

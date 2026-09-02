@@ -21,7 +21,7 @@ struct RideWeatherAttributionLabel: View {
       Link(destination: url ?? Self.legalPage) {
          Text("Weather data · Apple Weather")
             .font(.caption2)
-            .foregroundStyle(.white.opacity(0.4))
+            .foregroundStyle(RideDashboardTheme.ink(0.4))
       }
       .accessibilityLabel("Weather data from Apple Weather")
       .accessibilityHint("Opens Apple's weather data sources page")

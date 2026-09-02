@@ -37,7 +37,7 @@ struct RideMapDrawer: View {
       .clipShape(.rect(cornerRadius: 18, style: .continuous))
       .overlay {
          RoundedRectangle(cornerRadius: 18, style: .continuous)
-            .strokeBorder(Color.white.opacity(0.16), lineWidth: 1)
+            .strokeBorder(RideDashboardTheme.ink(0.16), lineWidth: 1)
       }
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier("ride.drawer.map")
@@ -79,12 +79,12 @@ struct RideMapDrawer: View {
    private var handleGlyph: some View {
       if isOpen {
          Capsule()
-            .fill(.white.opacity(0.45))
+            .fill(RideDashboardTheme.ink(0.45))
             .frame(width: 36, height: 4)
       } else {
          Image(systemName: .showMapIcon)
             .font(.title3.weight(.semibold))
-            .foregroundStyle(.white.opacity(0.55))
+            .foregroundStyle(RideDashboardTheme.ink(0.55))
       }
    }
 
@@ -138,7 +138,7 @@ struct RideMapDrawer: View {
             .font(.body.weight(.semibold))
             .foregroundStyle(
                rideMapViewModel.isFollowingRider
-                  ? .white.opacity(0.85)
+                  ? RideDashboardTheme.ink(0.85)
                   : RideDashboardTheme.ice
             )
             .frame(width: RideDashboardTheme.fabSize, height: RideDashboardTheme.fabSize)

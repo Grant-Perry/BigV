@@ -21,7 +21,7 @@ struct RideRadarChip: View {
          RideSensorChip(
             value: readout,
             valueColor: readoutColor,
-            tint: chromeTint ?? (isSelected ? RideChromeTokens.ice.opacity(0.35) : nil)
+            tint: chromeTint ?? (isSelected ? RideDashboardTheme.ice.opacity(0.35) : nil)
          ) {
             Image(systemName: .radarIcon)
                .font(.caption.weight(.semibold))
@@ -33,7 +33,7 @@ struct RideRadarChip: View {
       .overlay {
          if isSelected {
             Capsule()
-               .strokeBorder(RideChromeTokens.ice.opacity(0.85), lineWidth: 2)
+               .strokeBorder(RideDashboardTheme.ice.opacity(0.85), lineWidth: 2)
          }
       }
       .accessibilityElement(children: .ignore)
@@ -61,22 +61,22 @@ struct RideRadarChip: View {
    // MARK: - Palette
 
    private var iconColor: Color {
-      guard connection.isConnected else { return .white.opacity(0.35) }
+      guard connection.isConnected else { return RideDashboardTheme.ink(0.35) }
 
       return switch tier {
-         case .high: RideChromeTokens.halt
-         case .approaching: RideChromeTokens.amber
-         case nil: RideChromeTokens.ice
+         case .high: RideDashboardTheme.halt
+         case .approaching: RideDashboardTheme.amber
+         case nil: RideDashboardTheme.ice
       }
    }
 
    private var readoutColor: Color {
-      guard connection.isConnected else { return .white.opacity(0.4) }
+      guard connection.isConnected else { return RideDashboardTheme.ink(0.4) }
 
       return switch tier {
-         case .high: RideChromeTokens.halt
-         case .approaching: RideChromeTokens.amber
-         case nil: .white.opacity(0.85)
+         case .high: RideDashboardTheme.halt
+         case .approaching: RideDashboardTheme.amber
+         case nil: RideDashboardTheme.ink(0.85)
       }
    }
 
@@ -84,8 +84,8 @@ struct RideRadarChip: View {
    /// vision even when the numerals are too small to read.
    private var chromeTint: Color? {
       switch tier {
-         case .high: RideChromeTokens.halt.opacity(0.35)
-         case .approaching: RideChromeTokens.amber.opacity(0.25)
+         case .high: RideDashboardTheme.halt.opacity(0.35)
+         case .approaching: RideDashboardTheme.amber.opacity(0.25)
          case nil: nil
       }
    }

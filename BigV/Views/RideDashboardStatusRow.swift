@@ -71,6 +71,9 @@ struct RideDashboardStatusRow: View {
          if !rideViewModel.isIdle, backToStartModel.isAvailable {
             backToStartChip
          }
+
+         // Day and night, one tap, on the screen the rider is squinting at.
+         RideAppearanceChip()
       }
       // The speed hero's floor will eat this row if it can. Pin the chips at
       // their intrinsic height so weather, pulse, and radar never collapse
@@ -90,7 +93,7 @@ struct RideDashboardStatusRow: View {
       } label: {
          Image(systemName: "house.fill")
             .font(.caption.weight(.semibold))
-            .foregroundStyle(.white.opacity(0.7))
+            .foregroundStyle(RideDashboardTheme.ink(0.7))
             .frame(width: 34, height: 34)
             .contentShape(.circle)
       }

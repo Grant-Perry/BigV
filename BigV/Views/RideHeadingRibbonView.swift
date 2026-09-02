@@ -92,7 +92,7 @@ struct RideHeadingRibbonView: View {
       RoundedRectangle(cornerRadius: 16, style: .continuous)
          .fill(
             LinearGradient(
-               colors: [Color.black.opacity(0.30), Color.black.opacity(0.50)],
+               colors: [RideDashboardTheme.veil(0.30), RideDashboardTheme.veil(0.50)],
                startPoint: .top,
                endPoint: .bottom
             )
@@ -101,7 +101,7 @@ struct RideHeadingRibbonView: View {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                .strokeBorder(
                   LinearGradient(
-                     colors: [.white.opacity(0.16), .white.opacity(0.03)],
+                     colors: [RideDashboardTheme.ink(0.16), RideDashboardTheme.ink(0.03)],
                      startPoint: .top,
                      endPoint: .bottom
                   ),
@@ -144,13 +144,13 @@ struct RideHeadingRibbonView: View {
          Text(heading)
             .font(.system(size: 13, weight: .bold, design: .rounded))
             .kerning(0.5)
-            .foregroundStyle(hasCourse && !isDimmed ? RideDashboardTheme.ice : .white.opacity(0.4))
+            .foregroundStyle(hasCourse && !isDimmed ? RideDashboardTheme.ice : RideDashboardTheme.ink(0.4))
 
          if hasCourse {
             Text(headingDegrees)
                .font(.system(size: 13, weight: .bold, design: .rounded))
                .monospacedDigit()
-               .foregroundStyle(isDimmed ? .white.opacity(0.35) : RideDashboardTheme.Compass.minty)
+               .foregroundStyle(isDimmed ? RideDashboardTheme.ink(0.35) : RideDashboardTheme.Compass.minty)
          }
       }
       .padding(.horizontal, 10)
@@ -239,13 +239,13 @@ private struct RideHeadingRose: View, Animatable {
             } else if isIntercardinal {
                let label = Text(Self.intercardinals[(mark / 45 - 1) / 2])
                   .font(.system(size: isExpanded ? 14 : 12, weight: .bold, design: .rounded))
-                  .foregroundStyle(Color.white.opacity(isDimmed ? 0.3 : 0.62))
+                  .foregroundStyle(RideDashboardTheme.ink(isDimmed ? 0.3 : 0.62))
                context.draw(label, at: CGPoint(x: x, y: labelY + 1), anchor: .center)
             } else if mark.isMultiple(of: 30) {
                let numeral = Text(String(mark))
                   .font(.system(size: 9, weight: .semibold, design: .rounded))
                   .monospacedDigit()
-                  .foregroundStyle(Color.white.opacity(isDimmed ? 0.2 : 0.42))
+                  .foregroundStyle(RideDashboardTheme.ink(isDimmed ? 0.2 : 0.42))
                context.draw(numeral, at: CGPoint(x: x, y: numeralY), anchor: .center)
             }
          }
@@ -253,12 +253,12 @@ private struct RideHeadingRose: View, Animatable {
    }
 
    private func cardinalColor(isNear: Bool) -> Color {
-      if isDimmed { return .white.opacity(0.4) }
+      if isDimmed { return RideDashboardTheme.ink(0.4) }
       return isNear ? RideDashboardTheme.Compass.nearRed : RideDashboardTheme.Compass.dialYellow
    }
 
    private func tickColor(isCardinal: Bool, isMajor: Bool) -> Color {
-      if isDimmed { return .white.opacity(isCardinal ? 0.28 : 0.12) }
+      if isDimmed { return RideDashboardTheme.ink(isCardinal ? 0.28 : 0.12) }
       if isCardinal { return RideDashboardTheme.ice.opacity(0.95) }
       return RideDashboardTheme.ice.opacity(isMajor ? 0.6 : 0.36)
    }
@@ -295,7 +295,7 @@ struct RideCompassNeedle: View {
             )
 
          NeedleFacet(side: .left)
-            .stroke(Color.white.opacity(0.25), lineWidth: 0.6)
+            .stroke(RideDashboardTheme.ink(0.25), lineWidth: 0.6)
       }
       .frame(width: width, height: height)
    }

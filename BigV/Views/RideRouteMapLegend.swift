@@ -20,15 +20,15 @@ struct RideRouteMapLegend: View {
          entry(.red, label: "Finish")
 
          if showsVehicles {
-            entry(RideChromeTokens.amber, label: "Vehicle")
+            entry(RideDashboardTheme.amber, label: "Vehicle")
          }
       }
       .padding(.horizontal, 10)
       .padding(.vertical, 5)
-      .background(.black.opacity(0.55), in: .capsule)
+      .background(RideDashboardTheme.veil(0.55), in: .capsule)
       .overlay {
          Capsule()
-            .strokeBorder(.white.opacity(0.12), lineWidth: 0.5)
+            .strokeBorder(RideDashboardTheme.ink(0.12), lineWidth: 0.5)
       }
       .accessibilityElement(children: .combine)
       .accessibilityLabel(
@@ -46,7 +46,7 @@ struct RideRouteMapLegend: View {
 
          Text(label)
             .font(.system(size: 10, weight: .semibold))
-            .foregroundStyle(.white.opacity(0.75))
+            .foregroundStyle(RideDashboardTheme.ink(0.75))
       }
    }
 }

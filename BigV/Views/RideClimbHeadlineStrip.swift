@@ -55,7 +55,7 @@ struct RideClimbHeadlineStrip: View {
       _ label: String,
       value: String,
       unit: String?,
-      tint: Color = .white
+      tint: Color = RideDashboardTheme.ink
    ) -> some View {
       VStack(spacing: 4) {
          HStack(alignment: .firstTextBaseline, spacing: 2) {
@@ -69,14 +69,14 @@ struct RideClimbHeadlineStrip: View {
             if let unit {
                Text(unit)
                   .font(.system(size: 10, weight: .semibold))
-                  .foregroundStyle(.white.opacity(0.4))
+                  .foregroundStyle(RideDashboardTheme.ink(0.4))
             }
          }
 
          Text(label)
             .font(.system(size: 9, weight: .bold))
             .kerning(0.8)
-            .foregroundStyle(.white.opacity(0.45))
+            .foregroundStyle(RideDashboardTheme.ink(0.45))
       }
       .frame(maxWidth: .infinity)
       .padding(.vertical, 12)
@@ -118,18 +118,18 @@ struct RideClimbHeadlineStrip: View {
             Text(rideClimbModel.nextClimbDistanceText ?? "")
                .font(.system(size: 14, weight: .bold, design: .rounded))
                .monospacedDigit()
-               .foregroundStyle(.white)
+               .foregroundStyle(RideDashboardTheme.ink)
          }
 
          Text(rideClimbModel.nextClimbDemandText ?? "")
             .font(.system(size: 12, weight: .semibold, design: .rounded))
             .monospacedDigit()
-            .foregroundStyle(.white.opacity(0.6))
+            .foregroundStyle(RideDashboardTheme.ink(0.6))
 
          Text("NEXT CLIMB")
             .font(.system(size: 9, weight: .bold))
             .kerning(0.8)
-            .foregroundStyle(.white.opacity(0.45))
+            .foregroundStyle(RideDashboardTheme.ink(0.45))
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(.horizontal, 14)
@@ -146,7 +146,7 @@ struct RideClimbHeadlineStrip: View {
          Text("NEXT CLIMB")
             .font(.system(size: 9, weight: .bold))
             .kerning(0.8)
-            .foregroundStyle(.white.opacity(0.45))
+            .foregroundStyle(RideDashboardTheme.ink(0.45))
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(.horizontal, 14)

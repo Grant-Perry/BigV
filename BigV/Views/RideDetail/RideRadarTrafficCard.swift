@@ -39,15 +39,15 @@ struct RideRadarTrafficCard: View {
 
    private var legend: some View {
       HStack(spacing: 12) {
-         legendDot(RideChromeTokens.amber, label: "Pass")
-         legendDot(RideChromeTokens.halt, label: "Fast approach")
+         legendDot(RideDashboardTheme.amber, label: "Pass")
+         legendDot(RideDashboardTheme.halt, label: "Fast approach")
 
          Spacer()
 
          Text("MINUTES ACROSS · \(report.radarDistanceUnit) UP")
             .font(.system(size: 8, weight: .semibold))
             .kerning(0.6)
-            .foregroundStyle(.white.opacity(0.3))
+            .foregroundStyle(RideDashboardTheme.ink(0.3))
       }
    }
 
@@ -59,7 +59,7 @@ struct RideRadarTrafficCard: View {
 
          Text(label)
             .font(.system(size: 9, weight: .medium))
-            .foregroundStyle(.white.opacity(0.5))
+            .foregroundStyle(RideDashboardTheme.ink(0.5))
       }
    }
 
@@ -86,7 +86,7 @@ struct RideRadarTrafficCard: View {
             RideDetailFootnoteStat(
                label: "FAST",
                value: highCount,
-               tint: RideChromeTokens.halt
+               tint: RideDashboardTheme.halt
             )
          }
       }

@@ -119,7 +119,7 @@ struct RoutePreviewStageView: View {
                routePlannerViewModel.cancelPreview()
             }
             .buttonStyle(.bordered)
-            .tint(.white.opacity(0.5))
+            .tint(RideDashboardTheme.ink(0.5))
             .accessibilityIdentifier("planner.button.back")
 
             Button {
@@ -162,7 +162,7 @@ struct RoutePreviewStageView: View {
          if routePlannerViewModel.isPlanningApproach {
             Text("Getting you to the start…")
                .font(.caption.weight(.medium))
-               .foregroundStyle(.white.opacity(0.55))
+               .foregroundStyle(RideDashboardTheme.ink(0.55))
          }
       }
       .padding(.horizontal, 16)

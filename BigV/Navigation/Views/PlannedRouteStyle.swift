@@ -18,7 +18,7 @@ enum PlannedRouteStyle {
 
    /// Candidates the rider has not selected. Deliberately colourless so the
    /// selected route is the only guided line on the map.
-   static let alternateLine = Color.white.opacity(0.32)
+   static let alternateLine = RideDashboardTheme.ink(0.32)
 
    static let destinationMarker = RideDashboardTheme.ember
 

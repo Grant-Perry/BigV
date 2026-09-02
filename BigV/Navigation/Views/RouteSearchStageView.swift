@@ -83,19 +83,19 @@ struct RouteSearchStageView: View {
             HStack(spacing: 8) {
                Text("Favorites")
                   .font(.subheadline.weight(.bold))
-                  .foregroundStyle(.white.opacity(0.85))
+                  .foregroundStyle(RideDashboardTheme.ink(0.85))
 
                Text("\(routePlannerViewModel.favorites.count)")
                   .font(.caption.weight(.semibold))
                   .monospacedDigit()
-                  .foregroundStyle(.white.opacity(0.45))
+                  .foregroundStyle(RideDashboardTheme.ink(0.45))
 
                Spacer(minLength: 0)
 
                StarBoomChevron(
                   isExpanded: isFavoritesExpanded,
                   boomTrigger: favoritesSectionBoomTrigger,
-                  foregroundColor: .white.opacity(0.55)
+                  foregroundColor: RideDashboardTheme.ink(0.55)
                )
             }
             .padding(.horizontal, 14)
@@ -133,7 +133,7 @@ struct RouteSearchStageView: View {
          }
          .listRowBackground(Color.clear)
          .listRowInsets(.init(top: 4, leading: 0, bottom: 4, trailing: 0))
-         .listRowSeparatorTint(.white.opacity(0.12))
+         .listRowSeparatorTint(RideDashboardTheme.ink(0.12))
          .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             Button(role: .destructive) {
                routePlannerViewModel.removeFavorite(id: favorite.id)
@@ -165,7 +165,7 @@ struct RouteSearchStageView: View {
       } label: {
          Label("Import GPX Route", systemImage: "square.and.arrow.down")
             .font(.subheadline.weight(.semibold))
-            .foregroundStyle(.white.opacity(0.75))
+            .foregroundStyle(RideDashboardTheme.ink(0.75))
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
       }
@@ -181,11 +181,11 @@ struct RouteSearchStageView: View {
       HStack(spacing: 10) {
          Image(systemName: .searchIcon)
             .font(.subheadline.weight(.semibold))
-            .foregroundStyle(.white.opacity(0.45))
+            .foregroundStyle(RideDashboardTheme.ink(0.45))
 
          TextField("Address or place", text: $routePlannerViewModel.query)
             .font(.title3.weight(.medium))
-            .foregroundStyle(.white)
+            .foregroundStyle(RideDashboardTheme.ink)
             .textInputAutocapitalization(.words)
             .autocorrectionDisabled()
             .submitLabel(.search)
@@ -198,7 +198,7 @@ struct RouteSearchStageView: View {
             } label: {
                Image(systemName: .clearIcon)
                   .font(.subheadline)
-                  .foregroundStyle(.white.opacity(0.4))
+                  .foregroundStyle(RideDashboardTheme.ink(0.4))
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Clear search")
@@ -233,7 +233,7 @@ struct RouteSearchStageView: View {
          .buttonStyle(.plain)
          .listRowBackground(Color.clear)
          .listRowInsets(.init(top: 4, leading: 0, bottom: 4, trailing: 0))
-         .listRowSeparatorTint(.white.opacity(0.12))
+         .listRowSeparatorTint(RideDashboardTheme.ink(0.12))
          .accessibilityIdentifier("planner.suggestion.\(index)")
       }
       .listStyle(.plain)
@@ -244,7 +244,7 @@ struct RouteSearchStageView: View {
    private var hint: some View {
       Text("Apple provides the cycling route. Coverage is best in cities.")
          .font(.footnote)
-         .foregroundStyle(.white.opacity(0.35))
+         .foregroundStyle(RideDashboardTheme.ink(0.35))
          .multilineTextAlignment(.center)
          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
          .padding(.top, 24)
@@ -255,7 +255,7 @@ struct RouteSearchStageView: View {
    private func statusMessage(_ message: String) -> some View {
       Text(message)
          .font(.subheadline.weight(.medium))
-         .foregroundStyle(.white.opacity(0.5))
+         .foregroundStyle(RideDashboardTheme.ink(0.5))
          .multilineTextAlignment(.center)
          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
          .padding(.top, 24)
@@ -278,7 +278,7 @@ private struct RouteFavoriteRowView: View {
          HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(title)
                .font(.body.weight(.semibold))
-               .foregroundStyle(.white)
+               .foregroundStyle(RideDashboardTheme.ink)
                .lineLimit(1)
 
             Spacer(minLength: 8)
@@ -286,7 +286,7 @@ private struct RouteFavoriteRowView: View {
             Text(distanceText)
                .font(.caption.weight(.semibold))
                .monospacedDigit()
-               .foregroundStyle(.white.opacity(0.55))
+               .foregroundStyle(RideDashboardTheme.ink(0.55))
          }
 
          HStack(spacing: 6) {
@@ -297,12 +297,12 @@ private struct RouteFavoriteRowView: View {
             if let climbSummary {
                Text("·")
                   .font(.caption2)
-                  .foregroundStyle(.white.opacity(0.25))
+                  .foregroundStyle(RideDashboardTheme.ink(0.25))
 
                Text(climbSummary)
                   .font(.caption2.weight(.medium))
                   .monospacedDigit()
-                  .foregroundStyle(.white.opacity(0.45))
+                  .foregroundStyle(RideDashboardTheme.ink(0.45))
             }
          }
       }
@@ -339,12 +339,12 @@ private struct RouteSuggestionRowView: View {
       VStack(alignment: .leading, spacing: 2) {
          Text(suggestion.title)
             .font(.body.weight(.semibold))
-            .foregroundStyle(.white)
+            .foregroundStyle(RideDashboardTheme.ink)
 
          if suggestion.hasSubtitle {
             Text(suggestion.subtitle)
                .font(.caption)
-               .foregroundStyle(.white.opacity(0.5))
+               .foregroundStyle(RideDashboardTheme.ink(0.5))
          }
       }
       .frame(maxWidth: .infinity, alignment: .leading)

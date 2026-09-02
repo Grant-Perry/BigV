@@ -22,7 +22,7 @@ struct RoutePlanningFailureView: View {
 
          Text(failure.message)
             .font(.footnote)
-            .foregroundStyle(.white.opacity(0.7))
+            .foregroundStyle(RideDashboardTheme.ink(0.7))
             .fixedSize(horizontal: false, vertical: true)
       }
       .frame(maxWidth: .infinity, alignment: .leading)

@@ -20,7 +20,7 @@ struct RideMapFABStack: View {
             HStack(spacing: 12) {
                circleButton(
                   icon: rideMapViewModel.isPitched ? .flatIcon : .pitchedIcon,
-                  tint: rideMapViewModel.isPitched ? RideDashboardTheme.ice : .white.opacity(0.85),
+                  tint: rideMapViewModel.isPitched ? RideDashboardTheme.ice : RideDashboardTheme.ink(0.85),
                   label: rideMapViewModel.isPitched ? "2D map" : "3D map",
                   identifier: "map.button.pitch",
                   action: rideMapViewModel.togglePitch
@@ -28,7 +28,7 @@ struct RideMapFABStack: View {
 
                circleButton(
                   icon: rideMapViewModel.isSatellite ? .roadIcon : .satelliteIcon,
-                  tint: rideMapViewModel.isSatellite ? RideDashboardTheme.ember : .white.opacity(0.85),
+                  tint: rideMapViewModel.isSatellite ? RideDashboardTheme.ember : RideDashboardTheme.ink(0.85),
                   label: rideMapViewModel.isSatellite ? "Road view" : "Satellite view",
                   identifier: "map.button.imagery",
                   action: rideMapViewModel.toggleSatellite
@@ -47,7 +47,7 @@ struct RideMapFABStack: View {
 
       return circleButton(
          icon: isFollowing ? .panIcon : .recenterIcon,
-         tint: isFollowing ? .white.opacity(0.8) : RideDashboardTheme.ice,
+         tint: isFollowing ? RideDashboardTheme.ink(0.8) : RideDashboardTheme.ice,
          label: isFollowing ? "Explore the map" : "Re-center on rider",
          identifier: "map.button.cameraMode",
          action: rideMapViewModel.toggleCameraMode

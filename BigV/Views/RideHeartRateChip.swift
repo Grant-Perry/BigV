@@ -29,13 +29,13 @@ struct RideHeartRateChip: View {
       .overlay {
          if isSelected {
             Capsule()
-               .strokeBorder(RideChromeTokens.ice.opacity(0.85), lineWidth: 2)
+               .strokeBorder(RideDashboardTheme.ice.opacity(0.85), lineWidth: 2)
          }
       }
    }
 
    private var chipContent: some View {
-      RideSensorChip(value: value, tint: isSelected ? RideChromeTokens.ice.opacity(0.35) : nil) {
+      RideSensorChip(value: value, tint: isSelected ? RideDashboardTheme.ice.opacity(0.35) : nil) {
          RideHeartPulseView(
             beatsPerMinute: beatsPerMinute,
             isBeating: beatsPerMinute != nil,

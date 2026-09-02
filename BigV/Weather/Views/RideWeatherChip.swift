@@ -56,7 +56,7 @@ struct RideWeatherChip: View {
          Image(systemName: snapshot.symbolName)
             .font(.caption.weight(.semibold))
             .symbolRenderingMode(.hierarchical)
-            .foregroundStyle(RideChromeTokens.ice)
+            .foregroundStyle(RideDashboardTheme.ice)
       }
    }
 
@@ -70,7 +70,7 @@ struct RideWeatherChip: View {
          Image(systemName: rideWeatherModel.isLoading ? .pendingIcon : .absentIcon)
             .font(.caption.weight(.semibold))
             .symbolRenderingMode(.hierarchical)
-            .foregroundStyle(.white.opacity(0.4))
+            .foregroundStyle(RideDashboardTheme.ink(0.4))
       }
    }
 

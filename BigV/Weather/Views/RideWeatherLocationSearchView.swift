@@ -39,7 +39,7 @@ struct RideWeatherLocationSearchView: View {
                }
             }
       }
-      .preferredColorScheme(.dark)
+      .rideAppearance()
       .task(id: searchText) {
          // Debounced by the task's own cancellation: a new keystroke replaces
          // this one before the sleep completes, so only the last query flies.
@@ -55,7 +55,7 @@ struct RideWeatherLocationSearchView: View {
    private var content: some View {
       if isSearching {
          ProgressView()
-            .tint(.white)
+            .tint(RideDashboardTheme.ink)
       } else if !results.isEmpty {
          resultList
       } else if !trimmedQuery.isEmpty {
@@ -95,17 +95,17 @@ struct RideWeatherLocationSearchView: View {
       HStack(spacing: 12) {
          Image(systemName: "mappin.circle.fill")
             .font(.title3)
-            .foregroundStyle(RideChromeTokens.ice)
+            .foregroundStyle(RideDashboardTheme.ice)
 
          VStack(alignment: .leading, spacing: 2) {
             Text(item.name ?? "Unknown")
                .font(.subheadline.weight(.semibold))
-               .foregroundStyle(.white)
+               .foregroundStyle(RideDashboardTheme.ink)
 
             if let address = address(for: item) {
                Text(address)
                   .font(.caption)
-                  .foregroundStyle(.white.opacity(0.55))
+                  .foregroundStyle(RideDashboardTheme.ink(0.55))
                   .lineLimit(2)
             }
          }

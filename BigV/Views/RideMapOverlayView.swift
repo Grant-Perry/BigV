@@ -76,13 +76,13 @@ struct RideMapOverlayView: View {
 
          Text(name)
             .font(.footnote.weight(.semibold))
-            .foregroundStyle(.white.opacity(0.9))
+            .foregroundStyle(RideDashboardTheme.ink(0.9))
             .lineLimit(1)
 
          Button(action: rideMapViewModel.clearPlannedRoute) {
             Image(systemName: .clearRouteIcon)
                .font(.footnote)
-               .foregroundStyle(.white.opacity(0.55))
+               .foregroundStyle(RideDashboardTheme.ink(0.55))
                .frame(width: 28, height: 28)
                .contentShape(.circle)
          }
@@ -111,9 +111,9 @@ struct RideMapOverlayView: View {
          Text(degrees)
             .font(.caption2.weight(.medium))
             .monospacedDigit()
-            .foregroundStyle(.white.opacity(0.5))
+            .foregroundStyle(RideDashboardTheme.ink(0.5))
       }
-      .foregroundStyle(.white.opacity(0.9))
+      .foregroundStyle(RideDashboardTheme.ink(0.9))
       .padding(.horizontal, 10)
       .padding(.vertical, 6)
       .rideGlassChrome(in: .capsule)

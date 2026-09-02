@@ -72,7 +72,7 @@ struct RideHistoryView: View {
                Text("EARLIER")
                   .font(.caption2.weight(.bold))
                   .kerning(1.4)
-                  .foregroundStyle(.white.opacity(0.4))
+                  .foregroundStyle(RideDashboardTheme.ink(0.4))
                   .frame(maxWidth: .infinity, alignment: .leading)
                   .padding(.top, 8)
                   .padding(.leading, 4)

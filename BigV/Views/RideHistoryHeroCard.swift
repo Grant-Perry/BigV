@@ -71,7 +71,7 @@ struct RideHistoryHeroCard: View {
 
             Text(row.dateText)
                .font(.title3.weight(.semibold))
-               .foregroundStyle(.white)
+               .foregroundStyle(RideDashboardTheme.ink)
          }
 
          Spacer(minLength: 8)
@@ -86,7 +86,7 @@ struct RideHistoryHeroCard: View {
                Text(temperature)
                   .font(.subheadline.weight(.semibold))
                   .monospacedDigit()
-                  .foregroundStyle(.white.opacity(0.75))
+                  .foregroundStyle(RideDashboardTheme.ink(0.75))
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel("Weather \(temperature)")
@@ -110,18 +110,18 @@ struct RideHistoryHeroCard: View {
          Text(title)
             .font(.caption2.weight(.semibold))
             .kerning(0.8)
-            .foregroundStyle(.white.opacity(0.42))
+            .foregroundStyle(RideDashboardTheme.ink(0.42))
 
          HStack(alignment: .firstTextBaseline, spacing: 3) {
             Text(value)
                .font(.system(size: 20, weight: .semibold, design: .rounded))
                .monospacedDigit()
-               .foregroundStyle(.white)
+               .foregroundStyle(RideDashboardTheme.ink)
 
             if let unit {
                Text(unit)
                   .font(.caption2.weight(.semibold))
-                  .foregroundStyle(.white.opacity(0.45))
+                  .foregroundStyle(RideDashboardTheme.ink(0.45))
             }
          }
       }
@@ -134,11 +134,11 @@ struct RideHistoryHeroCard: View {
       HStack(spacing: 6) {
          Image(systemName: "car.rear.fill")
             .font(.caption2)
-            .foregroundStyle(RideChromeTokens.amber)
+            .foregroundStyle(RideDashboardTheme.amber)
 
          Text("\(row.vehicleCount) vehicle\(row.vehicleCount == 1 ? "" : "s") tracked by radar")
             .font(.caption.weight(.medium))
-            .foregroundStyle(.white.opacity(0.55))
+            .foregroundStyle(RideDashboardTheme.ink(0.55))
       }
       .accessibilityElement(children: .combine)
    }
@@ -150,7 +150,7 @@ struct RideHistoryHeroCard: View {
    private var reportFooter: some View {
       VStack(spacing: 10) {
          Rectangle()
-            .fill(.white.opacity(0.08))
+            .fill(RideDashboardTheme.ink(0.08))
             .frame(height: 1)
 
          HStack {

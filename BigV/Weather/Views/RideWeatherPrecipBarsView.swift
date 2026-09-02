@@ -83,7 +83,7 @@ struct RideWeatherPrecipBarsView: View {
    private func caption(for bar: RidePrecipBar) -> some View {
       Text(RidePrecipForecast.percentLabel(bar.precipitationChance))
          .font(.system(size: 9, weight: .bold))
-         .foregroundStyle(.white.opacity(bar.isWet ? 0.95 : 0.4))
+         .foregroundStyle(RideDashboardTheme.ink(bar.isWet ? 0.95 : 0.4))
          .lineLimit(1)
          .minimumScaleFactor(0.5)
          .padding(.horizontal, 1)
@@ -93,7 +93,7 @@ struct RideWeatherPrecipBarsView: View {
    private func fill(isWet: Bool, fraction: Double) -> LinearGradient {
       LinearGradient(
          colors: [
-            RideChromeTokens.ice.opacity(isWet ? 0.95 : 0.30),
+            RideDashboardTheme.ice.opacity(isWet ? 0.95 : 0.30),
             RideDashboardTheme.midnight.opacity(isWet ? 0.78 + 0.18 * fraction : 0.14)
          ],
          startPoint: .top,
@@ -109,7 +109,7 @@ struct RideWeatherPrecipBarsView: View {
             ForEach(axisMarkers) { marker in
                Text(marker.label)
                   .font(.system(size: isHourly ? 11 : 8, weight: .bold))
-                  .foregroundStyle(.white.opacity(0.35))
+                  .foregroundStyle(RideDashboardTheme.ink(0.35))
                   .position(x: proxy.size.width * marker.fraction, y: 7)
             }
          }
@@ -134,7 +134,7 @@ struct RideWeatherPrecipBarsView: View {
          if isHourly {
             Text("100%")
                .font(.system(size: 7, weight: .bold))
-               .foregroundStyle(.white.opacity(0.28))
+               .foregroundStyle(RideDashboardTheme.ink(0.28))
                .padding(.top, 2)
          }
       }
@@ -143,7 +143,7 @@ struct RideWeatherPrecipBarsView: View {
 
    private func gridLine(opacity: Double) -> some View {
       Rectangle()
-         .fill(.white.opacity(opacity))
+         .fill(RideDashboardTheme.ink(opacity))
          .frame(height: 1)
    }
 }

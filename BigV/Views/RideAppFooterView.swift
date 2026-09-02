@@ -36,7 +36,7 @@ struct RideAppFooterView: View {
          }
       }
       .multilineTextAlignment(.center)
-      .foregroundStyle(.white.opacity(0.34))
+      .foregroundStyle(RideDashboardTheme.ink(0.34))
       .frame(maxWidth: .infinity)
       .accessibilityElement(children: .combine)
       .accessibilityLabel("\(AppConstants.appVersionLine). \(AppConstants.copyrightLine)")

@@ -63,15 +63,15 @@ struct RidePlusPricingCard: View {
             VStack(alignment: .leading, spacing: 2) {
                Text(title)
                   .font(.subheadline.weight(.semibold))
-                  .foregroundStyle(.white)
+                  .foregroundStyle(RideDashboardTheme.ink)
                Text(detail)
                   .font(.caption)
-                  .foregroundStyle(.white.opacity(0.6))
+                  .foregroundStyle(RideDashboardTheme.ink(0.6))
             }
             Spacer()
             if plusStore.isPurchasing {
                ProgressView()
-                  .tint(.white)
+                  .tint(RideDashboardTheme.ink)
             } else {
                Image(systemName: emphasized ? "sparkles" : "plus.circle")
                   .foregroundStyle(emphasized ? RideDashboardTheme.ember : RideDashboardTheme.ice)
@@ -80,12 +80,12 @@ struct RidePlusPricingCard: View {
          .padding(12)
          .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-               .fill(emphasized ? RideDashboardTheme.ember.opacity(0.18) : Color.white.opacity(0.06))
+               .fill(emphasized ? RideDashboardTheme.ember.opacity(0.18) : RideDashboardTheme.ink(0.06))
          )
          .overlay {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                .strokeBorder(
-                  emphasized ? RideDashboardTheme.ember.opacity(0.55) : Color.white.opacity(0.12),
+                  emphasized ? RideDashboardTheme.ember.opacity(0.55) : RideDashboardTheme.ink(0.12),
                   lineWidth: 1
                )
          }

@@ -27,7 +27,7 @@ struct RouteGuidanceTurnListView: View {
 
                if turn.id != routeGuidanceViewModel.turns.last?.id {
                   Divider()
-                     .overlay(Color.white.opacity(0.12))
+                     .overlay(RideDashboardTheme.ink(0.12))
                }
             }
          }
@@ -49,13 +49,13 @@ struct RouteGuidanceTurnListView: View {
       return HStack(alignment: .top, spacing: 12) {
          Image(systemName: PlannedRouteManeuverIcon.systemName(for: turn.instruction))
             .font(.body.weight(.semibold))
-            .foregroundStyle(isUpcoming || isSelected ? RideDashboardTheme.ember : .white.opacity(0.8))
+            .foregroundStyle(isUpcoming || isSelected ? RideDashboardTheme.ember : RideDashboardTheme.ink(0.8))
             .frame(width: 22)
 
          VStack(alignment: .leading, spacing: 2) {
             Text(turn.instruction)
                .font(.subheadline.weight(isUpcoming || isSelected ? .bold : .semibold))
-               .foregroundStyle(.white)
+               .foregroundStyle(RideDashboardTheme.ink)
                .fixedSize(horizontal: false, vertical: true)
 
             if let notice = turn.notice {
@@ -72,7 +72,7 @@ struct RouteGuidanceTurnListView: View {
             Text(distance)
                .font(.footnote.weight(.bold))
                .monospacedDigit()
-               .foregroundStyle(isUpcoming ? RideDashboardTheme.ember : .white.opacity(0.65))
+               .foregroundStyle(isUpcoming ? RideDashboardTheme.ember : RideDashboardTheme.ink(0.65))
          }
       }
       .padding(.vertical, 10)

@@ -36,21 +36,21 @@ struct RideWeatherPrecipCard: View {
          HStack(spacing: 5) {
             Text(title)
                .font(.system(size: 13, weight: .bold))
-               .foregroundStyle(.white)
+               .foregroundStyle(RideDashboardTheme.ink)
                .lineLimit(1)
                .minimumScaleFactor(0.75)
                .contentTransition(.opacity)
 
             Image(systemName: "chevron.up.chevron.down")
                .font(.system(size: 10, weight: .bold))
-               .foregroundStyle(.white.opacity(0.35))
+               .foregroundStyle(RideDashboardTheme.ink(0.35))
 
             Spacer(minLength: 0)
          }
 
          Text(summary)
             .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(.white.opacity(0.55))
+            .foregroundStyle(RideDashboardTheme.ink(0.55))
             .lineLimit(2)
             .minimumScaleFactor(0.8)
             .contentTransition(.opacity)
@@ -77,7 +77,7 @@ struct RideWeatherPrecipCard: View {
       if bars.isEmpty {
          Text("Precipitation chart unavailable")
             .font(.caption)
-            .foregroundStyle(.white.opacity(0.45))
+            .foregroundStyle(RideDashboardTheme.ink(0.45))
             .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
       } else {
          RideWeatherPrecipBarsView(bars: bars, axisMarkers: axisMarkers(for: bars))

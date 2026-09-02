@@ -100,8 +100,8 @@ struct RideRadarTapeView: View {
          .fill(
             LinearGradient(
                colors: [
-                  RideChromeTokens.graphite.opacity(0.36),
-                  RideChromeTokens.void.opacity(0.55)
+                  RideDashboardTheme.graphite.opacity(0.36),
+                  RideDashboardTheme.void.opacity(0.55)
                ],
                startPoint: .top,
                endPoint: .bottom
@@ -109,7 +109,7 @@ struct RideRadarTapeView: View {
          )
          .overlay {
             RoundedRectangle(cornerRadius: railCornerRadius, style: .continuous)
-               .strokeBorder(.white.opacity(0.08), lineWidth: 1)
+               .strokeBorder(RideDashboardTheme.ink(0.08), lineWidth: 1)
          }
    }
 
@@ -224,7 +224,7 @@ struct RideRadarTapeView: View {
    private var riderMark: some View {
       Image(systemName: isVertical ? .riderIconVertical : .riderIconHorizontal)
          .font(.system(size: 13 * scale, weight: .bold))
-         .foregroundStyle(isDimmed ? .white.opacity(0.30) : RideChromeTokens.ice)
+         .foregroundStyle(isDimmed ? RideDashboardTheme.ink(0.30) : RideDashboardTheme.ice)
          .accessibilityHidden(true)
    }
 
@@ -248,7 +248,7 @@ struct RideRadarTapeView: View {
          } else {
             Text("—")
                .font(readoutFont)
-               .foregroundStyle(.white.opacity(0.28))
+               .foregroundStyle(RideDashboardTheme.ink(0.28))
          }
       }
       // A horizontal readout sits inline with the rail, so it needs a reserved
@@ -258,25 +258,25 @@ struct RideRadarTapeView: View {
 
    private var readoutColor: Color {
       switch tracks.map(\.tier).max() {
-         case .high: RideChromeTokens.halt
-         case .approaching: RideChromeTokens.amber
-         case nil: .white.opacity(0.45)
+         case .high: RideDashboardTheme.halt
+         case .approaching: RideDashboardTheme.amber
+         case nil: RideDashboardTheme.ink(0.45)
       }
    }
 
    // MARK: - Palette
 
    private var chromeColor: Color {
-      isDimmed ? .white : RideChromeTokens.ice
+      isDimmed ? RideDashboardTheme.ink : RideDashboardTheme.ice
    }
 
    private func tierColor(_ tier: RideRadarThreatTier) -> Color {
       if isDimmed {
-         return .white.opacity(0.35)
+         return RideDashboardTheme.ink(0.35)
       }
       return switch tier {
-         case .approaching: RideChromeTokens.amber
-         case .high: RideChromeTokens.halt
+         case .approaching: RideDashboardTheme.amber
+         case .high: RideDashboardTheme.halt
       }
    }
 

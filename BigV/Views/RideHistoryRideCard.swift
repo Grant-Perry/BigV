@@ -16,12 +16,12 @@ struct RideHistoryRideCard: View {
          VStack(alignment: .leading, spacing: 4) {
             Text(row.dateText)
                .font(.subheadline.weight(.semibold))
-               .foregroundStyle(.white)
+               .foregroundStyle(RideDashboardTheme.ink)
 
             Text("\(row.averageSpeedText) \(row.speedUnit) avg")
                .font(.caption.weight(.medium))
                .monospacedDigit()
-               .foregroundStyle(.white.opacity(0.42))
+               .foregroundStyle(RideDashboardTheme.ink(0.42))
          }
 
          Spacer(minLength: 8)
@@ -30,17 +30,17 @@ struct RideHistoryRideCard: View {
             Text("\(row.distanceText) \(distanceUnit)")
                .font(.body.weight(.semibold))
                .monospacedDigit()
-               .foregroundStyle(.white)
+               .foregroundStyle(RideDashboardTheme.ink)
 
             Text(row.durationText)
                .font(.caption.weight(.medium))
                .monospacedDigit()
-               .foregroundStyle(.white.opacity(0.45))
+               .foregroundStyle(RideDashboardTheme.ink(0.45))
          }
 
          Image(systemName: .chevronIcon)
             .font(.caption.weight(.semibold))
-            .foregroundStyle(.white.opacity(0.28))
+            .foregroundStyle(RideDashboardTheme.ink(0.28))
       }
       .padding(.horizontal, 16)
       .padding(.vertical, 14)

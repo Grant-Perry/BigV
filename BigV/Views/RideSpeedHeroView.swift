@@ -33,6 +33,8 @@ struct RideSpeedHeroView: View {
    var isSpeedChartSelected: Bool = false
    var onSelectSpeedChart: (() -> Void)? = nil
 
+   @Environment(\.colorScheme) private var colorScheme
+
    private var hasSatellites: Bool {
       layout == .portrait && (averageValue != nil || maximumValue != nil)
    }
@@ -102,7 +104,7 @@ struct RideSpeedHeroView: View {
          RoundedRectangle(cornerRadius: 24, style: .continuous)
             .strokeBorder(
                LinearGradient(
-                  colors: [.white.opacity(0.22), .white.opacity(0.04), RideDashboardTheme.ember.opacity(0.14)],
+                  colors: [RideDashboardTheme.ink(0.22), RideDashboardTheme.ink(0.04), RideDashboardTheme.ember.opacity(0.14)],
                   startPoint: .topLeading,
                   endPoint: .bottomTrailing
                ),
@@ -128,14 +130,14 @@ struct RideSpeedHeroView: View {
             .lineLimit(1)
             .minimumScaleFactor(0.6)
             .foregroundStyle(numeralColor)
-            .shadow(color: .black.opacity(0.35), radius: 10, y: 4)
+            .shadow(color: RideDashboardTheme.veil(0.35), radius: 10, y: 4)
             .accessibilityIdentifier("ride.speed")
             .accessibilityLabel("Speed")
             .accessibilityValue("\(value) \(unit)")
 
          Text(unit)
             .font(layout == .landscape ? .headline.weight(.bold) : (isExpanded ? .title.weight(.bold) : .title2.weight(.bold)))
-            .foregroundStyle(isDimmed ? .white.opacity(0.28) : RideDashboardTheme.amber)
+            .foregroundStyle(isDimmed ? RideDashboardTheme.ink(0.28) : RideDashboardTheme.amber)
       }
       .frame(maxWidth: .infinity)
    }
@@ -164,18 +166,18 @@ struct RideSpeedHeroView: View {
                Text(title)
                   .font(.caption2.weight(.bold))
                   .kerning(1)
-                  .foregroundStyle(isSpeedChartSelected ? RideDashboardTheme.ice : .white.opacity(0.55))
+                  .foregroundStyle(isSpeedChartSelected ? RideDashboardTheme.ice : RideDashboardTheme.ink(0.55))
 
                Text(value)
                   .font(.system(size: 18, weight: .semibold, design: .rounded))
                   .monospacedDigit()
                   .lineLimit(1)
                   .minimumScaleFactor(0.7)
-                  .foregroundStyle(isDimmed ? .white.opacity(0.4) : .white.opacity(0.94))
+                  .foregroundStyle(isDimmed ? RideDashboardTheme.ink(0.4) : RideDashboardTheme.ink(0.94))
 
                Text(unit)
                   .font(.caption2.weight(.semibold))
-                  .foregroundStyle(.white.opacity(0.42))
+                  .foregroundStyle(RideDashboardTheme.ink(0.42))
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
@@ -206,6 +208,14 @@ struct RideSpeedHeroView: View {
             RideTrailPlateView(plateName: RideAtmosphereScene.speedCluster.plateName)
          }
          .overlay {
+            // By day the photo is all but gone: black numerals over an ember
+            // trail are exactly the unreadable screen the day face exists to
+            // fix, so the plate becomes paper with a memory of the trail.
+            if colorScheme != .dark {
+               RideDashboardTheme.veil(0.66)
+            }
+         }
+         .overlay {
             // Settle the bottom so the ribbon's letters read over the photo.
             LinearGradient(
                colors: [.clear, .clear, RideDashboardTheme.void.opacity(0.55)],
@@ -219,7 +229,7 @@ struct RideSpeedHeroView: View {
    }
 
    private var numeralColor: Color {
-      isDimmed ? .white.opacity(0.35) : .white
+      isDimmed ? RideDashboardTheme.ink(0.35) : RideDashboardTheme.ink
    }
 
    private func glow(numeralSize: CGFloat) -> some View {
@@ -229,7 +239,7 @@ struct RideSpeedHeroView: View {
                .fill(
                   RadialGradient(
                      colors: [
-                        (isDimmed ? Color.white : RideDashboardTheme.ice).opacity(isDimmed ? 0.05 : 0.22),
+                        (isDimmed ? RideDashboardTheme.ink : RideDashboardTheme.ice).opacity(isDimmed ? 0.05 : 0.22),
                         .clear
                      ],
                      center: .center,

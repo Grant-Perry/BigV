@@ -30,7 +30,7 @@ struct RideStatusBar: View {
             if showsLabel {
                Text(statusText)
                   .font(.caption.weight(.semibold))
-                  .foregroundStyle(.white.opacity(0.88))
+                  .foregroundStyle(RideDashboardTheme.ink(0.88))
             }
 
             Spacer(minLength: 0)
@@ -39,7 +39,7 @@ struct RideStatusBar: View {
                Text(accuracyText)
                   .font(.caption2.weight(.medium))
                   .monospacedDigit()
-                  .foregroundStyle(.white.opacity(0.5))
+                  .foregroundStyle(RideDashboardTheme.ink(0.5))
             }
          }
          // Never wrap: a two-line status shoves the whole cockpit down.

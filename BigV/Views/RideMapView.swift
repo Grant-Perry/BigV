@@ -38,7 +38,7 @@ struct RideMapView: View {
          edgeInset: mapTapeEdgeInset
       )
       .frame(maxWidth: .infinity, maxHeight: .infinity)
-      .background(Color.black)
+      .background(RideDashboardTheme.void)
    }
 
    // MARK: - Radar

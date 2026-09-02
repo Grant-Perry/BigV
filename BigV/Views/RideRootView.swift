@@ -26,6 +26,7 @@ struct RideRootView: View {
    let rideBackupViewModel: RideBackupViewModel
    let rideClimbSettings: RideClimbSettings
    let rideLapSettings: RideLapSettings
+   let rideAppearanceSettings: RideAppearanceSettings
 
    @Environment(RideClimbModel.self) private var rideClimbModel
    @Environment(\.scenePhase) private var scenePhase
@@ -67,6 +68,7 @@ struct RideRootView: View {
                backupViewModel: rideBackupViewModel,
                climbSettings: rideClimbSettings,
                lapSettings: rideLapSettings,
+               appearanceSettings: rideAppearanceSettings,
                onShowRadar: { isShowingRadarPairing = true },
                onFinishSetup: { selectedTab = .dashboard }
             )
@@ -88,7 +90,9 @@ struct RideRootView: View {
       .sensoryFeedback(trigger: rideViewModel.radarClearPulse) { _, _ in
          rideViewModel.radarAlertHapticsEnabled ? .impact(weight: .light) : nil
       }
-      .preferredColorScheme(.dark)
+      // The rider's day/night choice, not a hardwired night: a black screen
+      // in full sun is the one thing a bike computer must never be.
+      .rideAppearance()
       .sheet(isPresented: $isShowingRadarPairing) {
          RideRadarPairingView(pairingViewModel: rideRadarPairingViewModel)
       }

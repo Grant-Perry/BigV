@@ -31,7 +31,7 @@ struct RouteGuidanceControlsView: View {
          HStack(spacing: 2) {
             circleButton(
                icon: routeGuidanceViewModel.isVoiceEnabled ? .voiceOnIcon : .voiceOffIcon,
-               tint: routeGuidanceViewModel.isVoiceEnabled ? .white.opacity(0.85) : .white.opacity(0.35),
+               tint: routeGuidanceViewModel.isVoiceEnabled ? RideDashboardTheme.ink(0.85) : RideDashboardTheme.ink(0.35),
                label: routeGuidanceViewModel.voiceButtonLabel,
                hint: "Turn calls only. The route stays on the map.",
                identifier: "guidance.button.voice",
@@ -40,7 +40,7 @@ struct RouteGuidanceControlsView: View {
 
             circleButton(
                icon: .endNavigationIcon,
-               tint: .white.opacity(0.55),
+               tint: RideDashboardTheme.ink(0.55),
                label: "End navigation",
                hint: "Clears the route and stops turn calls. The ride keeps recording.",
                identifier: "guidance.button.stop",

@@ -49,7 +49,7 @@ struct RideControlBar: View {
       Button(action: action) {
          Image(systemName: icon)
             .font(.body.weight(.bold))
-            .foregroundStyle(.white.opacity(0.95))
+            .foregroundStyle(RideDashboardTheme.ink(0.95))
             .frame(width: 44, height: 44)
             .background {
                Circle()

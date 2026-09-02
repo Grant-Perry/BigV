@@ -29,20 +29,20 @@ struct RideWeatherConditionsCard: View {
             VStack(alignment: .leading, spacing: 2) {
                Text(report.conditionLabel)
                   .font(.subheadline.weight(.semibold))
-                  .foregroundStyle(.white)
+                  .foregroundStyle(RideDashboardTheme.ink)
                   .lineLimit(1)
                   .minimumScaleFactor(0.8)
 
                if let feelsLike = report.feelsLikeText {
                   Text(feelsLike)
                      .font(.caption.weight(.medium))
-                     .foregroundStyle(.white.opacity(0.5))
+                     .foregroundStyle(RideDashboardTheme.ink(0.5))
                }
 
                if let wind = report.windText {
                   Text(wind)
                      .font(.caption.weight(.medium))
-                     .foregroundStyle(.white.opacity(0.5))
+                     .foregroundStyle(RideDashboardTheme.ink(0.5))
                }
             }
 
@@ -51,7 +51,7 @@ struct RideWeatherConditionsCard: View {
             Text(report.temperatureText)
                .font(.system(size: 30, weight: .semibold, design: .rounded))
                .monospacedDigit()
-               .foregroundStyle(.white)
+               .foregroundStyle(RideDashboardTheme.ink)
                .lineLimit(1)
                .minimumScaleFactor(0.6)
          }

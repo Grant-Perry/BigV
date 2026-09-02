@@ -24,11 +24,11 @@ struct RideAccessPaywallView: View {
             VStack(alignment: .leading, spacing: 16) {
                Text(plusStore.accessHeadline)
                   .font(.title2.weight(.bold))
-                  .foregroundStyle(.white)
+                  .foregroundStyle(RideDashboardTheme.ink)
 
                Text(plusStore.accessDetail)
                   .font(.body)
-                  .foregroundStyle(.white.opacity(0.78))
+                  .foregroundStyle(RideDashboardTheme.ink(0.78))
 
                RidePlusPricingCard(plusStore: plusStore, accessibilityPrefix: "paywall")
 
@@ -43,7 +43,7 @@ struct RideAccessPaywallView: View {
                   Button("Terms") { openURL(termsURL) }
                }
                .font(.caption.weight(.semibold))
-               .foregroundStyle(.white.opacity(0.7))
+               .foregroundStyle(RideDashboardTheme.ink(0.7))
             }
             .padding(20)
          }
@@ -67,6 +67,6 @@ struct RideAccessPaywallView: View {
             if isPlus { onDismiss() }
          }
       }
-      .preferredColorScheme(.dark)
+      .rideAppearance()
    }
 }

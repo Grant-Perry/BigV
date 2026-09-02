@@ -64,7 +64,7 @@ struct RideSummaryView: View {
          if let healthKitStatusText = rideViewModel.healthKitStatusText {
             Label(healthKitStatusText, systemImage: rideViewModel.didSaveToHealthKit ? .savedIcon : .pendingIcon)
                .font(.caption.weight(.medium))
-               .foregroundStyle(rideViewModel.didSaveToHealthKit ? .green : .white.opacity(0.5))
+               .foregroundStyle(rideViewModel.didSaveToHealthKit ? .green : RideDashboardTheme.ink(0.5))
          }
 
          if let storageWarning = rideViewModel.storageWarning {

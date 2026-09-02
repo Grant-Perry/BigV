@@ -22,6 +22,7 @@ struct RideSettingsView: View {
    @Bindable var backupViewModel: RideBackupViewModel
    @Bindable var climbSettings: RideClimbSettings
    @Bindable var lapSettings: RideLapSettings
+   @Bindable var appearanceSettings: RideAppearanceSettings
    let onShowRadar: () -> Void
    let onFinishSetup: () -> Void
 
@@ -44,6 +45,8 @@ struct RideSettingsView: View {
                unitsCard
 
                temperatureCard
+
+               appearanceCard
 
                radarCard
 
@@ -108,11 +111,11 @@ struct RideSettingsView: View {
       VStack(spacing: 8) {
          Image(systemName: "bicycle")
             .font(.system(size: 34, weight: .semibold))
-            .foregroundStyle(RideChromeTokens.ice)
+            .foregroundStyle(RideDashboardTheme.ice)
 
          Text("A couple of choices and the cockpit is yours.")
             .font(.footnote)
-            .foregroundStyle(.white.opacity(0.55))
+            .foregroundStyle(RideDashboardTheme.ink(0.55))
             .multilineTextAlignment(.center)
       }
       .frame(maxWidth: .infinity)
@@ -138,7 +141,7 @@ struct RideSettingsView: View {
 
          Text("Applies everywhere — speed, distance, elevation, radar ranges, history and your Watch.")
             .font(.caption2)
-            .foregroundStyle(.white.opacity(0.4))
+            .foregroundStyle(RideDashboardTheme.ink(0.4))
       }
       .padding(14)
       .rideGlassCard()
@@ -165,7 +168,36 @@ struct RideSettingsView: View {
 
          Text("Used by the weather chip and the forecast.")
             .font(.caption2)
-            .foregroundStyle(.white.opacity(0.4))
+            .foregroundStyle(RideDashboardTheme.ink(0.4))
+      }
+      .padding(14)
+      .rideGlassCard()
+   }
+
+   // MARK: - Appearance
+
+   /// Day, night, or the phone's call. The speedometer carries a one-tap
+   /// flip between the first two; Automatic is only offered here.
+   private var appearanceCard: some View {
+      VStack(alignment: .leading, spacing: 10) {
+         cardHeader("APPEARANCE")
+
+         ForEach(RideAppearanceMode.allCases) { mode in
+            RideSetupChoiceRow(
+               title: mode.title,
+               detail: mode.detail,
+               isSelected: appearanceSettings.mode == mode,
+               identifier: "setup.appearance.\(mode.rawValue)"
+            ) {
+               withAnimation(.easeInOut(duration: 0.25)) {
+                  appearanceSettings.mode = mode
+               }
+            }
+         }
+
+         Text("Day is for the sun. The sun-and-moon chip on the speedometer switches between Day and Night without coming back here.")
+            .font(.caption2)
+            .foregroundStyle(RideDashboardTheme.ink(0.4))
       }
       .padding(14)
       .rideGlassCard()
@@ -178,23 +210,23 @@ struct RideSettingsView: View {
          HStack(spacing: 12) {
             Image(systemName: "car.rear.waves.up")
                .font(.title3.weight(.semibold))
-               .foregroundStyle(RideChromeTokens.ice)
+               .foregroundStyle(RideDashboardTheme.ice)
 
             VStack(alignment: .leading, spacing: 2) {
                Text("Rear Radar")
                   .font(.subheadline.weight(.semibold))
-                  .foregroundStyle(.white)
+                  .foregroundStyle(RideDashboardTheme.ink)
 
                Text("Varia™ rear radar compatible")
                   .font(.caption)
-                  .foregroundStyle(.white.opacity(0.55))
+                  .foregroundStyle(RideDashboardTheme.ink(0.55))
             }
 
             Spacer()
 
             Image(systemName: "chevron.right")
                .font(.caption.weight(.semibold))
-               .foregroundStyle(.white.opacity(0.3))
+               .foregroundStyle(RideDashboardTheme.ink(0.3))
          }
          .padding(14)
          .contentShape(.rect)
@@ -216,20 +248,20 @@ struct RideSettingsView: View {
             VStack(alignment: .leading, spacing: 2) {
                Text("Climb Page Auto-Switch")
                   .font(.subheadline.weight(.semibold))
-                  .foregroundStyle(.white)
+                  .foregroundStyle(RideDashboardTheme.ink)
 
                Text("Jump to the climb page when a categorized climb starts")
                   .font(.caption)
-                  .foregroundStyle(.white.opacity(0.55))
+                  .foregroundStyle(RideDashboardTheme.ink(0.55))
             }
          }
-         .tint(RideChromeTokens.ember)
+         .tint(RideDashboardTheme.ember)
          .accessibilityIdentifier("settings.toggle.climbAutoSwitch")
 
          VStack(alignment: .leading, spacing: 6) {
             Text("Auto-Lap")
                .font(.subheadline.weight(.semibold))
-               .foregroundStyle(.white)
+               .foregroundStyle(RideDashboardTheme.ink)
 
             Picker("Auto-Lap", selection: $lapSettings.autoLapUnits) {
                ForEach(RideLapSettings.autoLapChoices, id: \.self) { choice in
@@ -241,7 +273,7 @@ struct RideSettingsView: View {
 
             Text("Cut a lap automatically every so many \(unitsSettings.system == .imperial ? "miles" : "kilometers"). The LAP button works either way.")
                .font(.caption2)
-               .foregroundStyle(.white.opacity(0.4))
+               .foregroundStyle(RideDashboardTheme.ink(0.4))
          }
       }
       .padding(14)
@@ -261,19 +293,19 @@ struct RideSettingsView: View {
          HStack {
             Text(plusStore.accessHeadline)
                .font(.subheadline.weight(.semibold))
-               .foregroundStyle(plusStore.isPlus ? RideChromeTokens.go : .white)
+               .foregroundStyle(plusStore.isPlus ? RideDashboardTheme.go : RideDashboardTheme.ink)
 
             Spacer()
 
             if plusStore.isPlus {
                Image(systemName: "checkmark.seal.fill")
-                  .foregroundStyle(RideChromeTokens.go)
+                  .foregroundStyle(RideDashboardTheme.go)
             }
          }
 
          Text(plusStore.accessDetail)
             .font(.caption2)
-            .foregroundStyle(.white.opacity(0.45))
+            .foregroundStyle(RideDashboardTheme.ink(0.45))
 
          if !plusStore.isPlus {
             RidePlusPricingCard(plusStore: plusStore, accessibilityPrefix: "settings")
@@ -292,13 +324,13 @@ struct RideSettingsView: View {
 
             Spacer()
          }
-         .tint(RideChromeTokens.ice)
+         .tint(RideDashboardTheme.ice)
 
          #if DEBUG
          Toggle("Force Plus (Debug)", isOn: $plusStore.forcePlusInDebug)
             .font(.caption)
-            .foregroundStyle(.white.opacity(0.7))
-            .tint(RideChromeTokens.ember)
+            .foregroundStyle(RideDashboardTheme.ink(0.7))
+            .tint(RideDashboardTheme.ember)
          #endif
 
          HStack(spacing: 16) {
@@ -306,12 +338,12 @@ struct RideSettingsView: View {
             Button("Terms") { openURL(termsURL) }
          }
          .font(.caption.weight(.semibold))
-         .foregroundStyle(.white.opacity(0.55))
+         .foregroundStyle(RideDashboardTheme.ink(0.55))
 
          if let message = plusStore.lastErrorMessage {
             Text(message)
                .font(.caption2)
-               .foregroundStyle(RideChromeTokens.halt)
+               .foregroundStyle(RideDashboardTheme.halt)
          }
       }
       .padding(14)
@@ -326,7 +358,7 @@ struct RideSettingsView: View {
 
          Text("A BigVelo backup is rides plus preferences, for this app. To open one ride in another app, export GPX from that ride’s story.")
             .font(.caption2)
-            .foregroundStyle(.white.opacity(0.45))
+            .foregroundStyle(RideDashboardTheme.ink(0.45))
 
          HStack(spacing: 12) {
             Button {
@@ -349,7 +381,7 @@ struct RideSettingsView: View {
 
             Spacer()
          }
-         .tint(RideChromeTokens.ice)
+         .tint(RideDashboardTheme.ice)
 
          if let url = backupViewModel.shareURL {
             ShareLink(
@@ -365,7 +397,7 @@ struct RideSettingsView: View {
          if let message = backupViewModel.statusMessage {
             Text(message)
                .font(.caption2)
-               .foregroundStyle(.white.opacity(0.55))
+               .foregroundStyle(RideDashboardTheme.ink(0.55))
          }
       }
       .padding(14)
@@ -381,16 +413,16 @@ struct RideSettingsView: View {
          HStack(spacing: 12) {
             Image(systemName: "arrow.counterclockwise")
                .font(.title3.weight(.semibold))
-               .foregroundStyle(RideChromeTokens.ember)
+               .foregroundStyle(RideDashboardTheme.ember)
 
             VStack(alignment: .leading, spacing: 2) {
                Text("Reset Onboarding")
                   .font(.subheadline.weight(.semibold))
-                  .foregroundStyle(.white)
+                  .foregroundStyle(RideDashboardTheme.ink)
 
                Text("Show the kit, radar, road, story and Keep BigVelo screens again")
                   .font(.caption)
-                  .foregroundStyle(.white.opacity(0.55))
+                  .foregroundStyle(RideDashboardTheme.ink(0.55))
             }
 
             Spacer()
@@ -438,7 +470,7 @@ struct RideSettingsView: View {
       Text(title)
          .font(.caption2.weight(.bold))
          .kerning(1.2)
-         .foregroundStyle(.white.opacity(0.45))
+         .foregroundStyle(RideDashboardTheme.ink(0.45))
    }
 
    private func handleImportResult(_ result: Result<[URL], Error>) {
@@ -479,6 +511,7 @@ struct RideSettingsView: View {
       backupViewModel: backup,
       climbSettings: RideClimbSettings(),
       lapSettings: RideLapSettings(),
+      appearanceSettings: RideAppearanceSettings(),
       onShowRadar: {},
       onFinishSetup: {}
    )

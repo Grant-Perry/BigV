@@ -19,6 +19,15 @@ struct RideDashboardView: View {
    @Environment(\.scenePhase) private var scenePhase
    @State private var isDrawerOpen = true
 
+   /// Natural height of the tile grid, measured inside its scroll view.
+   /// Starts generous so the first frame does not flash a shrunken hero.
+   @State private var metricsHeight: CGFloat = 320
+
+   /// What the cockpit actually granted the tiles. Less than they need means
+   /// the strip scrolls, and its bottom edge fades so the cut reads as a hint
+   /// rather than a bug.
+   @State private var metricsViewportHeight: CGFloat = 320
+
    var body: some View {
       Group {
          if verticalSizeClass == .compact {
@@ -129,10 +138,46 @@ struct RideDashboardView: View {
          RideDashboardLiveMetricSection(rideViewModel: rideViewModel)
             .layoutPriority(0)
 
-         RideDashboardMetricsGrid(
-            rideViewModel: rideViewModel,
-            routeGuidanceViewModel: routeGuidanceViewModel
-         )
+         // A grid never shrinks, so on a routed ride with a Watch feeding a
+         // pulse the column used to spill off both ends of the screen: status
+         // chips under the notch, control dock under the tab bar. The tiles
+         // are the one thing that may scroll; the grid measures itself so the
+         // scroll view never takes more than the tiles need, and the hero
+         // keeps whatever is left.
+         ScrollView(.vertical) {
+            RideDashboardMetricsGrid(
+               rideViewModel: rideViewModel,
+               routeGuidanceViewModel: routeGuidanceViewModel
+            )
+            .onGeometryChange(for: CGFloat.self) { proxy in
+               proxy.size.height
+            } action: { height in
+               metricsHeight = height
+            }
+         }
+         .scrollIndicators(.hidden)
+         .scrollBounceBehavior(.basedOnSize)
+         .frame(maxHeight: metricsHeight)
+         .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.height
+         } action: { height in
+            metricsViewportHeight = height
+         }
+         .mask {
+            if metricsViewportHeight < metricsHeight - 1 {
+               LinearGradient(
+                  stops: [
+                     .init(color: .white, location: 0),
+                     .init(color: .white, location: 0.82),
+                     .init(color: .white.opacity(0.08), location: 1)
+                  ],
+                  startPoint: .top,
+                  endPoint: .bottom
+               )
+            } else {
+               Color.white
+            }
+         }
          .layoutPriority(1)
       }
       .rideRadarTape(
@@ -159,6 +204,7 @@ struct RideDashboardView: View {
    .environment(RideWeatherModel(unitsSettings: RideUnitsSettings()))
    .environment(RideClimbModel())
    .environment(RideBackToStartModel())
+   .environment(RideAppearanceSettings())
    .preferredColorScheme(.dark)
 }
 
@@ -176,5 +222,6 @@ struct RideDashboardView: View {
    .environment(RideWeatherModel(unitsSettings: RideUnitsSettings()))
    .environment(RideClimbModel())
    .environment(RideBackToStartModel())
+   .environment(RideAppearanceSettings())
    .preferredColorScheme(.dark)
 }

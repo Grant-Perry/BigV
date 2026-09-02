@@ -106,7 +106,7 @@ struct RideClimbProfileChart: View {
                .foregroundStyle(RideDashboardTheme.ice.opacity(0.9))
                .padding(.horizontal, 5)
                .padding(.vertical, 2)
-               .background(.black.opacity(0.55), in: .capsule)
+               .background(RideDashboardTheme.veil(0.55), in: .capsule)
          }
       }
    }
@@ -173,14 +173,14 @@ struct RideClimbProfileChart: View {
    private var distanceAxis: some AxisContent {
       AxisMarks(values: .automatic(desiredCount: 4)) { value in
          AxisGridLine()
-            .foregroundStyle(.white.opacity(0.06))
+            .foregroundStyle(RideDashboardTheme.ink(0.06))
 
          AxisValueLabel {
             if let number = value.as(Double.self) {
                Text(number.formatted(.number.precision(.fractionLength(0...1))))
                   .font(.system(size: 9, weight: .medium))
                   .monospacedDigit()
-                  .foregroundStyle(.white.opacity(0.35))
+                  .foregroundStyle(RideDashboardTheme.ink(0.35))
             }
          }
       }
@@ -189,14 +189,14 @@ struct RideClimbProfileChart: View {
    private var altitudeAxis: some AxisContent {
       AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) { value in
          AxisGridLine()
-            .foregroundStyle(.white.opacity(0.06))
+            .foregroundStyle(RideDashboardTheme.ink(0.06))
 
          AxisValueLabel {
             if let number = value.as(Double.self) {
                Text(number.formatted(.number.precision(.fractionLength(0))))
                   .font(.system(size: 9, weight: .medium))
                   .monospacedDigit()
-                  .foregroundStyle(.white.opacity(0.35))
+                  .foregroundStyle(RideDashboardTheme.ink(0.35))
             }
          }
       }

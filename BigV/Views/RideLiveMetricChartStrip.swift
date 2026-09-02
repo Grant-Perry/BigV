@@ -45,14 +45,14 @@ struct RideLiveMetricChartStrip: View {
          Text(metric.title)
             .font(.caption2.weight(.bold))
             .kerning(0.8)
-            .foregroundStyle(.white.opacity(0.55))
+            .foregroundStyle(RideDashboardTheme.ink(0.55))
 
          Spacer()
 
          Button(action: onDismiss) {
             Image(systemName: "xmark")
                .font(.caption2.weight(.bold))
-               .foregroundStyle(.white.opacity(0.45))
+               .foregroundStyle(RideDashboardTheme.ink(0.45))
                .frame(width: 24, height: 24)
                .contentShape(.rect)
          }
@@ -69,7 +69,7 @@ struct RideLiveMetricChartStrip: View {
          Button(action: onDismiss) {
             Image(systemName: "xmark")
                .font(.caption2.weight(.bold))
-               .foregroundStyle(.white.opacity(0.45))
+               .foregroundStyle(RideDashboardTheme.ink(0.45))
                .frame(width: 24, height: 24)
                .contentShape(.rect)
          }
@@ -144,7 +144,7 @@ struct RideLiveMetricChartStrip: View {
    private var waitingLabel: some View {
       Text(metric.waitingMessage)
          .font(.caption.weight(.medium))
-         .foregroundStyle(.white.opacity(0.4))
+         .foregroundStyle(RideDashboardTheme.ink(0.4))
          .frame(maxWidth: .infinity, minHeight: chartHeight, alignment: .center)
    }
 

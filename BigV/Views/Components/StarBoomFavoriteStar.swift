@@ -89,7 +89,7 @@ struct StarBoomFavoriteStar: View {
                   )
             } else {
                Image(systemName: "star")
-                  .foregroundStyle(.white.opacity(0.55))
+                  .foregroundStyle(RideDashboardTheme.ink(0.55))
             }
          }
          .font(font)

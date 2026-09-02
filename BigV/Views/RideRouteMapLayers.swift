@@ -40,7 +40,7 @@ struct RideRouteMapLayers: MapContent {
    private func radarPassDot(for pass: RideRadarPassAnnotation) -> some MapContent {
       Annotation("Vehicle pass", coordinate: pass.coordinate, anchor: .center) {
          Circle()
-            .fill(pass.tier == .high ? RideChromeTokens.halt : RideChromeTokens.amber)
+            .fill(pass.tier == .high ? RideDashboardTheme.halt : RideDashboardTheme.amber)
             .stroke(.black.opacity(0.6), lineWidth: 1)
             .frame(width: 7, height: 7)
       }

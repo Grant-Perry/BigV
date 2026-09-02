@@ -24,29 +24,29 @@ struct RideSetupChoiceRow: View {
             VStack(alignment: .leading, spacing: 2) {
                Text(title)
                   .font(.subheadline.weight(.semibold))
-                  .foregroundStyle(.white)
+                  .foregroundStyle(RideDashboardTheme.ink)
 
                Text(detail)
                   .font(.caption)
-                  .foregroundStyle(.white.opacity(0.55))
+                  .foregroundStyle(RideDashboardTheme.ink(0.55))
             }
 
             Spacer()
 
             Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                .font(.title3)
-               .foregroundStyle(isSelected ? RideChromeTokens.go : .white.opacity(0.25))
+               .foregroundStyle(isSelected ? RideDashboardTheme.go : RideDashboardTheme.ink(0.25))
          }
          .padding(.vertical, 10)
          .padding(.horizontal, 12)
          .background(
-            .white.opacity(isSelected ? 0.09 : 0.04),
+            RideDashboardTheme.ink(isSelected ? 0.09 : 0.04),
             in: .rect(cornerRadius: 12)
          )
          .overlay {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                .strokeBorder(
-                  isSelected ? RideChromeTokens.go.opacity(0.5) : .white.opacity(0.06),
+                  isSelected ? RideDashboardTheme.go.opacity(0.5) : RideDashboardTheme.ink(0.06),
                   lineWidth: 1
                )
          }

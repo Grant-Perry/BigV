@@ -62,18 +62,18 @@ struct RouteClimbListView: View {
          Text("\(PlannedRouteFormatters.climbLength(climb.length)) @ \(PlannedRouteFormatters.averageGrade(climb.averageGrade))")
             .font(.caption.weight(.semibold))
             .monospacedDigit()
-            .foregroundStyle(.white.opacity(0.75))
+            .foregroundStyle(RideDashboardTheme.ink(0.75))
 
          Spacer()
 
          Text(PlannedRouteFormatters.elevationGain(climb.ascent))
             .font(.caption.weight(.bold))
             .monospacedDigit()
-            .foregroundStyle(.white)
+            .foregroundStyle(RideDashboardTheme.ink)
 
          Image(systemName: "chevron.down")
             .font(.system(size: 9, weight: .bold))
-            .foregroundStyle(.white.opacity(0.35))
+            .foregroundStyle(RideDashboardTheme.ink(0.35))
             .rotationEffect(.degrees(expandedClimbID == climb.id ? 180 : 0))
       }
    }

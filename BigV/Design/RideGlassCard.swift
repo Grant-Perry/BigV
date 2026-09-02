@@ -16,11 +16,17 @@ enum RideGlassDensity: Sendable {
 }
 
 /// Gradient-wash content card with an inner highlight edge.
+///
+/// At night the wash is smoked graphite with a white specular edge. By day it
+/// is near-white paper with a hair of ink around it and a soft drop shadow, so
+/// a card still lifts off the ground when there is no darkness to lift from.
 struct RideGlassCard<Content: View>: View {
 
    var density: RideGlassDensity = .hud
    var cornerRadius: CGFloat = RideDashboardTheme.cardRadius
    @ViewBuilder var content: () -> Content
+
+   @Environment(\.colorScheme) private var colorScheme
 
    var body: some View {
       content()
@@ -29,6 +35,11 @@ struct RideGlassCard<Content: View>: View {
             shape
                .strokeBorder(highlight, lineWidth: 1)
          }
+         .shadow(
+            color: .black.opacity(colorScheme == .dark ? 0 : 0.07),
+            radius: 10,
+            y: 4
+         )
    }
 
    // MARK: - Materials
@@ -38,8 +49,8 @@ struct RideGlassCard<Content: View>: View {
    }
 
    private var wash: LinearGradient {
-      switch density {
-         case .hud:
+      switch (density, colorScheme) {
+         case (.hud, .dark):
             LinearGradient(
                colors: [
                   Color.white.opacity(0.11),
@@ -50,7 +61,7 @@ struct RideGlassCard<Content: View>: View {
                endPoint: .bottomTrailing
             )
 
-         case .standard:
+         case (.standard, .dark):
             LinearGradient(
                colors: [
                   Color.white.opacity(0.14),
@@ -60,19 +71,53 @@ struct RideGlassCard<Content: View>: View {
                startPoint: .topLeading,
                endPoint: .bottomTrailing
             )
+
+         case (.hud, _):
+            LinearGradient(
+               colors: [
+                  Color.white.opacity(0.97),
+                  Color.white.opacity(0.88),
+                  RideDashboardTheme.graphite.opacity(0.92)
+               ],
+               startPoint: .topLeading,
+               endPoint: .bottomTrailing
+            )
+
+         case (.standard, _):
+            LinearGradient(
+               colors: [
+                  Color.white.opacity(0.97),
+                  Color.white.opacity(0.86),
+                  RideDashboardTheme.midnight.opacity(0.60)
+               ],
+               startPoint: .topLeading,
+               endPoint: .bottomTrailing
+            )
       }
    }
 
    private var highlight: LinearGradient {
-      LinearGradient(
-         colors: [
-            Color.white.opacity(density == .hud ? 0.20 : 0.26),
-            Color.white.opacity(0.04),
-            RideDashboardTheme.ice.opacity(0.10)
-         ],
-         startPoint: .topLeading,
-         endPoint: .bottomTrailing
-      )
+      if colorScheme == .dark {
+         LinearGradient(
+            colors: [
+               Color.white.opacity(density == .hud ? 0.20 : 0.26),
+               Color.white.opacity(0.04),
+               RideDashboardTheme.ice.opacity(0.10)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+         )
+      } else {
+         LinearGradient(
+            colors: [
+               RideDashboardTheme.ink(0.12),
+               RideDashboardTheme.ink(0.05),
+               RideDashboardTheme.ice.opacity(0.22)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+         )
+      }
    }
 }
 

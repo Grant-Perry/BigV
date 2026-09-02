@@ -20,11 +20,11 @@ struct RideLiveRadarTimelineStrip: View {
 
             Text("\(report.vehicleCountText) vehicles · closest \(report.closestPassText)")
                .font(.caption2.weight(.medium))
-               .foregroundStyle(.white.opacity(0.45))
+               .foregroundStyle(RideDashboardTheme.ink(0.45))
          } else {
             Text("No completed passes yet — the timeline fills as vehicles pass.")
                .font(.caption.weight(.medium))
-               .foregroundStyle(.white.opacity(0.4))
+               .foregroundStyle(RideDashboardTheme.ink(0.4))
                .frame(maxWidth: .infinity, minHeight: 76, alignment: .center)
          }
       }
@@ -42,14 +42,14 @@ struct RideLiveRadarTimelineStrip: View {
          Text("TRAFFIC TIMELINE")
             .font(.caption2.weight(.bold))
             .kerning(0.8)
-            .foregroundStyle(.white.opacity(0.55))
+            .foregroundStyle(RideDashboardTheme.ink(0.55))
 
          Spacer()
 
          Button(action: onDismiss) {
             Image(systemName: "xmark")
                .font(.caption2.weight(.bold))
-               .foregroundStyle(.white.opacity(0.45))
+               .foregroundStyle(RideDashboardTheme.ink(0.45))
                .frame(width: 24, height: 24)
                .contentShape(.rect)
          }

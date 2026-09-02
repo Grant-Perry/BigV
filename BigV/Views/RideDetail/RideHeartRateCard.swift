@@ -40,7 +40,7 @@ struct RideHeartRateCard: View {
          if report.isFromAppleHealth {
             Text("From Apple Health")
                .font(.system(size: 9, weight: .medium))
-               .foregroundStyle(.white.opacity(0.35))
+               .foregroundStyle(RideDashboardTheme.ink(0.35))
          }
       }
       .padding(14)

@@ -63,11 +63,11 @@ struct RoutePlannerView: View {
    private var planning: some View {
       VStack(spacing: 12) {
          ProgressView()
-            .tint(.white.opacity(0.7))
+            .tint(RideDashboardTheme.ink(0.7))
 
          Text("Finding a bike route…")
             .font(.subheadline.weight(.medium))
-            .foregroundStyle(.white.opacity(0.6))
+            .foregroundStyle(RideDashboardTheme.ink(0.6))
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
    }

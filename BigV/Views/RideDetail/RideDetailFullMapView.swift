@@ -52,7 +52,7 @@ struct RideDetailFullMapView: View {
       HStack(spacing: 12) {
          Text(titleText)
             .font(.subheadline.weight(.semibold))
-            .foregroundStyle(.white)
+            .foregroundStyle(RideDashboardTheme.ink)
             .lineLimit(1)
             .padding(.horizontal, 14)
             .padding(.vertical, 9)
@@ -65,7 +65,7 @@ struct RideDetailFullMapView: View {
          } label: {
             Image(systemName: "xmark")
                .font(.subheadline.weight(.bold))
-               .foregroundStyle(.white)
+               .foregroundStyle(RideDashboardTheme.ink)
                .frame(width: 38, height: 38)
          }
          .rideGlassChrome(in: .circle)

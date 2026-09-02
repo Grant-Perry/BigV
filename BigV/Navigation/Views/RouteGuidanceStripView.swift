@@ -79,7 +79,7 @@ struct RouteGuidanceStripView: View {
          if routeGuidanceViewModel.canPresentTurnList {
             Image(systemName: routeGuidanceViewModel.isTurnListPresented ? .collapseIcon : .expandIcon)
                .font(.caption.weight(.bold))
-               .foregroundStyle(.white.opacity(0.4))
+               .foregroundStyle(RideDashboardTheme.ink(0.4))
          }
       }
       .padding(.vertical, 4)
@@ -109,14 +109,14 @@ struct RouteGuidanceStripView: View {
             if let detail = routeGuidanceViewModel.statusDetail {
                Text(detail)
                   .font(.caption2)
-                  .foregroundStyle(.white.opacity(0.6))
+                  .foregroundStyle(RideDashboardTheme.ink(0.6))
                   .lineLimit(1)
             }
          }
       } else {
          Text(routeGuidanceViewModel.instruction ?? "Following route")
             .font(.subheadline.weight(.semibold))
-            .foregroundStyle(.white)
+            .foregroundStyle(RideDashboardTheme.ink)
             .lineLimit(2)
             .accessibilityIdentifier("dashboard.guidance.instruction")
       }

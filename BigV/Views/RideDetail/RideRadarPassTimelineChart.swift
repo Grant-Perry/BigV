@@ -20,7 +20,7 @@ struct RideRadarPassTimelineChart: View {
          )
          .symbolSize(pass.isHighTier ? 90 : 50)
          .foregroundStyle(
-            pass.isHighTier ? RideChromeTokens.halt : RideChromeTokens.amber
+            pass.isHighTier ? RideDashboardTheme.halt : RideDashboardTheme.amber
          )
          .opacity(0.9)
       }
@@ -41,14 +41,14 @@ struct RideRadarPassTimelineChart: View {
    private var compactAxis: some AxisContent {
       AxisMarks(values: .automatic(desiredCount: 4)) { value in
          AxisGridLine()
-            .foregroundStyle(.white.opacity(0.06))
+            .foregroundStyle(RideDashboardTheme.ink(0.06))
 
          AxisValueLabel {
             if let number = value.as(Double.self) {
                Text(number.formatted(.number.precision(.fractionLength(0))))
                   .font(.system(size: 9, weight: .medium))
                   .monospacedDigit()
-                  .foregroundStyle(.white.opacity(0.35))
+                  .foregroundStyle(RideDashboardTheme.ink(0.35))
             }
          }
       }

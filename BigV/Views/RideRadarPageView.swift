@@ -43,23 +43,23 @@ struct RideRadarPageView: View {
       HStack(spacing: 8) {
          Image(systemName: "car.rear.waves.up")
             .font(.caption.weight(.semibold))
-            .foregroundStyle(rideViewModel.isRadarConnected ? RideChromeTokens.ice : .white.opacity(0.4))
+            .foregroundStyle(rideViewModel.isRadarConnected ? RideDashboardTheme.ice : RideDashboardTheme.ink(0.4))
 
          Text("REAR RADAR")
             .font(.caption2.weight(.bold))
             .kerning(1.2)
-            .foregroundStyle(.white.opacity(0.7))
+            .foregroundStyle(RideDashboardTheme.ink(0.7))
 
          Spacer()
 
          Text(connectionLabel)
             .font(.caption2.weight(.semibold))
-            .foregroundStyle(rideViewModel.isRadarConnected ? RideChromeTokens.ice.opacity(0.8) : RideChromeTokens.amber)
+            .foregroundStyle(rideViewModel.isRadarConnected ? RideDashboardTheme.ice.opacity(0.8) : RideDashboardTheme.amber)
 
          Button(action: onShowRadar) {
             Image(systemName: "gearshape.fill")
                .font(.caption.weight(.semibold))
-               .foregroundStyle(.white.opacity(0.7))
+               .foregroundStyle(RideDashboardTheme.ink(0.7))
                .frame(width: 36, height: 36)
                .contentShape(.circle)
          }
@@ -121,7 +121,7 @@ private struct RideRadarRoadView: View {
       .clipShape(.rect(cornerRadius: 24, style: .continuous))
       .overlay {
          RoundedRectangle(cornerRadius: 24, style: .continuous)
-            .strokeBorder(.white.opacity(0.08), lineWidth: 1)
+            .strokeBorder(RideDashboardTheme.ink(0.08), lineWidth: 1)
       }
       .accessibilityElement(children: .ignore)
       .accessibilityLabel("Rear radar road")
@@ -158,8 +158,8 @@ private struct RideRadarRoadView: View {
          .fill(
             LinearGradient(
                colors: [
-                  RideChromeTokens.graphite.opacity(isDimmed ? 0.35 : 0.65),
-                  RideChromeTokens.void.opacity(0.9)
+                  RideDashboardTheme.graphite.opacity(isDimmed ? 0.35 : 0.65),
+                  RideDashboardTheme.void.opacity(0.9)
                ],
                startPoint: .top,
                endPoint: .bottom
@@ -169,7 +169,7 @@ private struct RideRadarRoadView: View {
 
    private func laneMarkings(in size: CGSize) -> some View {
       Canvas { context, canvasSize in
-         let color = (isDimmed ? Color.white : RideChromeTokens.ice).opacity(0.28)
+         let color = (isDimmed ? RideDashboardTheme.ink : RideDashboardTheme.ice).opacity(0.28)
 
          // Edges follow the perspective taper.
          for side: CGFloat in [-1, 1] {
@@ -204,7 +204,7 @@ private struct RideRadarRoadView: View {
             Text(RideFormatters.radarDistance(Double(meters), system: unitSystem))
                .font(.system(size: 10, weight: .semibold, design: .rounded))
                .monospacedDigit()
-               .foregroundStyle(.white.opacity(0.30))
+               .foregroundStyle(RideDashboardTheme.ink(0.30))
                .position(
                   x: 24,
                   y: vehicleY(forDistance: Double(meters), height: size.height)
@@ -220,12 +220,12 @@ private struct RideRadarRoadView: View {
       VStack(spacing: 3) {
          Image(systemName: "bicycle")
             .font(.system(size: 22, weight: .semibold))
-            .foregroundStyle(isDimmed ? .white.opacity(0.35) : RideChromeTokens.ice)
+            .foregroundStyle(isDimmed ? RideDashboardTheme.ink(0.35) : RideDashboardTheme.ice)
 
          Text("YOU")
             .font(.system(size: 9, weight: .bold, design: .rounded))
             .kerning(1)
-            .foregroundStyle(.white.opacity(0.45))
+            .foregroundStyle(RideDashboardTheme.ink(0.45))
       }
       .position(x: size.width / 2, y: 32)
       .accessibilityHidden(true)
@@ -238,12 +238,12 @@ private struct RideRadarRoadView: View {
          Text(isConnected ? "ROAD CLEAR" : "RADAR OFFLINE")
             .font(.footnote.weight(.bold))
             .kerning(1.6)
-            .foregroundStyle(.white.opacity(isConnected ? 0.45 : 0.35))
+            .foregroundStyle(RideDashboardTheme.ink(isConnected ? 0.45 : 0.35))
 
          if !isConnected {
             Text("Reconnecting…")
                .font(.caption2)
-               .foregroundStyle(.white.opacity(0.3))
+               .foregroundStyle(RideDashboardTheme.ink(0.3))
          }
       }
    }
@@ -328,10 +328,10 @@ private struct RideRadarVehicleMark: View {
    }
 
    private var color: Color {
-      if isDimmed { return .white.opacity(0.35) }
+      if isDimmed { return RideDashboardTheme.ink(0.35) }
       return switch track.tier {
-         case .approaching: RideChromeTokens.amber
-         case .high: RideChromeTokens.halt
+         case .approaching: RideDashboardTheme.amber
+         case .high: RideDashboardTheme.halt
       }
    }
 }
@@ -369,26 +369,26 @@ private struct RideRadarDataStrip: View {
             Text(value)
                .font(.system(size: 20, weight: .bold, design: .rounded))
                .monospacedDigit()
-               .foregroundStyle(.white)
+               .foregroundStyle(RideDashboardTheme.ink)
 
             if let unit {
                Text(unit)
                   .font(.system(size: 10, weight: .semibold))
-                  .foregroundStyle(.white.opacity(0.4))
+                  .foregroundStyle(RideDashboardTheme.ink(0.4))
             }
          }
 
          Text(label)
             .font(.system(size: 9, weight: .bold))
             .kerning(0.8)
-            .foregroundStyle(.white.opacity(0.45))
+            .foregroundStyle(RideDashboardTheme.ink(0.45))
       }
       .frame(maxWidth: .infinity)
    }
 
    private var divider: some View {
       Rectangle()
-         .fill(.white.opacity(0.10))
+         .fill(RideDashboardTheme.ink(0.10))
          .frame(width: 1, height: 30)
    }
 }

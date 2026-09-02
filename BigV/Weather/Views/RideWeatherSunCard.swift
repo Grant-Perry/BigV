@@ -16,19 +16,19 @@ struct RideWeatherSunCard: View {
             title: "Sunrise",
             systemImage: "sunrise.fill",
             date: today?.sunrise,
-            tint: RideChromeTokens.ice
+            tint: RideDashboardTheme.ice
          )
 
          Divider()
             .frame(height: 44)
-            .overlay(.white.opacity(0.1))
+            .overlay(RideDashboardTheme.ink(0.1))
             .padding(.horizontal, 8)
 
          sunBlock(
             title: "Sunset",
             systemImage: "sunset.fill",
             date: today?.sunset,
-            tint: RideChromeTokens.amber
+            tint: RideDashboardTheme.amber
          )
       }
       .padding(.horizontal, 16)
@@ -57,11 +57,11 @@ struct RideWeatherSunCard: View {
          VStack(alignment: .leading, spacing: 2) {
             Text(title)
                .font(.caption.weight(.semibold))
-               .foregroundStyle(.white.opacity(0.5))
+               .foregroundStyle(RideDashboardTheme.ink(0.5))
 
             Text(label(date))
                .font(.headline.monospacedDigit())
-               .foregroundStyle(.white)
+               .foregroundStyle(RideDashboardTheme.ink)
          }
 
          Spacer(minLength: 0)

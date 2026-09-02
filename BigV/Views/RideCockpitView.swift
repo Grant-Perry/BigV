@@ -99,5 +99,6 @@ struct RideCockpitView: View {
    .environment(RideWeatherModel(unitsSettings: RideUnitsSettings()))
    .environment(RideClimbModel())
    .environment(RideBackToStartModel())
+   .environment(RideAppearanceSettings())
    .preferredColorScheme(.dark)
 }

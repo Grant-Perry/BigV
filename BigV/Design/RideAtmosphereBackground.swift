@@ -36,21 +36,29 @@ struct RideTrailPlateView: View {
       Image(plateName)
          .resizable()
          .scaledToFill()
-         .overlay(Color.black.opacity(0.2))
+         .overlay(RideDashboardTheme.veil(0.2))
    }
 }
 
 /// Cockpit scene art. Trail plate plus dim vignette so HUD text stays king.
+///
+/// By day the same plate is washed nearly out: the ground is paper, and a
+/// photo that reads as atmosphere at night reads as clutter under black ink
+/// in the sun.
 struct RideAtmosphereBackground: View {
 
    var scene: RideAtmosphereScene = .dashboard
+
+   @Environment(\.colorScheme) private var colorScheme
+
+   private var isDark: Bool { colorScheme == .dark }
 
    var body: some View {
       ZStack {
          RideDashboardTheme.void
 
          RideTrailPlateView(plateName: scene.plateName)
-            .opacity(0.40)
+            .opacity(isDark ? 0.40 : 0.16)
             .overlay {
                LinearGradient(
                   colors: [
@@ -76,7 +84,7 @@ struct RideAtmosphereBackground: View {
 
          RadialGradient(
             colors: [
-               RideDashboardTheme.ember.opacity(0.14),
+               RideDashboardTheme.ember.opacity(isDark ? 0.14 : 0.08),
                RideDashboardTheme.ember.opacity(0)
             ],
             center: .init(x: 0.50, y: 0.42),
@@ -86,7 +94,7 @@ struct RideAtmosphereBackground: View {
 
          RadialGradient(
             colors: [
-               RideDashboardTheme.ice.opacity(0.08),
+               RideDashboardTheme.ice.opacity(isDark ? 0.08 : 0.05),
                RideDashboardTheme.ice.opacity(0)
             ],
             center: .init(x: 0.78, y: 0.16),
@@ -100,6 +108,12 @@ struct RideAtmosphereBackground: View {
    }
 }
 
-#Preview {
+#Preview("Night") {
    RideAtmosphereBackground(scene: .dashboard)
+      .preferredColorScheme(.dark)
+}
+
+#Preview("Day") {
+   RideAtmosphereBackground(scene: .dashboard)
+      .preferredColorScheme(.light)
 }

@@ -43,13 +43,13 @@ struct RideClimbPageView: View {
          Image(systemName: "mountain.2.fill")
             .font(.caption.weight(.semibold))
             .foregroundStyle(
-               rideClimbModel.isOnClimb ? RideDashboardTheme.ember : .white.opacity(0.4)
+               rideClimbModel.isOnClimb ? RideDashboardTheme.ember : RideDashboardTheme.ink(0.4)
             )
 
          Text("CLIMB")
             .font(.caption2.weight(.bold))
             .kerning(1.2)
-            .foregroundStyle(.white.opacity(0.7))
+            .foregroundStyle(RideDashboardTheme.ink(0.7))
 
          Spacer()
 
@@ -58,7 +58,7 @@ struct RideClimbPageView: View {
          } else {
             Text(rideClimbModel.hasRouteData ? "ROUTE PROFILE" : "FREERIDE")
                .font(.caption2.weight(.semibold))
-               .foregroundStyle(.white.opacity(0.45))
+               .foregroundStyle(RideDashboardTheme.ink(0.45))
          }
       }
       .padding(.horizontal, 4)
@@ -88,7 +88,7 @@ struct RideClimbPageView: View {
             Text(rideClimbModel.chartDistanceUnit)
                .font(.system(size: 8, weight: .bold))
                .kerning(0.8)
-               .foregroundStyle(.white.opacity(0.3))
+               .foregroundStyle(RideDashboardTheme.ink(0.3))
 
             Spacer()
 
@@ -96,7 +96,7 @@ struct RideClimbPageView: View {
             Text("ELEVATION © OPEN-METEO")
                .font(.system(size: 8, weight: .semibold))
                .kerning(0.6)
-               .foregroundStyle(.white.opacity(0.25))
+               .foregroundStyle(RideDashboardTheme.ink(0.25))
          }
       }
       .padding(12)
@@ -127,24 +127,24 @@ struct RideClimbPageView: View {
             Text(value)
                .font(.system(size: 20, weight: .bold, design: .rounded))
                .monospacedDigit()
-               .foregroundStyle(.white)
+               .foregroundStyle(RideDashboardTheme.ink)
 
             Text(unit)
                .font(.system(size: 10, weight: .semibold))
-               .foregroundStyle(.white.opacity(0.4))
+               .foregroundStyle(RideDashboardTheme.ink(0.4))
          }
 
          Text(label)
             .font(.system(size: 9, weight: .bold))
             .kerning(0.8)
-            .foregroundStyle(.white.opacity(0.45))
+            .foregroundStyle(RideDashboardTheme.ink(0.45))
       }
       .frame(maxWidth: .infinity)
    }
 
    private var divider: some View {
       Rectangle()
-         .fill(.white.opacity(0.10))
+         .fill(RideDashboardTheme.ink(0.10))
          .frame(width: 1, height: 30)
    }
 }

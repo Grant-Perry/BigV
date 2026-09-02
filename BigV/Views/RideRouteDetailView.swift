@@ -134,7 +134,7 @@ struct RideRouteDetailView: View {
    private var expandHint: some View {
       Image(systemName: "arrow.up.left.and.arrow.down.right")
          .font(.caption.weight(.bold))
-         .foregroundStyle(.white)
+         .foregroundStyle(RideDashboardTheme.ink)
          .frame(width: 32, height: 32)
          .rideGlassChrome(in: .circle)
          .padding(10)
