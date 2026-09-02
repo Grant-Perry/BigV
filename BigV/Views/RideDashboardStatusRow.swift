@@ -72,6 +72,11 @@ struct RideDashboardStatusRow: View {
             backToStartChip
          }
       }
+      // The speed hero's floor will eat this row if it can. Pin the chips at
+      // their intrinsic height so weather, pulse, and radar never collapse
+      // into the GPS mark under the cluster.
+      .fixedSize(horizontal: false, vertical: true)
+      .layoutPriority(2)
       .sheet(isPresented: Bindable(backToStartModel).isPresentingOptions) {
          RideBackToStartSheet(backToStartModel: backToStartModel)
       }

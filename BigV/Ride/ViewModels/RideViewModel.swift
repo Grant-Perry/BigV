@@ -22,6 +22,10 @@ final class RideViewModel {
    private let rideUnitsSettings: RideUnitsSettings
    let plusStore: BigVeloPlusStore?
 
+   /// Magnetometer for the ribbon while the bike is stopped. Owned here so the
+   /// dashboard can start and stop it with its own lifecycle.
+   private let compassHeadingSource = RideCompassHeadingSource()
+
    /// Opens the keep-BigVelo sheet after a refused START (phone or Watch).
    var isShowingAccessPaywall = false
 
@@ -108,20 +112,48 @@ final class RideViewModel {
 
    var gradeUnit: String { RideFormatters.Unit.grade }
 
-   var course: Double { state.course }
+   /// VAM. Blank until the engine trusts a fix, like grade; descent reads 0.
+   var verticalSpeed: String {
+      state.hasGPSFix ? RideFormatters.verticalSpeed(state.verticalSpeed) : RideFormatters.placeholder
+   }
+
+   var verticalSpeedUnit: String { RideFormatters.Unit.verticalSpeed }
+
+   /// Where the bike is pointed.
+   ///
+   /// GPS course while rolling — it follows the bike, not the phone, so a
+   /// pocketed phone still reads the road. At a standstill GPS has no course,
+   /// so the magnetometer takes over; failing that, the last course we had.
+   var course: Double {
+      if state.isMoving, state.course >= 0 {
+         return state.course
+      }
+      if compassHeadingSource.heading >= 0 {
+         return compassHeadingSource.heading
+      }
+      return state.course
+   }
 
    var heading: String {
-      RideFormatters.cardinal(state.course) ?? RideFormatters.placeholder
+      RideFormatters.cardinal(course) ?? RideFormatters.placeholder
    }
 
    var headingDegrees: String {
-      RideFormatters.headingDegrees(state.course) ?? RideFormatters.placeholder
+      RideFormatters.headingDegrees(course) ?? RideFormatters.placeholder
+   }
+
+   func startCompassHeading() {
+      compassHeadingSource.start()
+   }
+
+   func stopCompassHeading() {
+      compassHeadingSource.stop()
    }
 
    // MARK: - Sensors
 
-   /// `nil` until a Watch is feeding a pulse, which is also the signal the chip
-   /// uses to stay off the dashboard entirely.
+   /// `nil` until a Watch is feeding a pulse, which is also the signal the
+   /// dashboard uses to keep heart-rate chrome off the grid.
    var heartRate: String? {
       state.heartRate.map(RideFormatters.heartRate)
    }
@@ -129,6 +161,10 @@ final class RideViewModel {
    var heartRateUnit: String { RideFormatters.Unit.heartRate }
 
    var heartRateBeatsPerMinute: Double? { state.heartRate }
+
+   /// Live pulse from the Watch. Stale readings clear, so this is the same
+   /// signal as `heartRate` — the metric tile only belongs on the grid while true.
+   var isHeartRateActive: Bool { state.heartRate != nil }
 
    // MARK: - Radar
 

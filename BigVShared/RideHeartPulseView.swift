@@ -7,9 +7,9 @@ import SwiftUI
 
 /// BigMetric-style beating heart: custom outline with a swirling ice-to-pulse gradient.
 ///
-/// When a plausible BPM is present the swirl speeds up slightly and the heart
-/// scales on a lub-dub curve. Frozen on reduced luminance so always-on displays
-/// do not burn compositor time.
+/// One swirl turn and one lub-dub scale cycle per beat, locked to the same
+/// clock — 90 BPM spins 50% faster than 60. Frozen on reduced luminance so
+/// always-on displays do not burn compositor time.
 struct RideHeartPulseView: View {
 
    let beatsPerMinute: Double?
@@ -17,7 +17,6 @@ struct RideHeartPulseView: View {
    var font: Font = .caption.weight(.semibold)
 
    @Environment(\.isLuminanceReduced) private var isLuminanceReduced
-   @State private var swirlPhase = false
 
    var body: some View {
       let bpm = clampedRate
@@ -25,6 +24,9 @@ struct RideHeartPulseView: View {
       let size = iconSize
 
       TimelineView(.animation(minimumInterval: shouldAnimate ? 1.0 / 24.0 : 60, paused: !shouldAnimate)) { context in
+         let rate = bpm ?? Self.restingRate
+         let swirl = shouldAnimate ? Self.beatPhase(at: context.date, bpm: rate) : 0
+
          RideHeartIconShape()
             .stroke(
                style: StrokeStyle(
@@ -33,42 +35,29 @@ struct RideHeartPulseView: View {
                   lineJoin: .round,
                   miterLimit: 0,
                   dash: shouldAnimate ? [150, 15] : [],
-                  dashPhase: swirlPhase ? -83 : 83
+                  dashPhase: shouldAnimate ? swirl * Self.dashTravel : 0
                )
             )
             .frame(width: size, height: size)
-            .foregroundStyle(shouldAnimate ? AnyShapeStyle(heartGradient) : AnyShapeStyle(RideChromeTokens.pulse.opacity(0.85)))
-            .hueRotation(.degrees(shouldAnimate && swirlPhase ? 0 : 360))
-            .scaleEffect(shouldAnimate ? Self.lubDubScale(at: context.date, bpm: bpm ?? Self.restingRate) : 1)
+            .foregroundStyle(shouldAnimate ? AnyShapeStyle(heartGradient(progress: swirl)) : AnyShapeStyle(RideChromeTokens.pulse.opacity(0.85)))
+            .hueRotation(.degrees(shouldAnimate ? swirl * 360 : 0))
+            .scaleEffect(shouldAnimate ? Self.lubDubScale(phase: swirl) : 1)
             .shadow(
                color: RideChromeTokens.pulse.opacity(shouldAnimate ? 0.45 : 0.15),
                radius: shouldAnimate ? 4 : 1
             )
-      }
-      .onAppear {
-         guard !isLuminanceReduced else { return }
-         withAnimation(.linear(duration: swirlDuration(bpm: clampedRate)).repeatForever(autoreverses: false)) {
-            swirlPhase.toggle()
-         }
-      }
-      .onChange(of: clampedRate) { _, newRate in
-         guard newRate != nil, !isLuminanceReduced else { return }
-         swirlPhase = false
-         withAnimation(.linear(duration: swirlDuration(bpm: newRate)).repeatForever(autoreverses: false)) {
-            swirlPhase.toggle()
-         }
       }
       .accessibilityHidden(true)
    }
 
    // MARK: - Style
 
-   private var heartGradient: AngularGradient {
+   private func heartGradient(progress: Double) -> AngularGradient {
       AngularGradient(
          colors: [RideChromeTokens.ice, RideChromeTokens.pulse, RideChromeTokens.ice],
          center: .center,
-         startAngle: .degrees(swirlPhase ? 360 : 0),
-         endAngle: .degrees(swirlPhase ? 720 : 360)
+         startAngle: .degrees(progress * 360),
+         endAngle: .degrees(progress * 360 + 360)
       )
    }
 
@@ -93,18 +82,15 @@ struct RideHeartPulseView: View {
       return beatsPerMinute
    }
 
-   private func swirlDuration(bpm: Double?) -> TimeInterval {
-      guard let bpm else { return 2.5 }
-      // Faster pulse → slightly faster swirl, clamped so it never strobes.
-      return min(3.0, max(1.6, 120.0 / bpm))
+   /// `0...1` through the current beat. Same clock for swirl and lub-dub.
+   private static func beatPhase(at date: Date, bpm: Double) -> Double {
+      let cycle = 60.0 / bpm
+      return date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: cycle) / cycle
    }
 
    // MARK: - Lub-dub
 
-   private static func lubDubScale(at date: Date, bpm: Double) -> CGFloat {
-      let cycle = 60.0 / bpm
-      let phase = date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: cycle) / cycle
-
+   private static func lubDubScale(phase: Double) -> CGFloat {
       switch phase {
          case ..<0.12:
             return 1.0 + 0.18 * easeOut(phase / 0.12)
@@ -128,6 +114,7 @@ struct RideHeartPulseView: View {
    }
 
    private static let restingRate: Double = 72
+   private static let dashTravel: CGFloat = 166
 }
 
 #Preview {

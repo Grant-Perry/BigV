@@ -68,14 +68,15 @@ struct RideDashboardLandscapeView: View {
                RideDashboardMetricsGrid(
                   rideViewModel: rideViewModel,
                   routeGuidanceViewModel: routeGuidanceViewModel,
-                  isCompact: true
+                  layout: .landscape
                )
                .hidden()
                .accessibilityHidden(true)
 
                RideDashboardInstrumentHero(
                   rideViewModel: rideViewModel,
-                  isExpanded: false
+                  isExpanded: false,
+                  layout: .landscape
                )
             }
             .layoutPriority(1)
@@ -83,7 +84,7 @@ struct RideDashboardLandscapeView: View {
             RideDashboardMetricsGrid(
                rideViewModel: rideViewModel,
                routeGuidanceViewModel: routeGuidanceViewModel,
-               isCompact: true
+               layout: .landscape
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .frame(minHeight: isDrawerOpen ? 96 : RideMapDrawer.collapsedHeight)

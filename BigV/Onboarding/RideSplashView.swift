@@ -56,17 +56,9 @@ struct RideSplashView: View {
       VStack(spacing: 16) {
          Spacer()
 
-         Text("BigVelo")
-            .font(.system(size: 72, weight: .bold, design: .rounded))
-            .foregroundStyle(.white)
-            .shadow(color: .black.opacity(0.6), radius: 16, y: 6)
+         RideWordmark(pointSize: 68)
             .minimumScaleFactor(0.7)
             .lineLimit(1)
-
-         Capsule()
-            .fill(RideDashboardTheme.ember)
-            .frame(width: 64, height: 4)
-            .shadow(color: RideDashboardTheme.ember.opacity(0.55), radius: 8, y: 0)
 
          Spacer()
          Spacer()

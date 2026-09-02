@@ -23,6 +23,10 @@ nonisolated enum RideFormatters {
       static let cadence = "RPM"
       static let heartRate = "BPM"
       static let power = "W"
+
+      /// Metres per hour on every bike computer, imperial included — VAM is
+      /// defined in that unit and riders compare it across borders.
+      static let verticalSpeed = "M/H"
    }
 
    static let placeholder = "—"

@@ -16,6 +16,7 @@ struct RideDashboardView: View {
    let onShowRadar: () -> Void
 
    @Environment(\.verticalSizeClass) private var verticalSizeClass
+   @Environment(\.scenePhase) private var scenePhase
    @State private var isDrawerOpen = true
 
    var body: some View {
@@ -35,6 +36,18 @@ struct RideDashboardView: View {
          }
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
+      // The magnetometer only matters while this screen is up: it is what
+      // gives the ribbon a heading at a standstill, and it costs battery, so
+      // it runs exactly as long as the cockpit is on screen and in front.
+      .onAppear { rideViewModel.startCompassHeading() }
+      .onDisappear { rideViewModel.stopCompassHeading() }
+      .onChange(of: scenePhase) { _, phase in
+         if phase == .active {
+            rideViewModel.startCompassHeading()
+         } else {
+            rideViewModel.stopCompassHeading()
+         }
+      }
    }
 
    // MARK: - Portrait
@@ -94,12 +107,16 @@ struct RideDashboardView: View {
       }
    }
 
-   /// The hero and the tiles, which is the surface the radar tape lies over.
+   /// The hero, the compass band and the strip: the surface the radar tape
+   /// lies over.
    ///
-   /// Scoped to these two rather than the whole column so the tape can never
-   /// cover the status chips at the top or the drawer's controls below, whichever
-   /// edge the rider parks it on. The tiles already hold their content away from
-   /// the left and right margins, so a vertical tape lands on empty card.
+   /// Scoped to these rather than the whole column so the tape can never cover
+   /// the status chips at the top or the drawer's controls below, whichever
+   /// edge the rider parks it on. The cards already hold their content away
+   /// from the left and right margins, so a vertical tape lands on empty card.
+   ///
+   /// Top to bottom is the reading order on a bike: speed with the heading
+   /// under it, then how far and how long, then the climb figures.
    private var instrumentStack: some View {
       VStack(spacing: 10) {
          RideDashboardInstrumentHero(
