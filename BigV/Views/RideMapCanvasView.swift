@@ -13,10 +13,6 @@ struct RideMapCanvasView: View {
    @Bindable var rideMapViewModel: RideMapViewModel
    var showsCompass: Bool = true
 
-   /// `nil` takes the view model's own follow-aware modes, which is what the
-   /// full map page wants. The drawer names its own set instead.
-   var interactionModes: MapInteractionModes?
-
    /// Bounds are an initialiser parameter rather than a modifier, and they are
    /// the only zoom lever a `userLocation` camera gives.
    var cameraBounds: MapCameraBounds?
@@ -39,7 +35,7 @@ struct RideMapCanvasView: View {
       Map(
          position: $rideMapViewModel.cameraPosition,
          bounds: cameraBounds,
-         interactionModes: interactionModes ?? rideMapViewModel.interactionModes
+         interactionModes: rideMapViewModel.interactionModes
       ) {
          if rideMapViewModel.hasPlannedRoute {
             MapPolyline(coordinates: rideMapViewModel.plannedRouteCoordinates)
@@ -80,8 +76,13 @@ struct RideMapCanvasView: View {
             MapCompass()
          }
       }
+      // Rides alongside MapKit's own handling rather than replacing it: the map
+      // still pans, and this only tells the view model the rider has the camera
+      // so it knows to hand it back.
+      .simultaneousGesture(riderCameraDrag)
       .onMapCameraChange(frequency: .continuous) { context in
          rideMapViewModel.rememberCamera(context.camera)
+         rideMapViewModel.reassertFollowIfNeeded()
       }
       .onChange(of: rideMapViewModel.plannedRouteID) { _, newID in
          guard newID != nil else { return }
@@ -91,5 +92,15 @@ struct RideMapCanvasView: View {
          guard !isIdle else { return }
          rideMapViewModel.recenter()
       }
+   }
+
+   // MARK: - Camera Handover
+
+   /// Past a tap's worth of movement, so a double tap to expand the drawer is
+   /// never mistaken for the rider taking the camera.
+   private var riderCameraDrag: some Gesture {
+      DragGesture(minimumDistance: 10)
+         .onChanged { _ in rideMapViewModel.riderBeganMovingCamera() }
+         .onEnded { _ in rideMapViewModel.riderFinishedMovingCamera() }
    }
 }

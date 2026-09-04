@@ -15,6 +15,11 @@ struct RideDashboardView: View {
    let onExpandMap: () -> Void
    let onShowRadar: () -> Void
 
+   /// Turning the page is the dashboard's job now, not the pager's: the map
+   /// drawer pans, so a page-turning drag laid over the whole screen would
+   /// fight every pan the rider makes. Recognised above the drawer instead.
+   var onSwipeForward: () -> Void = {}
+
    @Environment(\.verticalSizeClass) private var verticalSizeClass
    @Environment(\.scenePhase) private var scenePhase
    @State private var isDrawerOpen = true
@@ -38,6 +43,7 @@ struct RideDashboardView: View {
                showsDrawerMap: showsDrawerMap,
                onExpandMap: onExpandMap,
                onShowRadar: onShowRadar,
+               onSwipeForward: onSwipeForward,
                isDrawerOpen: $isDrawerOpen
             )
          } else {
@@ -71,8 +77,12 @@ struct RideDashboardView: View {
             onExpand: onExpandMap,
             isOpen: $isDrawerOpen
          )
-         .overlay(alignment: .bottom) {
-            RideControlBar(rideViewModel: rideViewModel)
+         // Bottom-trailing and compact: parked in one corner of the map rather
+         // than laid across its middle, so the rider can see the road the
+         // controls float over.
+         .overlay(alignment: .bottomTrailing) {
+            RideControlBar(rideViewModel: rideViewModel, style: .compact)
+               .padding(.trailing, 10)
                .padding(.bottom, 10)
          }
          // A bottom tape parks on the drawer's top edge rather than the true
@@ -114,6 +124,17 @@ struct RideDashboardView: View {
 
          instrumentStack
       }
+      .contentShape(.rect)
+      .simultaneousGesture(swipeForward)
+   }
+
+   /// Only forward: back from the dashboard is the tab bar, not a page.
+   private var swipeForward: some Gesture {
+      DragGesture(minimumDistance: RidePageSwipe.minimumDistance)
+         .onEnded { value in
+            guard RidePageSwipe.isForward(value) else { return }
+            onSwipeForward()
+         }
    }
 
    /// The hero, the compass band and the strip: the surface the radar tape

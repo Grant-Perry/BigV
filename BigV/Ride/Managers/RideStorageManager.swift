@@ -94,6 +94,66 @@ final class RideStorageManager {
       return beats.reduce(0, +) / Double(beats.count)
    }
 
+   // MARK: - Interrupted Rides
+
+   /// Ride rows that were never closed out — the app was killed, crashed or ran
+   /// out of battery mid-ride.
+   ///
+   /// Newest first, because only the newest can be the ride the rider was on
+   /// when the app went away; anything older is a leftover from a previous
+   /// interruption that has to be filed rather than resumed.
+   func interruptedRides() -> [Ride] {
+      let descriptor = FetchDescriptor<Ride>(
+         predicate: #Predicate<Ride> { $0.endDate == nil },
+         sortBy: [SortDescriptor(\.startDate, order: .reverse)]
+      )
+
+      do {
+         return try modelContext.fetch(descriptor)
+      } catch {
+         record(error, reason: "interrupted ride fetch")
+         return []
+      }
+   }
+
+   /// Re-adopts an interrupted ride so recording continues writing into the row
+   /// the rider already filled, instead of starting a second one beside it.
+   func adopt(_ ride: Ride) {
+      activeRide = ride
+      unsavedSampleCount = 0
+   }
+
+   /// Files an interrupted ride into history with the totals it already carries.
+   ///
+   /// Used for a ride too old to resume. The row was written a sample at a time,
+   /// so its totals are already correct as of the last sample; all it is missing
+   /// is the `endDate` that history filters on.
+   func closeOut(_ ride: Ride) {
+      guard ride.endDate == nil else { return }
+
+      if activeRide?.persistentModelID == ride.persistentModelID {
+         activeRide = nil
+      }
+
+      ride.endDate = ride.samples.map(\.timestamp).max()
+         ?? ride.startDate.addingTimeInterval(ride.duration)
+
+      if ride.averageHeartRate == nil {
+         ride.averageHeartRate = Self.averageHeartRate(of: ride.samples)
+      }
+
+      save(reason: "interrupted ride recovered")
+   }
+
+   /// Erases an interrupted ride that never covered enough ground to keep.
+   func discardInterrupted(_ ride: Ride, reason: RideRetentionPolicy.DiscardReason) {
+      if activeRide?.persistentModelID == ride.persistentModelID {
+         activeRide = nil
+      }
+
+      discard(ride, reason: reason)
+   }
+
    /// Drops the in-progress ride without finalizing it. Used when the session
    /// has already decided the ride is not worth keeping.
    func discardActiveRide(reason: RideRetentionPolicy.DiscardReason) {

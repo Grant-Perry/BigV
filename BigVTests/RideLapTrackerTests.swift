@@ -124,4 +124,40 @@ struct RideLapTrackerTests {
       #expect(auto.first?.index == 2)
       #expect(tracker.completedLapCount == 2)
    }
+
+   // MARK: - Restore
+
+   @Test func restoringPicksUpNumberingWhereTheInterruptedRideLeftOff() throws {
+      var tracker = RideLapTracker()
+      tracker.restore(
+         completedLapCount: 3,
+         anchorDate: at(1_800),
+         anchorDistance: 15_000,
+         anchorElevationGain: 120
+      )
+
+      let cut = tracker.cut(distance: 18_000, elevationGain: 190, at: at(2_400))
+      let lap = try #require(cut)
+
+      #expect(lap.index == 4)
+      #expect(lap.startDistance == 15_000)
+      #expect(lap.distance == 3_000)
+      #expect(lap.elevationGain == 70)
+      #expect(tracker.hasLaps)
+   }
+
+   @Test func restoringKeepsAutoLapBoundariesWhereTheyWere() {
+      var tracker = RideLapTracker()
+      tracker.restore(
+         completedLapCount: 2,
+         anchorDate: at(1_200),
+         anchorDistance: 10_000,
+         anchorElevationGain: 80
+      )
+
+      let laps = tracker.autoLaps(distance: 15_400, elevationGain: 100, at: at(1_900), every: 5_000)
+
+      #expect(laps.map(\.endDistance) == [15_000])
+      #expect(laps.map(\.index) == [3])
+   }
 }

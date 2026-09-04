@@ -78,6 +78,23 @@ nonisolated struct RideLapTracker {
       completedLapCount = 0
    }
 
+   /// Re-anchors onto a ride that was interrupted, from the laps already stored.
+   ///
+   /// The open lap is whatever came after the last cut, so the anchor is that
+   /// cut — or the ride's start when nothing was ever cut. Auto-lap boundaries
+   /// then keep falling exactly where they would have.
+   mutating func restore(
+      completedLapCount: Int,
+      anchorDate: Date,
+      anchorDistance: Double,
+      anchorElevationGain: Double
+   ) {
+      self.completedLapCount = max(0, completedLapCount)
+      self.anchorDate = anchorDate
+      self.anchorDistance = max(0, anchorDistance)
+      self.anchorElevationGain = max(0, anchorElevationGain)
+   }
+
    // MARK: - Manual
 
    /// Cuts a lap here, wherever here is. `nil` before recording has begun.

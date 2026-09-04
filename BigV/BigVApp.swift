@@ -101,6 +101,11 @@ struct BigVApp: App {
       rideSessionManager.activateWatchLink()
       rideSessionManager.activateRadarLink()
 
+      // Before any view exists, so a rider whose app was jettisoned mid-ride
+      // lands on a cockpit that is already recording rather than on a zeroed
+      // one. Also files every ride an older build left open and invisible.
+      rideSessionManager.recoverInterruptedRide()
+
       sharedModelContainer = modelContainer
 
       let rideViewModel = RideViewModel(

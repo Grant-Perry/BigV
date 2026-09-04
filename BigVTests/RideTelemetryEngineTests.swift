@@ -317,4 +317,75 @@ struct RideTelemetryEngineTests {
       #expect(engine.altitude == nil)
       #expect(engine.verticalSpeed == 0)
    }
+
+   // MARK: - Restore
+
+   @Test func restoringCarriesTheInterruptedRideTotalsForward() {
+      var engine = RideTelemetryEngine()
+
+      engine.restore(
+         RideTelemetryEngine.RestoredTotals(
+            distance: 22_500,
+            movingTime: 3_300,
+            maximumSpeed: 14.2,
+            elevationGain: 380,
+            elevationLoss: 260,
+            altitude: 190,
+            acceptedSampleCount: 3_310
+         )
+      )
+
+      #expect(engine.distance == 22_500)
+      #expect(engine.movingTime == 3_300)
+      #expect(engine.maximumSpeed == 14.2)
+      #expect(engine.elevationGain == 380)
+      #expect(engine.elevationLoss == 260)
+      #expect(engine.altitude == 190)
+      #expect(engine.acceptedSampleCount == 3_310)
+
+      // No fix and no anchor: the next sample has to re-seed rather than be
+      // measured against wherever the rider was an hour ago.
+      #expect(!engine.hasFix)
+      #expect(engine.speed == 0)
+   }
+
+   @Test func theFirstSampleAfterARestoreAddsNoPhantomDistance() {
+      var engine = RideTelemetryEngine()
+      let reference = Date(timeIntervalSince1970: 1_000_000)
+
+      engine.restore(
+         RideTelemetryEngine.RestoredTotals(distance: 22_500, acceptedSampleCount: 3_310)
+      )
+
+      // Miles from where the ride was recording when the app was killed.
+      let elsewhere = sample(northing: 30_000, secondsFromStart: 0, reference: reference)
+      #expect(engine.ingest(elsewhere) == .acquiredFix)
+      #expect(engine.distance == 22_500)
+
+      // And ordinary riding accumulates on top from there.
+      for step in 1...20 {
+         _ = engine.ingest(
+            sample(
+               northing: 30_000 + Double(step) * 10,
+               secondsFromStart: Double(step),
+               reference: reference
+            )
+         )
+      }
+
+      #expect(engine.distance > 22_500)
+      #expect(engine.distance < 22_500 + 400)
+   }
+
+   @Test func restoringReplacesAnyEarlierTotals() {
+      var engine = RideTelemetryEngine()
+      ride(into: &engine, steps: 30)
+      #expect(engine.distance > 0)
+
+      engine.restore(RideTelemetryEngine.RestoredTotals())
+
+      #expect(engine.distance == 0)
+      #expect(engine.movingTime == 0)
+      #expect(engine.altitude == nil)
+   }
 }

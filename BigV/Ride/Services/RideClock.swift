@@ -46,6 +46,24 @@ struct RideClock: Sendable {
       pauseStartedAt = nil
    }
 
+   // MARK: - Restore
+
+   /// Re-anchors the clock onto a ride that was interrupted and is being picked
+   /// back up.
+   ///
+   /// Everything between the last recorded second and now is time the app was
+   /// not running, so it is charged to pauses. Ride time therefore resumes at
+   /// the figure the rider last saw rather than jumping by however long the
+   /// phone spent doing something else.
+   mutating func restore(
+      elapsed: TimeInterval,
+      since startDate: Date,
+      at reference: Date = .now
+   ) {
+      pauseStartedAt = nil
+      pausedDuration = max(0, reference.timeIntervalSince(startDate) - max(0, elapsed))
+   }
+
    // MARK: - Elapsed
 
    /// Wall time from `startDate` to `reference`, less every pause.

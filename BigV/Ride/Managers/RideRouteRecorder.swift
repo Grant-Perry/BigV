@@ -62,6 +62,19 @@ final class RideRouteRecorder {
       )
    }
 
+   /// Rebuilds the breadcrumb for a ride being picked back up after the app was
+   /// killed. Replayed through `append` rather than assigned, so a long ride's
+   /// stored track lands under the same downsampling every live track gets.
+   func restore(_ coordinates: [CLLocationCoordinate2D]) {
+      reset()
+
+      for coordinate in coordinates {
+         append(coordinate)
+      }
+
+      DebugPrint(mode: .telemetry, "Route restored to \(self.coordinates.count) points")
+   }
+
    func reset() {
       coordinates.removeAll(keepingCapacity: true)
       spacing = configuration.minimumSpacing

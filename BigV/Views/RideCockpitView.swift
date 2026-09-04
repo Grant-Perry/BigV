@@ -18,6 +18,15 @@ struct RideCockpitView: View {
    let summaryDetailViewModel: RideDetailViewModel
    let onShowRadar: () -> Void
 
+   /// Shown for a few seconds after the app picks a ride back up. The rider was
+   /// somewhere else when iOS took the app away, so the first thing they need
+   /// to know on returning is that their ride is still running.
+   @State private var isShowingRecoveryNotice = false
+
+   /// The pulse this cockpit has already announced, so leaving the tab and
+   /// coming back does not re-announce a recovery from an hour ago.
+   @State private var acknowledgedRecoveryPulse = 0
+
    var body: some View {
       Group {
          if rideViewModel.isFinished {
@@ -44,8 +53,14 @@ struct RideCockpitView: View {
             .ignoresSafeArea()
       }
       .safeAreaInset(edge: .top, spacing: 0) {
-         if rideViewModel.showsAccessLock {
-            accessLockBanner
+         VStack(spacing: 6) {
+            if rideViewModel.showsAccessLock {
+               accessLockBanner
+            }
+
+            if isShowingRecoveryNotice {
+               recoveryBanner
+            }
          }
       }
       .sheet(isPresented: accessPaywallBinding) {
@@ -59,6 +74,46 @@ struct RideCockpitView: View {
       .onChange(of: rideViewModel.startDeniedPulse) { _, _ in
          rideViewModel.presentAccessPaywallIfLocked()
       }
+      // Recovery runs before any view exists, so the pulse is already set by the
+      // time this appears — hence `task` as well as `onChange`.
+      .task { showRecoveryNoticeIfNeeded() }
+      .onChange(of: rideViewModel.recoveredRidePulse) { _, _ in
+         showRecoveryNoticeIfNeeded()
+      }
+   }
+
+   // MARK: - Recovery Notice
+
+   private func showRecoveryNoticeIfNeeded() {
+      let pulse = rideViewModel.recoveredRidePulse
+      guard pulse > 0, pulse != acknowledgedRecoveryPulse else { return }
+
+      acknowledgedRecoveryPulse = pulse
+      withAnimation { isShowingRecoveryNotice = true }
+
+      Task {
+         try? await Task.sleep(for: .seconds(6))
+         withAnimation { isShowingRecoveryNotice = false }
+      }
+   }
+
+   private var recoveryBanner: some View {
+      HStack(spacing: 8) {
+         Image(systemName: "arrow.clockwise.circle.fill")
+            .font(.footnote.weight(.bold))
+
+         Text("Ride restored — still recording from where you left off.")
+            .font(.caption.weight(.semibold))
+            .multilineTextAlignment(.leading)
+      }
+      .foregroundStyle(.white)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(12)
+      .background(RideDashboardTheme.go.opacity(0.88), in: .rect(cornerRadius: 12))
+      .padding(.horizontal, 16)
+      .padding(.top, 8)
+      .transition(.opacity.combined(with: .move(edge: .top)))
+      .accessibilityIdentifier("dashboard.banner.rideRestored")
    }
 
    private var accessPaywallBinding: Binding<Bool> {

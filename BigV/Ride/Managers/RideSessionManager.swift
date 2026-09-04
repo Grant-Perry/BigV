@@ -28,6 +28,11 @@ final class RideSessionManager {
    /// the keep-BigVelo sheet from this pulse, including Watch START.
    private(set) var startDeniedPulse = 0
 
+   /// Bumps when a ride the app was killed mid-way through has been picked back
+   /// up, so the cockpit can tell the rider their ride is still running rather
+   /// than leaving them to work it out from a distance that is not zero.
+   private(set) var recoveredRidePulse = 0
+
    // MARK: - Private Properties
 
    private let locationManager: RideLocationManager
@@ -41,6 +46,7 @@ final class RideSessionManager {
    private let rideWeatherStamper: RideWeatherStamper?
    private let rideLapSettings: RideLapSettings?
    private let recordingAccess: (any RideRecordingAccessing)?
+   private let checkpointStore: RideSessionCheckpointStore
    private var telemetryEngine: RideTelemetryEngine
    private var rideClock = RideClock()
    private var radarTracker = RideRadarTracker()
@@ -68,6 +74,16 @@ final class RideSessionManager {
 
    /// Passes completed before this ride started don't belong to it.
    private var radarPassCountAtRideStart = 0
+
+   /// Passes this ride already recorded before the app was killed. Added back
+   /// on top of the live tracker's count so a recovered ride's traffic total
+   /// picks up rather than restarting at zero.
+   private var restoredRadarPassCount = 0
+
+   /// Throttles checkpoint writes on the tick. The checkpoint only has to be
+   /// fresh enough to prove the app was mid-ride, not accurate to the second.
+   private var lastCheckpointWriteAt = Date.distantPast
+   private let checkpointRefreshInterval: TimeInterval = 60
 
    /// Displayed speed drops to zero when samples stop arriving for this long.
    private let sampleStalenessWindow: TimeInterval = 4
@@ -99,7 +115,8 @@ final class RideSessionManager {
       rideRadarAnnouncer: RideRadarAnnouncer? = nil,
       rideWeatherStamper: RideWeatherStamper? = nil,
       rideLapSettings: RideLapSettings? = nil,
-      recordingAccess: (any RideRecordingAccessing)? = nil
+      recordingAccess: (any RideRecordingAccessing)? = nil,
+      checkpointStore: RideSessionCheckpointStore = RideSessionCheckpointStore()
    ) {
       self.locationManager = locationManager
       self.rideStorageManager = rideStorageManager
@@ -115,6 +132,7 @@ final class RideSessionManager {
       self.rideWeatherStamper = rideWeatherStamper
       self.rideLapSettings = rideLapSettings
       self.recordingAccess = recordingAccess
+      self.checkpointStore = checkpointStore
       self.telemetryEngine = RideTelemetryEngine(configuration: configuration)
    }
 
@@ -139,6 +157,7 @@ final class RideSessionManager {
       state = RideState()
       state.radar = radar
       radarPassCountAtRideStart = radarTracker.vehiclePassCount
+      restoredRadarPassCount = 0
       state.radar.vehiclePassCount = 0
       state.radar.closestPassDistanceMeters = nil
       state.radar.maximumPassClosingSpeedMetersPerSecond = nil
@@ -153,6 +172,7 @@ final class RideSessionManager {
       startLocationStream()
       startClock()
       requestHealthAuthorization()
+      writeCheckpoint(force: true)
       mirrorToWatch()
 
       DebugPrint(mode: .sessionLifecycle, "Ride start requested")
@@ -166,6 +186,7 @@ final class RideSessionManager {
       telemetryEngine.markSpeedStale()
       publishTelemetry()
       flushPendingWork()
+      writeCheckpoint(force: true)
       mirrorToWatch()
 
       DebugPrint(mode: .sessionLifecycle, "Ride paused")
@@ -177,6 +198,7 @@ final class RideSessionManager {
       rideClock.endPause()
       lastSampleAt = nil
       state.phase = .recording
+      writeCheckpoint(force: true)
       mirrorToWatch()
 
       DebugPrint(mode: .sessionLifecycle, "Ride resumed")
@@ -184,6 +206,11 @@ final class RideSessionManager {
 
    func end() {
       guard state.phase.isActive else { return }
+
+      // Cleared first: from here on every path either files the ride or erases
+      // it, so a crash between now and finalization must not look like an
+      // interruption to resume.
+      checkpointStore.clear()
 
       // Cancelling before the first fix never produced a ride, so there is
       // nothing to summarize or export.
@@ -238,6 +265,7 @@ final class RideSessionManager {
    }
 
    private func returnToIdle() {
+      checkpointStore.clear()
       stopStreams()
       ScreenAwakeService.setKeepAwake(false)
       telemetryEngine.reset()
@@ -252,8 +280,200 @@ final class RideSessionManager {
       finishedRideID = nil
       lastSampleAt = nil
       lastRiderCoordinate = nil
+      restoredRadarPassCount = 0
       heartRateRingBuffer.clear()
       mirrorToWatch()
+   }
+
+   // MARK: - Interruption Recovery
+
+   /// Picks up a ride the app was killed in the middle of, and files any older
+   /// ride that was left open.
+   ///
+   /// iOS is free to jettison a backgrounded app at any moment — memory
+   /// pressure while the rider is reading mail is the common one — and a ride
+   /// row exists from the first GPS fix, so the numbers are already on disk when
+   /// that happens. What was missing was anyone to come back for them: history
+   /// lists only rides with an `endDate`, so an interrupted ride was on disk and
+   /// invisible, which reads to the rider as a ride that never happened.
+   ///
+   /// Called once at launch, before the cockpit is on screen. Every open row is
+   /// dealt with, not just the newest: the newest may be resumable, and anything
+   /// older is filed into history or erased on the same retention rule a
+   /// hand-ended ride gets.
+   func recoverInterruptedRide() {
+      guard state.phase == .idle, let rideStorageManager else { return }
+
+      let checkpoint = checkpointStore.load()
+      let interrupted = rideStorageManager.interruptedRides()
+
+      guard !interrupted.isEmpty else {
+         checkpointStore.clear()
+         return
+      }
+
+      var hasResumed = false
+
+      for ride in interrupted {
+         let decision = RideInterruptionRecovery.decision(
+            // Only the newest open row can be the ride the app died on, so
+            // every other row is judged without the checkpoint's blessing.
+            checkpoint: hasResumed ? nil : checkpoint,
+            rideStartDate: ride.startDate,
+            distance: ride.distance,
+            sampleCount: ride.samples.count
+         )
+
+         switch decision {
+            case .resume(let isPaused):
+               resumeInterrupted(ride, isPaused: isPaused)
+               hasResumed = true
+
+            case .closeOut:
+               rideStorageManager.closeOut(ride)
+               DebugPrint(
+                  mode: .sessionLifecycle,
+                  "Interrupted ride recovered into history: \(Int(ride.distance)) m"
+               )
+
+            case .discard(let reason):
+               rideStorageManager.discardInterrupted(ride, reason: reason)
+               DebugPrint(
+                  mode: .sessionLifecycle,
+                  "Interrupted ride discarded (\(reason.rawValue))"
+               )
+         }
+      }
+
+      if !hasResumed {
+         checkpointStore.clear()
+      }
+
+      state.hasStorageFailure = rideStorageManager.hasFailure
+   }
+
+   /// Rebuilds the live session around a ride row that is still open.
+   ///
+   /// Everything the rider was looking at comes back from the row: totals from
+   /// the columns the sample writer keeps current, the breadcrumb from the
+   /// samples, the lap anchor from the last cut. The clock charges the dead time
+   /// to pauses, and the telemetry engine comes back without a position anchor,
+   /// so the first fix after this re-seeds instead of drawing one phantom line
+   /// across however far the rider travelled while the app was gone.
+   private func resumeInterrupted(_ ride: Ride, isPaused: Bool) {
+      let samples = ride.samples.sorted { $0.timestamp < $1.timestamp }
+
+      telemetryEngine.restore(
+         RideTelemetryEngine.RestoredTotals(
+            distance: ride.distance,
+            movingTime: ride.movingTime,
+            maximumSpeed: ride.maximumSpeed,
+            elevationGain: ride.elevationGain,
+            elevationLoss: ride.elevationLoss,
+            altitude: samples.last?.altitude,
+            acceptedSampleCount: samples.count
+         )
+      )
+
+      rideRouteRecorder.restore(
+         samples.map {
+            CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude)
+         }
+      )
+
+      rideClock.restore(elapsed: ride.duration, since: ride.startDate)
+
+      // A ride that comes back paused has to come back with an open pause, or
+      // RESUME would fold every second since the relaunch into ride time.
+      if isPaused {
+         rideClock.beginPause()
+      }
+
+      restoreLapTracker(from: ride)
+
+      // The radar link outlives rides, exactly as it does across a fresh START.
+      let radar = state.radar
+      state = RideState()
+      state.radar = radar
+
+      radarPassCountAtRideStart = radarTracker.vehiclePassCount
+      restoredRadarPassCount = ride.vehicleCount
+      state.radar.vehiclePassCount = ride.vehicleCount
+      state.radar.closestPassDistanceMeters = ride.closestPassDistance
+      state.radar.maximumPassClosingSpeedMetersPerSecond = ride.maximumClosingSpeed
+
+      finishedRideID = nil
+      state.phase = isPaused ? .paused : .recording
+      state.startDate = ride.startDate
+      lastSampleAt = nil
+      lastRiderCoordinate = samples.last.map {
+         CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude)
+      }
+      heartRateRingBuffer.clear()
+
+      publishTelemetry()
+      refreshElapsedTime()
+
+      rideStorageManager?.adopt(ride)
+
+      // A paused ride keeps its streams for the same reason a hand-paused one
+      // does: RESUME has to be instant, and the wrist has to stay mirrored.
+      ScreenAwakeService.setKeepAwake(true)
+      startLocationStream()
+      startClock()
+      requestHealthAuthorization()
+      writeCheckpoint(force: true)
+      mirrorToWatch()
+
+      recoveredRidePulse += 1
+
+      DebugPrint(
+         mode: .sessionLifecycle,
+         "Ride resumed after interruption: \(Int(ride.distance)) m, \(samples.count) samples"
+      )
+   }
+
+   /// Re-anchors laps onto the last cut, or onto the ride's start when the rider
+   /// never cut one.
+   private func restoreLapTracker(from ride: Ride) {
+      guard let lastLap = ride.laps.max(by: { $0.index < $1.index }) else {
+         lapTracker.begin(at: ride.startDate)
+         return
+      }
+
+      // Laps run cut to cut from the ride's start, so their gains sum to the
+      // ride's cumulative gain at the last cut — which is what the anchor is.
+      lapTracker.restore(
+         completedLapCount: lastLap.index,
+         anchorDate: lastLap.endDate,
+         anchorDistance: lastLap.endDistance,
+         anchorElevationGain: ride.laps.reduce(0) { $0 + $1.elevationGain }
+      )
+   }
+
+   // MARK: - Checkpoint
+
+   /// Stamps what the app is in the middle of, for the next launch to read.
+   ///
+   /// `force` is for the moments that change the answer — START, the first fix,
+   /// pause, resume, backgrounding. The ride tick calls it unforced, which lets
+   /// a rider who never leaves the app still leave a fresh stamp behind without
+   /// writing to `UserDefaults` once a second.
+   private func writeCheckpoint(force: Bool) {
+      guard state.phase.isActive else { return }
+
+      let now = Date.now
+      guard force || now.timeIntervalSince(lastCheckpointWriteAt) >= checkpointRefreshInterval
+      else { return }
+
+      lastCheckpointWriteAt = now
+      checkpointStore.write(
+         RideSessionCheckpoint(
+            phase: state.phase,
+            startDate: state.startDate,
+            updatedAt: now
+         )
+      )
    }
 
    // MARK: - Discarding
@@ -277,6 +497,11 @@ final class RideSessionManager {
    /// Commits pending ride data. Called on pause and when the scene leaves the
    /// foreground so a force-quit or a dead battery cannot swallow the ride.
    func flushPendingWork() {
+      // The checkpoint is refreshed even without a store behind the session:
+      // leaving the foreground is exactly when the app is most likely to be
+      // jettisoned, so this is the stamp recovery will read.
+      writeCheckpoint(force: true)
+
       guard let rideStorageManager else { return }
 
       rideStorageManager.flush()
@@ -417,6 +642,7 @@ final class RideSessionManager {
       rideStorageManager?.beginRide(startDate: startDate)
       state.hasStorageFailure = rideStorageManager?.hasFailure ?? false
       stampStartWeather(at: location.coordinate)
+      writeCheckpoint(force: true)
       mirrorToWatch()
 
       DebugPrint(mode: .sessionLifecycle, "GPS fix acquired, recording started")
@@ -557,6 +783,7 @@ final class RideSessionManager {
 
       refreshElapsedTime()
       expireStaleSpeed()
+      writeCheckpoint(force: false)
       mirrorToWatch()
    }
 
@@ -895,7 +1122,7 @@ final class RideSessionManager {
       state.radar.nearestDistanceMeters = radarTracker.nearestTrack?.distanceMeters
       state.radar.nearestClosingSpeedMetersPerSecond =
          radarTracker.nearestTrack?.closingSpeedMetersPerSecond
-      state.radar.vehiclePassCount = max(
+      state.radar.vehiclePassCount = restoredRadarPassCount + max(
          0, radarTracker.vehiclePassCount - radarPassCountAtRideStart
       )
    }

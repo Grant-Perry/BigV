@@ -154,6 +154,39 @@ struct RideTelemetryEngine {
       verticalWindow.removeAll()
    }
 
+   // MARK: - Restore
+
+   /// Totals carried over from a ride the app was killed in the middle of.
+   struct RestoredTotals: Sendable, Equatable {
+
+      var distance: Double = 0
+      var movingTime: TimeInterval = 0
+      var maximumSpeed: Double = 0
+      var elevationGain: Double = 0
+      var elevationLoss: Double = 0
+      var altitude: Double?
+      var acceptedSampleCount: Int = 0
+   }
+
+   /// Reloads a ride's accumulated totals without a position anchor.
+   ///
+   /// Deliberately leaves `hasFix` false: the next sample seeds the engine as
+   /// if it were the ride's first, so the metres the rider covered while the app
+   /// was dead never arrive as one phantom straight line. Distance, climbing and
+   /// moving time resume from the figures already on disk and grow from there.
+   mutating func restore(_ totals: RestoredTotals) {
+      reset()
+
+      distance = totals.distance
+      movingTime = totals.movingTime
+      maximumSpeed = totals.maximumSpeed
+      elevationGain = totals.elevationGain
+      elevationLoss = totals.elevationLoss
+      altitude = totals.altitude
+      elevationReference = totals.altitude
+      acceptedSampleCount = totals.acceptedSampleCount
+   }
+
    /// Zeroes the displayed speed without disturbing totals.
    ///
    /// Used when samples stop arriving, so a stopped rider never sees a stale number.

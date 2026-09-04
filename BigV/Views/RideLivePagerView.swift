@@ -22,8 +22,11 @@ struct RideLivePagerView: View {
    /// The radar page exists only when a radar does — no rider without one
    /// should ever swipe onto an empty road. The climb page is always present:
    /// freeride still detects climbs, and an empty page teaches the swipe.
+   ///
+   /// Filtered rather than listed, so `RidePage`'s declaration order stays the
+   /// single place swipe order is decided.
    private var pages: [RidePage] {
-      rideViewModel.isRadarAvailable ? RidePage.allCases : [.dashboard, .climb, .map]
+      RidePage.allCases.filter { $0 != .radar || rideViewModel.isRadarAvailable }
    }
 
    var body: some View {
@@ -43,10 +46,11 @@ struct RideLivePagerView: View {
          if page == .map { isMapPageMounted = true }
          routeGuidanceViewModel.collapseTurnList()
       }
-      .onChange(of: rideViewModel.isRadarAvailable) { _, isAvailable in
-         if !isAvailable, selectedPage == .radar {
-            selectedPage = .dashboard
-         }
+      .onChange(of: pages) { _, available in
+         // A radar that appears or disappears mid-ride reorders the deck under
+         // the rider; keep them on the page they were reading.
+         guard !available.contains(selectedPage) else { return }
+         selectedPage = .dashboard
       }
       // A categorized climb starting pulls the dashboard onto the climb page.
       // Only the dashboard: a rider reading the map or the radar chose to.
@@ -73,34 +77,28 @@ struct RideLivePagerView: View {
 
    // MARK: - Page Swipe
 
-   /// Drawer tap layers and MapKit pans can eat TabView's own drag. This
-   /// recovers a clear horizontal swipe without disabling map zoom / explore pan.
-   private var swipeToClimb: some Gesture {
-      DragGesture(minimumDistance: 40)
-         .onEnded { value in
-            guard RidePageSwipe.isForward(value) else { return }
-            selectedPage = .climb
-         }
+   /// Moves one page along the deck, stopping at either end.
+   private func turnPage(by offset: Int) {
+      guard let index = pages.firstIndex(of: selectedPage) else { return }
+
+      let destination = index + offset
+      guard pages.indices.contains(destination) else { return }
+
+      selectedPage = pages[destination]
    }
 
+   /// The map page pans everywhere now, so a drag anywhere in it is a pan and
+   /// nothing else. Only the leading edge still turns a page — the same corner
+   /// of the screen every iOS back gesture lives in — and the collapse button in
+   /// the overlay is the way out that needs no gesture at all.
    private var swipeOffMap: some Gesture {
-      DragGesture(minimumDistance: 40)
+      DragGesture(minimumDistance: RidePageSwipe.minimumDistance)
          .onEnded { value in
-            if RidePageSwipe.isBack(value) {
-               // Following: no map pan, so the whole page can page back.
-               // Exploring: only a leading-edge swipe, so a map pan stays a pan.
-               if rideMapViewModel.isFollowingRider || RidePageSwipe.startsAtLeadingEdge(value) {
-                  selectedPage = .climb
-               }
-               return
-            }
+            guard RidePageSwipe.isBack(value),
+                  RidePageSwipe.startsAtLeadingEdge(value)
+            else { return }
 
-            // Forward off the map lands on the radar page, when one exists.
-            if RidePageSwipe.isForward(value),
-               rideMapViewModel.isFollowingRider,
-               pages.contains(.radar) {
-               selectedPage = .radar
-            }
+            turnPage(by: -1)
          }
    }
 
@@ -116,9 +114,9 @@ struct RideLivePagerView: View {
                routeGuidanceViewModel: routeGuidanceViewModel,
                showsDrawerMap: selectedPage == .dashboard,
                onExpandMap: { selectedPage = .map },
-               onShowRadar: onShowRadar
+               onShowRadar: onShowRadar,
+               onSwipeForward: { turnPage(by: 1) }
             )
-            .simultaneousGesture(swipeToClimb)
 
          case .climb:
             RideClimbPageView()
@@ -129,7 +127,8 @@ struct RideLivePagerView: View {
                   RideMapView(
                      rideViewModel: rideViewModel,
                      rideMapViewModel: rideMapViewModel,
-                     routeGuidanceViewModel: routeGuidanceViewModel
+                     routeGuidanceViewModel: routeGuidanceViewModel,
+                     onCollapse: { selectedPage = .dashboard }
                   )
                } else {
                   Color.clear
@@ -165,27 +164,6 @@ private struct RidePageIndicatorView: View {
       }
       .accessibilityElement(children: .ignore)
       .accessibilityLabel("Page \(selectedPage.title)")
-   }
-}
-
-// MARK: - Swipe Test
-
-private enum RidePageSwipe {
-
-   static func isForward(_ value: DragGesture.Value) -> Bool {
-      isHorizontal(value) && value.translation.width < -60
-   }
-
-   static func isBack(_ value: DragGesture.Value) -> Bool {
-      isHorizontal(value) && value.translation.width > 60
-   }
-
-   static func startsAtLeadingEdge(_ value: DragGesture.Value) -> Bool {
-      value.startLocation.x < 36
-   }
-
-   private static func isHorizontal(_ value: DragGesture.Value) -> Bool {
-      abs(value.translation.width) > abs(value.translation.height) * 1.3
    }
 }
 

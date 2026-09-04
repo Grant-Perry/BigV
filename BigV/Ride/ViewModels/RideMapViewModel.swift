@@ -32,19 +32,12 @@ final class RideMapViewModel {
    private(set) var focusedManeuverID: PlannedRouteManeuver.ID?
    private(set) var focusedManeuverCoordinate: CLLocationCoordinate2D?
 
-   /// While following, single-finger drags are left alone so the page swipe still
-   /// reaches the pager: a full-bleed pannable map swallows horizontal drags and
-   /// strands the rider on this page. Pinch and rotate are multi-touch, so they
-   /// never collide with paging and stay available throughout.
-   var interactionModes: MapInteractionModes {
-      isFollowingRider ? [.zoom, .rotate] : .all
-   }
+   /// Everything, on both surfaces. A map the rider cannot drag is not a map,
+   /// and the paging that used to depend on locking it now lives above the
+   /// drawer on the dashboard and on a leading-edge swipe on the map page.
+   var interactionModes: MapInteractionModes { .all }
 
    // MARK: - Drawer Camera
-
-   /// Pinch, rotate and tilt, but never pan: the dashboard is a pager page, and
-   /// a panning map inside it swallows the horizontal swipe to the map page.
-   static let drawerInteractionModes: MapInteractionModes = [.zoom, .rotate, .pitch]
 
    /// The drawer is a 190-point strip, so MapKit's own follow altitude reads as
    /// a street atlas rather than the road ahead. Capping the camera distance is
@@ -54,6 +47,29 @@ final class RideMapViewModel {
    /// Lifted the first time the rider pinches, so the cap only ever sets the
    /// default framing and never fights a gesture. Re-centring restores it.
    private(set) var isDrawerZoomFree = false
+
+   // MARK: - Auto Re-Centre
+
+   /// How long the rider keeps the camera after letting go of it.
+   ///
+   /// The camera coming back on its own is the whole point: MapKit drops a
+   /// `userLocation` camera the instant a finger touches the map, so without
+   /// this a single accidental drag leaves the rider watching a patch of road
+   /// they have already left, with no way back but a deliberate tap.
+   static let autoRecenterDelay: TimeInterval = 8
+
+   /// A camera change this soon after a touch belongs to the rider — including
+   /// the momentum that keeps arriving after the finger has gone.
+   private static let touchGrace: TimeInterval = 1.5
+
+   @ObservationIgnored private var autoRecenterTask: Task<Void, Never>?
+   @ObservationIgnored private var lastRiderTouchAt: Date = .distantPast
+   @ObservationIgnored private var lastFollowReassertAt: Date = .distantPast
+
+   /// Set when the rider takes the camera on purpose — the explore button, a
+   /// tapped turn, a framed route. A camera they asked for is theirs until they
+   /// hand it back; only an incidental drag times out.
+   @ObservationIgnored private var isExploringByChoice = false
 
    var drawerCameraBounds: MapCameraBounds {
       MapCameraBounds(
@@ -65,10 +81,72 @@ final class RideMapViewModel {
    /// MapKit stays in charge of the pinch itself; this only records that the
    /// rider now owns the drawer's zoom.
    func riderTookOverDrawerZoom() {
+      riderBeganMovingCamera()
+
       guard !isDrawerZoomFree else { return }
 
       isDrawerZoomFree = true
       DebugPrint(mode: .navigation, "Drawer zoom released to rider")
+   }
+
+   // MARK: - Rider Camera Gestures
+
+   /// A finger landed on the map. MapKit has already taken the camera off the
+   /// rider by the time this runs, so this is bookkeeping catching up with what
+   /// the map did, not a decision.
+   func riderBeganMovingCamera() {
+      lastRiderTouchAt = .now
+      autoRecenterTask?.cancel()
+      autoRecenterTask = nil
+
+      guard isFollowingRider else { return }
+
+      isFollowingRider = false
+      DebugPrint(mode: .navigation, "Map released to rider")
+   }
+
+   /// The finger lifted. Start the countdown back to the rider.
+   func riderFinishedMovingCamera() {
+      lastRiderTouchAt = .now
+      scheduleAutoRecenter()
+   }
+
+   private func scheduleAutoRecenter() {
+      autoRecenterTask?.cancel()
+      autoRecenterTask = nil
+
+      guard !isExploringByChoice else { return }
+
+      autoRecenterTask = Task { @MainActor [weak self] in
+         try? await Task.sleep(for: .seconds(Self.autoRecenterDelay))
+         guard !Task.isCancelled, let self, !self.isFollowingRider else { return }
+
+         self.recenter()
+      }
+   }
+
+   /// Puts the camera back on the rider when MapKit has quietly dropped a
+   /// `userLocation` position while we still believe we are following.
+   ///
+   /// The one failure this exists for: an interaction the gesture hooks never
+   /// saw — a momentum glide, a rotate that begins as a two-finger tap — leaves
+   /// the map frozen over ground the rider has left, with every flag still
+   /// saying it is following. Called from the camera-change callback, which is
+   /// where such a drift becomes visible.
+   func reassertFollowIfNeeded() {
+      let now = Date.now
+
+      // Called from a continuous camera callback, so it is rate limited: if
+      // MapKit ever refuses a follow camera, this must correct once a second,
+      // not fight it at frame rate.
+      guard isFollowingRider,
+            !cameraPosition.followsUserLocation,
+            now.timeIntervalSince(lastRiderTouchAt) > Self.touchGrace,
+            now.timeIntervalSince(lastFollowReassertAt) > 1
+      else { return }
+
+      lastFollowReassertAt = now
+      cameraPosition = .followRider
    }
 
    /// The camera to freeze on when the rider takes over. Deliberately untracked:
@@ -135,6 +213,10 @@ final class RideMapViewModel {
    /// moment lost.
    func framePlannedRoute() {
       guard isIdle else { return }
+
+      autoRecenterTask?.cancel()
+      autoRecenterTask = nil
+      isExploringByChoice = true
 
       guard let route = plannedRouteManager.activeRoute,
             let region = RideRouteBounds.region(for: route.coordinates)
@@ -210,6 +292,10 @@ final class RideMapViewModel {
    }
 
    func recenter() {
+      autoRecenterTask?.cancel()
+      autoRecenterTask = nil
+      isExploringByChoice = false
+
       focusedManeuverID = nil
       focusedManeuverCoordinate = nil
       cameraPosition = .followRider
@@ -222,6 +308,10 @@ final class RideMapViewModel {
    /// Frames one planned step. Keeps the current 2D / 3D pitch.
    func focusManeuver(id: PlannedRouteManeuver.ID, coordinate: CLLocationCoordinate2D) {
       guard CLLocationCoordinate2DIsValid(coordinate) else { return }
+
+      autoRecenterTask?.cancel()
+      autoRecenterTask = nil
+      isExploringByChoice = true
 
       focusedManeuverID = id
       focusedManeuverCoordinate = coordinate
@@ -246,6 +336,10 @@ final class RideMapViewModel {
    // MARK: - Camera Release
 
    private func releaseCamera() {
+      autoRecenterTask?.cancel()
+      autoRecenterTask = nil
+      isExploringByChoice = true
+
       guard let lastCamera else { return }
 
       cameraPosition = .camera(pitched(lastCamera))

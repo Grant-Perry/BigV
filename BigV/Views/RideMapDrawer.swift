@@ -6,8 +6,10 @@
 import SwiftUI
 
 /// Bottom-third live map on the dashboard. Default open, framed close, and
-/// live: pinch, rotate and tilt all work. A double tap expands to the full map
-/// page. Swipe the grabber: up opens, down collapses.
+/// fully live: drag, pinch, rotate and tilt all work, and the camera returns to
+/// the rider on its own a few seconds after they let go. The expand button — or
+/// a double tap — opens the full map page. Swipe the grabber: up opens, down
+/// collapses.
 struct RideMapDrawer: View {
 
    /// Tall enough that the handle clears the control dock, which floats over
@@ -15,7 +17,11 @@ struct RideMapDrawer: View {
    /// hidden under glass.
    static let collapsedHeight: CGFloat = 96
    static let openHeight: CGFloat = 190
-   static let controlClearance: CGFloat = 62
+
+   /// Drawer chrome is deliberately smaller than the map page's 48-point FABs:
+   /// this map is 190 points tall, and furniture sized for a full screen covers
+   /// the road it is drawn over.
+   private static let chromeSize: CGFloat = 34
 
    let rideMapViewModel: RideMapViewModel
    var isMapMounted: Bool
@@ -91,12 +97,11 @@ struct RideMapDrawer: View {
    // MARK: - Map
 
    private var mapBody: some View {
-      ZStack(alignment: .bottomTrailing) {
+      ZStack(alignment: .topTrailing) {
          if isMapMounted {
             RideMapCanvasView(
                rideMapViewModel: rideMapViewModel,
                showsCompass: false,
-               interactionModes: RideMapViewModel.drawerInteractionModes,
                cameraBounds: rideMapViewModel.drawerCameraBounds
             )
             // No full-bleed tap catcher: it would swallow the map's own
@@ -115,39 +120,74 @@ struct RideMapDrawer: View {
    }
 
    /// Rides alongside MapKit's pinch rather than replacing it, purely to tell
-   /// the view model the rider has taken the zoom over.
+   /// the view model the rider has taken the zoom over — and, on release, to
+   /// start the countdown that hands the camera back.
    private var pinchToFreeZoom: some Gesture {
       MagnifyGesture(minimumScaleDelta: 0.01)
          .onChanged { _ in rideMapViewModel.riderTookOverDrawerZoom() }
+         .onEnded { _ in rideMapViewModel.riderFinishedMovingCamera() }
    }
 
    // MARK: - Chrome
 
-   /// Layered above the canvas so the FAB consumes its own hits.
-   /// Recentring only: address search is a tab now, not map furniture.
+   /// Layered above the canvas so each button consumes its own hits.
+   ///
+   /// Parked at the top edge, opposite the control dock the dashboard floats
+   /// over the bottom: between them the map keeps its whole middle, which is
+   /// where the rider and the road ahead actually are.
    private var chrome: some View {
-      recenterButton
-         .padding(.trailing, 12)
-         .padding(.bottom, Self.controlClearance)
-         .zIndex(1)
+      HStack(spacing: 8) {
+         expandButton
+         recenterButton
+      }
+      .padding(.top, 8)
+      .padding(.trailing, 10)
+      .zIndex(1)
+   }
+
+   /// A visible way onto the full map. The double tap still works, but a drawer
+   /// that pans needs a control the rider can see, not only a gesture they have
+   /// to know about — and one that cannot be mistaken for a drag.
+   private var expandButton: some View {
+      chromeButton(
+         icon: .expandIcon,
+         tint: RideDashboardTheme.ink(0.85),
+         label: "Open full map",
+         identifier: "drawer.button.expand",
+         action: onExpand
+      )
    }
 
    private var recenterButton: some View {
-      Button(action: rideMapViewModel.recenter) {
-         Image(systemName: .recenterIcon)
-            .font(.body.weight(.semibold))
-            .foregroundStyle(
-               rideMapViewModel.isFollowingRider
-                  ? RideDashboardTheme.ink(0.85)
-                  : RideDashboardTheme.ice
-            )
-            .frame(width: RideDashboardTheme.fabSize, height: RideDashboardTheme.fabSize)
+      chromeButton(
+         icon: .recenterIcon,
+         tint: rideMapViewModel.isFollowingRider
+            ? RideDashboardTheme.ink(0.85)
+            : RideDashboardTheme.ice,
+         label: "Center on my location",
+         identifier: "drawer.button.recenter",
+         action: rideMapViewModel.recenter
+      )
+   }
+
+   private func chromeButton(
+      icon: String,
+      tint: Color,
+      label: String,
+      identifier: String,
+      action: @escaping () -> Void
+   ) -> some View {
+      Button(action: action) {
+         Image(systemName: icon)
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(tint)
+            .frame(width: Self.chromeSize, height: Self.chromeSize)
             .contentShape(.circle)
       }
       .buttonStyle(.plain)
       .rideGlassChrome(in: Circle())
-      .accessibilityLabel("Center on my location")
-      .accessibilityIdentifier("drawer.button.recenter")
+      .accessibilityLabel(label)
+      .accessibilityIdentifier(identifier)
    }
 
    // MARK: - Drag
@@ -167,4 +207,5 @@ struct RideMapDrawer: View {
 private extension String {
    static let recenterIcon = "location.fill.viewfinder"
    static let showMapIcon = "chevron.compact.up"
+   static let expandIcon = "arrow.up.left.and.arrow.down.right"
 }

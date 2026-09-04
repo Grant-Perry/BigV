@@ -49,6 +49,9 @@ final class RideViewModel {
 
    var startDeniedPulse: Int { rideSessionManager.startDeniedPulse }
 
+   /// Bumps when the app picked a ride back up after being killed mid-ride.
+   var recoveredRidePulse: Int { rideSessionManager.recoveredRidePulse }
+
    func presentAccessPaywallIfLocked() {
       guard !canBeginRide else { return }
       isShowingAccessPaywall = true

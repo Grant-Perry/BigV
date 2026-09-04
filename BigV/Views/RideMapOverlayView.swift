@@ -14,6 +14,10 @@ struct RideMapOverlayView: View {
    let rideMapViewModel: RideMapViewModel
    let routeGuidanceViewModel: RouteGuidanceViewModel
 
+   /// Back to the dashboard. The page swipe still works, but a map that pans
+   /// edge to edge eats most drags, so the way out cannot be a gesture alone.
+   var onCollapse: (() -> Void)?
+
    var body: some View {
       VStack(spacing: 10) {
          if routeGuidanceViewModel.isActive {
@@ -49,6 +53,10 @@ struct RideMapOverlayView: View {
 
    private var topRow: some View {
       HStack(alignment: .top, spacing: 8) {
+         if let onCollapse {
+            collapseButton(action: onCollapse)
+         }
+
          if let headingDegrees = rideMapViewModel.headingDegrees {
             headingPill(degrees: headingDegrees)
          }
@@ -62,6 +70,22 @@ struct RideMapOverlayView: View {
             destinationChip(name: destinationName)
          }
       }
+   }
+
+   // MARK: - Collapse
+
+   private func collapseButton(action: @escaping () -> Void) -> some View {
+      Button(action: action) {
+         Image(systemName: .collapseIcon)
+            .font(.footnote.weight(.bold))
+            .foregroundStyle(RideDashboardTheme.ink(0.85))
+            .frame(width: 34, height: 34)
+            .contentShape(.circle)
+      }
+      .buttonStyle(.plain)
+      .rideGlassChrome(in: Circle())
+      .accessibilityLabel("Back to the dashboard")
+      .accessibilityIdentifier("map.button.collapse")
    }
 
    // MARK: - Destination
@@ -150,6 +174,7 @@ struct RideMapOverlayView: View {
 private extension String {
    static let destinationIcon = "flag.fill"
    static let clearRouteIcon = "xmark"
+   static let collapseIcon = "arrow.down.right.and.arrow.up.left"
 }
 
 #Preview {

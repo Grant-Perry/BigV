@@ -18,6 +18,7 @@ struct RideDashboardLandscapeView: View {
    let showsDrawerMap: Bool
    let onExpandMap: () -> Void
    let onShowRadar: () -> Void
+   var onSwipeForward: () -> Void = {}
 
    @Binding var isDrawerOpen: Bool
 
@@ -43,8 +44,9 @@ struct RideDashboardLandscapeView: View {
                onExpand: onExpandMap,
                isOpen: $isDrawerOpen
             )
-            .overlay(alignment: .bottom) {
-               RideControlBar(rideViewModel: rideViewModel)
+            .overlay(alignment: .bottomTrailing) {
+               RideControlBar(rideViewModel: rideViewModel, style: .compact)
+                  .padding(.trailing, 10)
                   .padding(.bottom, 10)
             }
             .frame(maxHeight: .infinity)
@@ -92,11 +94,25 @@ struct RideDashboardLandscapeView: View {
             .layoutPriority(-1)
          }
          .frame(maxWidth: 340)
+         .contentShape(.rect)
+         .simultaneousGesture(swipeForward)
       }
       .padding(.horizontal, 16)
       .padding(.vertical, 8)
       .safeAreaPadding(.leading, 8)
       .safeAreaPadding(.trailing, 8)
+   }
+
+   // MARK: - Page Swipe
+
+   /// Recognised on the trailing column only: the leading column is all map now,
+   /// and a page-turning drag there would fight every pan.
+   private var swipeForward: some Gesture {
+      DragGesture(minimumDistance: RidePageSwipe.minimumDistance)
+         .onEnded { value in
+            guard RidePageSwipe.isForward(value) else { return }
+            onSwipeForward()
+         }
    }
 
    // MARK: - Radar

@@ -12,6 +12,7 @@ struct RideMapView: View {
    let rideViewModel: RideViewModel
    let rideMapViewModel: RideMapViewModel
    let routeGuidanceViewModel: RouteGuidanceViewModel
+   var onCollapse: (() -> Void)?
 
    var body: some View {
       ZStack(alignment: .top) {
@@ -22,7 +23,8 @@ struct RideMapView: View {
 
          RideMapOverlayView(
             rideMapViewModel: rideMapViewModel,
-            routeGuidanceViewModel: routeGuidanceViewModel
+            routeGuidanceViewModel: routeGuidanceViewModel,
+            onCollapse: onCollapse
          )
       }
       // Traffic awareness must not vanish because the rider swiped to the map.

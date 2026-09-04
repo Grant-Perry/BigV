@@ -118,4 +118,41 @@ struct RideClockTests {
 
       #expect(clock.elapsed(since: start, at: date(600)) == 600)
    }
+
+   // MARK: - Restore
+
+   @Test func restoringResumesAtTheElapsedTimeTheRiderLastSaw() {
+      var clock = RideClock()
+
+      // Killed at 20 minutes of ride time, relaunched an hour after the start.
+      clock.restore(elapsed: 1_200, since: start, at: date(3_600))
+
+      #expect(clock.elapsed(since: start, at: date(3_600)) == 1_200)
+   }
+
+   @Test func timeTheAppWasDeadIsNotChargedToTheRider() {
+      var clock = RideClock()
+
+      clock.restore(elapsed: 1_200, since: start, at: date(3_600))
+
+      // Ten more minutes of riding after the relaunch is ten more minutes.
+      #expect(clock.elapsed(since: start, at: date(4_200)) == 1_800)
+   }
+
+   @Test func restoringClosesAnyOpenPause() {
+      var clock = RideClock()
+
+      clock.beginPause(at: date(100))
+      clock.restore(elapsed: 90, since: start, at: date(600))
+
+      #expect(clock.elapsed(since: start, at: date(600)) == 90)
+   }
+
+   @Test func restoringMoreElapsedThanWallTimeNeverRunsTheClockBackwards() {
+      var clock = RideClock()
+
+      clock.restore(elapsed: 9_000, since: start, at: date(600))
+
+      #expect(clock.elapsed(since: start, at: date(600)) == 600)
+   }
 }
