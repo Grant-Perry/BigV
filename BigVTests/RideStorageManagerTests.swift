@@ -312,7 +312,46 @@ struct RideStorageManagerTests {
       ])
    }
 
+   @Test func savedRidesExcludesActiveUnfinalizedRide() throws {
+      let (storage, _) = try makeStorage()
+      let reference = Date(timeIntervalSince1970: 1_000_000)
+
+      // Active recording that has not ended
+      storage.beginRide(startDate: reference)
+      storage.append(draft(index: 0, reference: reference), totals: RideState())
+
+      #expect(storage.savedRides().isEmpty)
+
+      // Once finalized, it appears in savedRides
+      storage.finalizeRide(with: populatedState(
+         startDate: reference,
+         endDate: reference.addingTimeInterval(600)
+      ))
+
+      #expect(storage.savedRides().count == 1)
+   }
+
    // MARK: - Deletion
+
+   @Test func deletingActiveRideClearsActiveRideReference() throws {
+      let (storage, _) = try makeStorage()
+      let reference = Date(timeIntervalSince1970: 1_000_000)
+
+      storage.beginRide(startDate: reference)
+      storage.append(draft(index: 0, reference: reference), totals: RideState())
+
+      let activeRideContext = try #require(storage.activeRideChartSamples())
+      #expect(activeRideContext.samples.count == 1)
+
+      // Finding the active ride and deleting it
+      let sample = try #require(activeRideContext.samples.first)
+      let rideID = try #require(sample.ride?.persistentModelID)
+      if let activeRide = storage.ride(with: rideID) {
+         storage.delete(activeRide)
+      }
+
+      #expect(storage.activeRideChartSamples() == nil)
+   }
 
    @Test func deletingARideCascadesToItsSamples() throws {
       let (storage, context) = try makeStorage()

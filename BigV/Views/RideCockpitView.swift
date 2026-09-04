@@ -15,7 +15,7 @@ struct RideCockpitView: View {
    let rideMapViewModel: RideMapViewModel
    let routeGuidanceViewModel: RouteGuidanceViewModel
    let summaryRouteViewModel: RideRouteViewModel
-   let rideDetailViewModel: RideDetailViewModel
+   let summaryDetailViewModel: RideDetailViewModel
    let onShowRadar: () -> Void
 
    var body: some View {
@@ -24,7 +24,7 @@ struct RideCockpitView: View {
             RideSummaryView(
                rideViewModel: rideViewModel,
                rideRouteViewModel: summaryRouteViewModel,
-               rideDetailViewModel: rideDetailViewModel
+               rideDetailViewModel: summaryDetailViewModel
             )
             .rideAppFooter()
          } else {
@@ -93,7 +93,7 @@ struct RideCockpitView: View {
       rideMapViewModel: RideMapViewModel(),
       routeGuidanceViewModel: RouteGuidanceViewModel(),
       summaryRouteViewModel: RideRouteViewModel(),
-      rideDetailViewModel: RideDetailViewModel(),
+      summaryDetailViewModel: RideDetailViewModel(),
       onShowRadar: {}
    )
    .environment(RideWeatherModel(unitsSettings: RideUnitsSettings()))

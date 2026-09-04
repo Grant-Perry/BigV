@@ -34,6 +34,9 @@ final class RideClimbModel {
    /// auto-switch trigger, monotonic for the same reason radar pulses are.
    private(set) var climbStartPulse = 0
 
+   /// The most recent completed climb split cut by this model, for views and tests.
+   private(set) var lastCompletedSplit: RideClimbSplitDraft?
+
    // MARK: - Dependencies
 
    /// All optional so previews and tests can build the model with no session
@@ -111,12 +114,10 @@ final class RideClimbModel {
    }
 
    /// One pass of the whole climb picture. Internal so tests can step it.
-   func refresh() {
-      guard let rideSessionManager else { return }
-
-      let rideState = rideSessionManager.state
+   func refresh(state: RideState? = nil) {
+      let rideState = state ?? rideSessionManager?.state ?? RideState()
       syncRideLifecycle(rideState.phase)
-      syncRoute()
+      syncRoute(with: rideState)
       refreshProgress(with: rideState)
       feedLiveDetector(with: rideState)
    }
@@ -141,13 +142,17 @@ final class RideClimbModel {
 
    /// Re-prepares the progress engine when the route or its profile changes —
    /// a new plan, a reroute, or enrichment landing on the active route.
-   private func syncRoute() {
+   private func syncRoute(with rideState: RideState) {
       let route = plannedRouteManager?.activeRoute
 
       let routeID = route?.id
       let profileCount = route?.elevationProfile.count ?? 0
 
       guard routeID != preparedRouteID || profileCount != preparedProfileCount else { return }
+
+      if let anchor = plannedClimbAnchor {
+         cutPlannedSplitIfCompleted(for: anchor, playhead: progress.playheadDistance, with: rideState)
+      }
 
       preparedRouteID = routeID
       preparedProfileCount = profileCount
@@ -169,6 +174,9 @@ final class RideClimbModel {
             rideState.phase == .recording || rideState.phase == .paused
       else {
          if progress != .none {
+            if let anchor = plannedClimbAnchor {
+               cutPlannedSplitIfCompleted(for: anchor, playhead: progress.playheadDistance, with: rideState)
+            }
             progress = .none
             plannedClimbAnchor = nil
          }
@@ -192,11 +200,12 @@ final class RideClimbModel {
 
       // A climb the rider just topped out. Passing the end distance is what
       // distinguishes cresting from the route being cleared underneath us.
-      if let anchor = plannedClimbAnchor,
-         anchor.climb.id != newID,
-         let playhead = new.playheadDistance,
-         playhead >= anchor.climb.endDistance {
-         cutPlannedSplit(for: anchor, with: rideState)
+      if let anchor = plannedClimbAnchor, anchor.climb.id != newID {
+         cutPlannedSplitIfCompleted(
+            for: anchor,
+            playhead: new.playheadDistance ?? progress.playheadDistance,
+            with: rideState
+         )
       }
       plannedClimbAnchor = nil
 
@@ -213,20 +222,36 @@ final class RideClimbModel {
       }
    }
 
+   private func cutPlannedSplitIfCompleted(
+      for anchor: ClimbAnchor,
+      playhead: Double?,
+      with rideState: RideState
+   ) {
+      let distanceRidden = rideState.distance - anchor.startDistance
+      let arrivedAtDestination = routeGuidanceManager?.phase == .arrived
+      let reachedEnd = (playhead.map { $0 >= anchor.climb.endDistance - 15 } ?? false)
+         || (arrivedAtDestination && distanceRidden >= anchor.climb.length - 60)
+         || distanceRidden >= anchor.climb.length - 15
+
+      if reachedEnd {
+         cutPlannedSplit(for: anchor, with: rideState)
+      }
+   }
+
    private func cutPlannedSplit(for anchor: ClimbAnchor, with rideState: RideState) {
       guard rideState.phase == .recording else { return }
 
-      rideSessionManager?.record(
-         climbSplit: RideClimbSplitDraft(
-            startDate: anchor.startedAt,
-            endDate: .now,
-            startDistance: anchor.startDistance,
-            endDistance: rideState.distance,
-            elevationGain: anchor.climb.ascent,
-            averageGrade: anchor.climb.averageGrade,
-            category: anchor.climb.category
-         )
+      let draft = RideClimbSplitDraft(
+         startDate: anchor.startedAt,
+         endDate: .now,
+         startDistance: anchor.startDistance,
+         endDistance: rideState.distance,
+         elevationGain: anchor.climb.ascent,
+         averageGrade: anchor.climb.averageGrade,
+         category: anchor.climb.category
       )
+      lastCompletedSplit = draft
+      rideSessionManager?.record(climbSplit: draft)
    }
 
    // MARK: - Live Detection
@@ -245,16 +270,16 @@ final class RideClimbModel {
       // both detectors would record every climb twice.
       guard let completed, !progress.hasRouteProfile else { return }
 
-      rideSessionManager?.record(
-         climbSplit: RideClimbSplitDraft(
-            startDate: completed.startedAt,
-            endDate: completed.endedAt,
-            startDistance: completed.startDistance,
-            endDistance: completed.endDistance,
-            elevationGain: completed.ascent,
-            averageGrade: completed.averageGrade,
-            category: completed.category
-         )
+      let draft = RideClimbSplitDraft(
+         startDate: completed.startedAt,
+         endDate: completed.endedAt,
+         startDistance: completed.startDistance,
+         endDistance: completed.endDistance,
+         elevationGain: completed.ascent,
+         averageGrade: completed.averageGrade,
+         category: completed.category
       )
+      lastCompletedSplit = draft
+      rideSessionManager?.record(climbSplit: draft)
    }
 }

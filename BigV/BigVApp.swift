@@ -37,9 +37,10 @@ struct BigVApp: App {
    @State private var summaryRouteViewModel: RideRouteViewModel
    @State private var historyRouteViewModel: RideRouteViewModel
 
-   /// The history detail screen's full report: charts, weather, traffic and
-   /// the Apple Health read-back that enriches older rides.
-   @State private var rideDetailViewModel: RideDetailViewModel
+   /// The summary and history detail each get their own detail view model so a
+   /// finished ride's summary report is never cleared or overwritten by browsing history.
+   @State private var summaryDetailViewModel: RideDetailViewModel
+   @State private var historyDetailViewModel: RideDetailViewModel
    @State private var routePlannerViewModel: RoutePlannerViewModel
    @State private var routeGuidanceViewModel: RouteGuidanceViewModel
 
@@ -202,7 +203,13 @@ struct BigVApp: App {
       _historyRouteViewModel = State(
          initialValue: RideRouteViewModel(rideStorageManager: rideStorageManager)
       )
-      _rideDetailViewModel = State(
+      _summaryDetailViewModel = State(
+         initialValue: RideDetailViewModel(
+            rideStorageManager: rideStorageManager,
+            vitalsReader: RideHealthVitalsReader()
+         )
+      )
+      _historyDetailViewModel = State(
          initialValue: RideDetailViewModel(
             rideStorageManager: rideStorageManager,
             vitalsReader: RideHealthVitalsReader()
@@ -224,7 +231,8 @@ struct BigVApp: App {
                rideHistoryViewModel: rideHistoryViewModel,
                summaryRouteViewModel: summaryRouteViewModel,
                historyRouteViewModel: historyRouteViewModel,
-               rideDetailViewModel: rideDetailViewModel,
+               summaryDetailViewModel: summaryDetailViewModel,
+               historyDetailViewModel: historyDetailViewModel,
                routePlannerViewModel: routePlannerViewModel,
                routeGuidanceViewModel: routeGuidanceViewModel,
                rideRadarPairingViewModel: rideRadarPairingViewModel,

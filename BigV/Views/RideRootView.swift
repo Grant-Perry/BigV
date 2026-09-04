@@ -16,7 +16,8 @@ struct RideRootView: View {
    let rideHistoryViewModel: RideHistoryViewModel
    let summaryRouteViewModel: RideRouteViewModel
    let historyRouteViewModel: RideRouteViewModel
-   let rideDetailViewModel: RideDetailViewModel
+   let summaryDetailViewModel: RideDetailViewModel
+   let historyDetailViewModel: RideDetailViewModel
    let routePlannerViewModel: RoutePlannerViewModel
    let routeGuidanceViewModel: RouteGuidanceViewModel
    let rideRadarPairingViewModel: RideRadarPairingViewModel
@@ -41,7 +42,7 @@ struct RideRootView: View {
                rideMapViewModel: rideMapViewModel,
                routeGuidanceViewModel: routeGuidanceViewModel,
                summaryRouteViewModel: summaryRouteViewModel,
-               rideDetailViewModel: rideDetailViewModel,
+               summaryDetailViewModel: summaryDetailViewModel,
                onShowRadar: { isShowingRadarPairing = true }
             )
          }
@@ -50,7 +51,7 @@ struct RideRootView: View {
             RideHistoryView(
                rideHistoryViewModel: rideHistoryViewModel,
                rideRouteViewModel: historyRouteViewModel,
-               rideDetailViewModel: rideDetailViewModel
+               rideDetailViewModel: historyDetailViewModel
             )
          }
 

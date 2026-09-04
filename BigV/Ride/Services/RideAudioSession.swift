@@ -39,6 +39,12 @@ actor RideAudioSession {
    private var claimants: Set<Client> = []
    private var isActive = false
 
+   var hasActiveClaim: Bool { isActive }
+
+   func hasClaimant(_ client: Client) -> Bool {
+      claimants.contains(client)
+   }
+
    // MARK: - Claiming
 
    /// Activates the session for one client. Returns a failure description, or

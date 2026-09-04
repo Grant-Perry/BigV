@@ -255,6 +255,7 @@ final class RideStorageManager {
 
    func savedRides() -> [Ride] {
       let descriptor = FetchDescriptor<Ride>(
+         predicate: #Predicate<Ride> { $0.endDate != nil },
          sortBy: [SortDescriptor(\.startDate, order: .reverse)]
       )
 
@@ -281,6 +282,9 @@ final class RideStorageManager {
    }
 
    func delete(_ ride: Ride) {
+      if ride.persistentModelID == activeRide?.persistentModelID {
+         activeRide = nil
+      }
       modelContext.delete(ride)
       save(reason: "ride deleted")
    }

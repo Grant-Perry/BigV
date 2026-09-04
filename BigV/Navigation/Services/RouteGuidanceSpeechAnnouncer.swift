@@ -61,6 +61,12 @@ final class RouteGuidanceSpeechAnnouncer {
       synthesizer.delegate = observer
    }
 
+   deinit {
+      Task {
+         await RideAudioSession.shared.release(.guidanceSpeech)
+      }
+   }
+
    // MARK: - Speaking
 
    /// Says one phrase, abandoning anything still being said.
@@ -81,10 +87,22 @@ final class RouteGuidanceSpeechAnnouncer {
       utteranceTask = Task { [weak self] in
          let claimed = await self?.claimSession() == true
 
-         guard let self, token == utteranceToken else { return }
+         guard let self else {
+            if claimed {
+               Task { await RideAudioSession.shared.release(.guidanceSpeech) }
+            }
+            return
+         }
+
+         guard token == utteranceToken, !Task.isCancelled, isEnabled else {
+            if claimed && !isUtterancePending && !synthesizer.isSpeaking {
+               releaseSession()
+            }
+            return
+         }
          isUtterancePending = false
 
-         guard claimed, !Task.isCancelled, isEnabled else { return }
+         guard claimed else { return }
          utter(trimmed)
       }
    }
