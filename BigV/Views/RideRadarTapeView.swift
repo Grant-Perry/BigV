@@ -29,6 +29,9 @@ struct RideRadarTapeView: View {
    /// horizontal. Every glyph, tick and font scales with it.
    var thickness: CGFloat = Self.compactWidth
 
+   /// Double-tap walks the tape clockwise around the screen.
+   var onCyclePlacement: (() -> Void)?
+
    static let compactWidth: CGFloat = 48
 
    /// Portrait-dashboard ribbon: slightly wider than the compact strip.
@@ -43,7 +46,7 @@ struct RideRadarTapeView: View {
    /// How much bigger than the compact strip this instance is drawn.
    private var scale: CGFloat { max(1, thickness / Self.compactWidth) }
 
-   private var pipRadius: CGFloat { 5.5 * scale }
+   private var pipRadius: CGFloat { 9 * scale }
 
    private var nearestDistance: Double? {
       tracks.map(\.distanceMeters).min()
@@ -73,10 +76,15 @@ struct RideRadarTapeView: View {
             .frame(height: thickness)
          }
       }
+      .contentShape(.rect)
+      .onTapGesture(count: 2) { onCyclePlacement?() }
       .animation(.smooth(duration: 0.25), value: tracks)
       .accessibilityElement(children: .ignore)
       .accessibilityLabel("Rear radar")
       .accessibilityValue(accessibilitySummary)
+      .accessibilityHint("Moves the tape clockwise")
+      .accessibilityAddTraits(.isButton)
+      .accessibilityAction(named: "Move clockwise") { onCyclePlacement?() }
       .accessibilityIdentifier("ride.radar")
    }
 
@@ -230,9 +238,9 @@ struct RideRadarTapeView: View {
 
    // MARK: - Readout
 
-   /// Handlebar-glanceable at dashboard scale, quiet at strip scale.
+   /// Handlebar-glanceable on every placement — the number is the tape.
    private var readoutFont: Font {
-      .system(size: 12 * scale, weight: scale > 1.15 ? .bold : .semibold, design: .rounded)
+      .system(size: 18 * scale, weight: .bold, design: .rounded)
    }
 
    @ViewBuilder
@@ -244,7 +252,7 @@ struct RideRadarTapeView: View {
                .monospacedDigit()
                .foregroundStyle(readoutColor)
                .lineLimit(1)
-               .minimumScaleFactor(0.7)
+               .minimumScaleFactor(0.8)
          } else {
             Text("—")
                .font(readoutFont)
@@ -253,7 +261,7 @@ struct RideRadarTapeView: View {
       }
       // A horizontal readout sits inline with the rail, so it needs a reserved
       // width or the whole tape shifts every time the distance gains a digit.
-      .frame(minWidth: isVertical ? nil : 38 * scale, alignment: .trailing)
+      .frame(minWidth: isVertical ? nil : 64 * scale, alignment: .trailing)
    }
 
    private var readoutColor: Color {

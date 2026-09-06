@@ -479,7 +479,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = BigV/BigV.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 26;
+				CURRENT_PROJECT_VERSION = 27;
 				DEVELOPMENT_TEAM = KP3ZH5K2SY;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -487,9 +487,9 @@
 				INFOPLIST_KEY_CFBundleDisplayName = BigVelo;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "BigVelo connects to your bike's rear radar to warn you about vehicles approaching from behind.";
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "BigVelo reads cycling workout data from Apple Health to enrich your ride metrics.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "BigVelo reads heart rate and active energy from Apple Health to show pulse and calories on your ride story.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "BigVelo saves your rides to Apple Health as cycling workouts, including distance and route.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "BigVelo uses your location to record ride speed, distance, elevation and route, and to show the local weather and forecast where you are riding.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "BigVelo uses your location to record ride speed, distance, elevation and route, show local weather, and keep recording while the screen is locked or the phone is in a pocket — including rides you start from Apple Watch.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = NO;
@@ -499,7 +499,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.17;
+				MARKETING_VERSION = 1.18;
 				PRODUCT_BUNDLE_IDENTIFIER = com.grantperry.BigVelo;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -519,7 +519,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = BigV/BigV.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 26;
+				CURRENT_PROJECT_VERSION = 27;
 				DEVELOPMENT_TEAM = KP3ZH5K2SY;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -527,9 +527,9 @@
 				INFOPLIST_KEY_CFBundleDisplayName = BigVelo;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "BigVelo connects to your bike's rear radar to warn you about vehicles approaching from behind.";
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "BigVelo reads cycling workout data from Apple Health to enrich your ride metrics.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "BigVelo reads heart rate and active energy from Apple Health to show pulse and calories on your ride story.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "BigVelo saves your rides to Apple Health as cycling workouts, including distance and route.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "BigVelo uses your location to record ride speed, distance, elevation and route, and to show the local weather and forecast where you are riding.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "BigVelo uses your location to record ride speed, distance, elevation and route, show local weather, and keep recording while the screen is locked or the phone is in a pocket — including rides you start from Apple Watch.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = NO;
@@ -539,7 +539,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.17;
+				MARKETING_VERSION = 1.18;
 				PRODUCT_BUNDLE_IDENTIFIER = com.grantperry.BigVelo;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -557,11 +557,11 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 26;
+				CURRENT_PROJECT_VERSION = 27;
 				DEVELOPMENT_TEAM = KP3ZH5K2SY;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
-				MARKETING_VERSION = 1.17;
+				MARKETING_VERSION = 1.18;
 				PRODUCT_BUNDLE_IDENTIFIER = com.grantperry.BigVeloTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
@@ -580,11 +580,11 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 26;
+				CURRENT_PROJECT_VERSION = 27;
 				DEVELOPMENT_TEAM = KP3ZH5K2SY;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
-				MARKETING_VERSION = 1.17;
+				MARKETING_VERSION = 1.18;
 				PRODUCT_BUNDLE_IDENTIFIER = com.grantperry.BigVeloTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
@@ -602,10 +602,10 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 26;
+				CURRENT_PROJECT_VERSION = 27;
 				DEVELOPMENT_TEAM = KP3ZH5K2SY;
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.17;
+				MARKETING_VERSION = 1.18;
 				PRODUCT_BUNDLE_IDENTIFIER = com.grantperry.BigVeloUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
@@ -623,10 +623,10 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 26;
+				CURRENT_PROJECT_VERSION = 27;
 				DEVELOPMENT_TEAM = KP3ZH5K2SY;
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.17;
+				MARKETING_VERSION = 1.18;
 				PRODUCT_BUNDLE_IDENTIFIER = com.grantperry.BigVeloUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
@@ -647,7 +647,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "BigV Watch App/BigV Watch App.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 26;
+				CURRENT_PROJECT_VERSION = 27;
 				DEVELOPMENT_TEAM = KP3ZH5K2SY;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -655,12 +655,13 @@
 				INFOPLIST_KEY_CFBundleDisplayName = BigVelo;
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "BigVelo reads your heart rate on the Watch so the phone can show it live while you ride.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "BigVelo starts a workout session on the Watch to read your heart rate and credit your Activity rings. Your ride is saved to Health by the iPhone.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "BigVelo starts an outdoor cycling workout on Apple Watch. Ride location is recorded on iPhone.";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.grantperry.BigVelo;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.17;
+				MARKETING_VERSION = 1.18;
 				PRODUCT_BUNDLE_IDENTIFIER = com.grantperry.BigVelo.watchkitapp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
@@ -684,7 +685,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "BigV Watch App/BigV Watch App.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 26;
+				CURRENT_PROJECT_VERSION = 27;
 				DEVELOPMENT_TEAM = KP3ZH5K2SY;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -692,12 +693,13 @@
 				INFOPLIST_KEY_CFBundleDisplayName = BigVelo;
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "BigVelo reads your heart rate on the Watch so the phone can show it live while you ride.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "BigVelo starts a workout session on the Watch to read your heart rate and credit your Activity rings. Your ride is saved to Health by the iPhone.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "BigVelo starts an outdoor cycling workout on Apple Watch. Ride location is recorded on iPhone.";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.grantperry.BigVelo;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.17;
+				MARKETING_VERSION = 1.18;
 				PRODUCT_BUNDLE_IDENTIFIER = com.grantperry.BigVelo.watchkitapp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;

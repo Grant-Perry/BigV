@@ -8,6 +8,11 @@ import Foundation
 /// App-level strings that are not ride data: version, build, attribution.
 enum AppConstants {
 
+   nonisolated static let siteURL = URL(string: "https://bigvelo.com")!
+   nonisolated static let privacyURL = URL(string: "https://bigvelo.com/privacy")!
+   nonisolated static let termsURL = URL(string: "https://bigvelo.com/terms")!
+   nonisolated static let supportURL = URL(string: "https://bigvelo.com/support")!
+
    nonisolated static var appMarketingVersion: String {
       Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
    }

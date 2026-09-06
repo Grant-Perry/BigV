@@ -57,6 +57,7 @@ struct RideDashboardLandscapeView: View {
                isVisible: rideViewModel.showsRadarTape,
                isDimmed: rideViewModel.isRadarDimmed,
                unitSystem: rideViewModel.unitSystem,
+               onCyclePlacement: rideViewModel.cycleRadarPlacement,
                thickness: compactTapeThickness,
                inset: 6
             )

@@ -43,6 +43,33 @@ struct RideAppFooterView: View {
    }
 }
 
+// MARK: - Scrim
+
+/// Ground for the footer.
+///
+/// The footer is a nine-point whisper sitting over whatever the rider is
+/// scrolling, so without this the last card's text runs straight through it. A
+/// fade rather than a fill — a hard edge would read as a shelf — and the same
+/// gradient already lands the pinned Start Riding button.
+private struct RideAppFooterScrim: View {
+
+   var body: some View {
+      LinearGradient(
+         colors: [
+            RideDashboardTheme.void.opacity(0),
+            RideDashboardTheme.void.opacity(0.70),
+            RideDashboardTheme.void.opacity(0.92)
+         ],
+         startPoint: .top,
+         endPoint: .bottom
+      )
+      // Pulled up past the type so the fade has begun by the time it reaches
+      // the words, and out of hit testing so a drag down here still scrolls.
+      .padding(.top, -16)
+      .allowsHitTesting(false)
+   }
+}
+
 extension View {
 
    /// Adds the version/copyright footer below a tab's content. Applied to the
@@ -53,6 +80,7 @@ extension View {
             .padding(.horizontal, 20)
             .padding(.top, 8)
             .padding(.bottom, 2)
+            .background { RideAppFooterScrim() }
       }
    }
 }

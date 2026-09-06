@@ -18,9 +18,7 @@ struct RideOnboardingView: View {
 
    @State private var page: RideOnboardingPageID = .kit
    @State private var isShowingRedeem = false
-
-   private let privacyURL = URL(string: "https://bigvelo.app/privacy")!
-   private let termsURL = URL(string: "https://bigvelo.app/terms")!
+   @State private var isShowingManageSubscriptions = false
 
    var body: some View {
       ZStack {
@@ -48,6 +46,7 @@ struct RideOnboardingView: View {
       .offerCodeRedemption(isPresented: $isShowingRedeem) { _ in
          Task { await plusStore.refreshEntitlement() }
       }
+      .manageSubscriptionsSheet(isPresented: $isShowingManageSubscriptions)
       .task {
          await plusStore.loadProducts()
       }
@@ -217,18 +216,28 @@ struct RideOnboardingView: View {
    }
 
    private var plusActions: some View {
-      HStack(spacing: 16) {
-         Button("Restore") {
-            Task { await plusStore.restore() }
+      VStack(spacing: 8) {
+         HStack(spacing: 16) {
+            Button("Restore") {
+               Task { await plusStore.restore() }
+            }
+            Button("Redeem Code") {
+               isShowingRedeem = true
+            }
+            Button("Manage") {
+               isShowingManageSubscriptions = true
+            }
          }
-         Button("Redeem Code") {
-            isShowingRedeem = true
-         }
-         Button("Privacy") {
-            openURL(privacyURL)
-         }
-         Button("Terms") {
-            openURL(termsURL)
+         HStack(spacing: 16) {
+            Button("Privacy") {
+               openURL(AppConstants.privacyURL)
+            }
+            Button("Terms") {
+               openURL(AppConstants.termsURL)
+            }
+            Button("Support") {
+               openURL(AppConstants.supportURL)
+            }
          }
       }
       .font(.caption.weight(.semibold))

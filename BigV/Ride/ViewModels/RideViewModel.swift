@@ -293,6 +293,11 @@ final class RideViewModel {
 
    /// Cuts a lap by hand. The session ignores presses outside recording.
    func lap() { rideSessionManager.recordLap() }
+
+   /// Walks the radar tape around the screen clockwise and persists the edge.
+   func cycleRadarPlacement() {
+      rideRadarSettings.placement = rideRadarSettings.placement.nextClockwise
+   }
    func reset() {
       clearSelectedMetric()
       clearLiveRadarTimeline()

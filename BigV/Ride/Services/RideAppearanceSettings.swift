@@ -26,6 +26,16 @@ enum RideAppearanceMode: String, CaseIterable, Identifiable, Sendable {
       }
    }
 
+   /// What fits in a segment. "Automatic" stays the spoken and written name;
+   /// three segments on a 320-point phone do not have room for it.
+   var shortTitle: String {
+      switch self {
+         case .system: "Auto"
+         case .light: "Day"
+         case .dark: "Night"
+      }
+   }
+
    var detail: String {
       switch self {
          case .system: "Follows the phone’s appearance"

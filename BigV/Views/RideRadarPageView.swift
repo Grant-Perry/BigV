@@ -130,13 +130,14 @@ private struct RideRadarRoadView: View {
 
    // MARK: - Geometry
 
-   /// Rear-view mapping, same as the tape: distance zero sits just below the
-   /// rider mark at the top; max range at the bottom. Closing traffic rises.
+   /// Rear-view mapping: distance zero sits just below the rider mark at the
+   /// top; max range at the bottom. Closing traffic rises. Uses the page
+   /// curve so a pack of cars can occupy the height instead of stacking.
    private func vehicleY(forDistance distance: Double, height: CGFloat) -> CGFloat {
-      let topInset: CGFloat = 64
-      let bottomInset: CGFloat = 28
+      let topInset: CGFloat = 52
+      let bottomInset: CGFloat = 24
       let usable = height - topInset - bottomInset
-      return topInset + usable * CGFloat(RideRadarTapeGeometry.fraction(forDistance: distance))
+      return topInset + usable * CGFloat(RideRadarTapeGeometry.pageFraction(forDistance: distance))
    }
 
    private func roadWidth(atY y: CGFloat, in size: CGSize) -> CGFloat {
@@ -202,9 +203,9 @@ private struct RideRadarRoadView: View {
       ZStack(alignment: .leading) {
          ForEach([40, 90, 140], id: \.self) { meters in
             Text(RideFormatters.radarDistance(Double(meters), system: unitSystem))
-               .font(.system(size: 10, weight: .semibold, design: .rounded))
+               .font(.system(size: 13, weight: .semibold, design: .rounded))
                .monospacedDigit()
-               .foregroundStyle(RideDashboardTheme.ink(0.30))
+               .foregroundStyle(RideDashboardTheme.ink(0.38))
                .position(
                   x: 24,
                   y: vehicleY(forDistance: Double(meters), height: size.height)
@@ -300,7 +301,7 @@ private struct RideRadarVehicleMark: View {
 
    /// Nearer vehicles draw larger, reinforcing the perspective.
    private var scale: CGFloat {
-      1.35 - 0.55 * CGFloat(RideRadarTapeGeometry.fraction(forDistance: track.distanceMeters))
+      1.35 - 0.55 * CGFloat(RideRadarTapeGeometry.pageFraction(forDistance: track.distanceMeters))
    }
 
    var body: some View {
@@ -318,11 +319,12 @@ private struct RideRadarVehicleMark: View {
       }
       .overlay(alignment: .trailing) {
          Text(RideFormatters.radarDistance(track.distanceMeters, system: unitSystem))
-            .font(.system(size: 11, weight: .semibold, design: .rounded))
+            .font(.system(size: 20, weight: .bold, design: .rounded))
             .monospacedDigit()
-            .foregroundStyle(color.opacity(0.9))
+            .foregroundStyle(color)
+            .shadow(color: .black.opacity(0.65), radius: 4, y: 1)
             .fixedSize()
-            .offset(x: 46 * scale)
+            .alignmentGuide(.trailing) { $0[.leading] - 22 }
       }
       .accessibilityHidden(true)
    }

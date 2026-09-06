@@ -41,6 +41,12 @@ struct RidePlusPricingCard: View {
             emphasized: false
          )
 
+         Text(Self.autoRenewCopy)
+            .font(.caption2)
+            .foregroundStyle(RideDashboardTheme.ink(0.5))
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("\(accessibilityPrefix).plus.legal")
+
          if let message = plusStore.lastErrorMessage {
             Text(message)
                .font(.caption2)
@@ -48,6 +54,9 @@ struct RidePlusPricingCard: View {
          }
       }
    }
+
+   /// Guideline 3.1.2 — period, price (on the rows), auto-renew, and where to cancel.
+   private static let autoRenewCopy = "BigVelo+ Monthly and Yearly auto-renew unless you cancel at least 24 hours before the period ends. Payment is charged to your Apple ID at confirmation. Manage or cancel in Settings or your Apple ID subscriptions. The 30-day device trial is separate and is not an App Store introductory offer. Lifetime is a one-time purchase."
 
    private func pricingRow(
       title: String,

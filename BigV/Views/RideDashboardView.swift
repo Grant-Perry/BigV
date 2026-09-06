@@ -95,6 +95,7 @@ struct RideDashboardView: View {
             isVisible: rideViewModel.showsRadarTape && rideViewModel.radarPlacement == .bottom,
             isDimmed: rideViewModel.isRadarDimmed,
             unitSystem: rideViewModel.unitSystem,
+            onCyclePlacement: rideViewModel.cycleRadarPlacement,
             inset: 10,
             edgeInset: 8,
             alignment: .top,
@@ -206,7 +207,8 @@ struct RideDashboardView: View {
          tracks: rideViewModel.radarTracks,
          isVisible: rideViewModel.showsRadarTape && rideViewModel.radarPlacement != .bottom,
          isDimmed: rideViewModel.isRadarDimmed,
-         unitSystem: rideViewModel.unitSystem
+         unitSystem: rideViewModel.unitSystem,
+         onCyclePlacement: rideViewModel.cycleRadarPlacement
       )
    }
 }

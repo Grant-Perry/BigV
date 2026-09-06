@@ -63,6 +63,15 @@ final class BigVeloPlusStore: RideRecordingAccessing {
       }
    }
 
+   /// How much of the free month is still on the clock, `0...1`, or `nil` once
+   /// there is no clock to show. Settings draws it as a meter so the rider sees
+   /// the trial burning down instead of reading a number and guessing.
+   var trialFractionRemaining: Double? {
+      guard case .trial(let days) = accessStatus else { return nil }
+      let total = RideAccessPolicy.trialLength / 86_400
+      return min(1, max(0, Double(days) / total))
+   }
+
    var accessDetail: String {
       switch accessStatus {
          case .subscribed:

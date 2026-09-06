@@ -33,6 +33,21 @@ struct RideRadarTapeGeometryTests {
       #expect(abs(farFraction - 0.8) < 0.0001)
    }
 
+   @Test func thePageNearFieldIsMilderThanTheTape() {
+      let tape = RideRadarTapeGeometry.fraction(forDistance: 40)
+      let page = RideRadarTapeGeometry.pageFraction(forDistance: 40)
+      #expect(page < tape)
+      #expect(abs(page - 0.36) < 0.0001)
+   }
+
+   @Test func thePageFarFieldHasMoreRoomThanTheTape() {
+      // 90 m on the tape is 80%; on the page it sits earlier so 90–140 m
+      // can occupy the leftover height instead of stacking.
+      let tape = RideRadarTapeGeometry.fraction(forDistance: 90)
+      let page = RideRadarTapeGeometry.pageFraction(forDistance: 90)
+      #expect(page < tape)
+   }
+
    @Test func theMappingNeverInverts() {
       var previous = -1.0
       for distance in stride(from: 0.0, through: 140.0, by: 5) {

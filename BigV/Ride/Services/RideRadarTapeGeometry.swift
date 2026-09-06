@@ -22,17 +22,24 @@ nonisolated enum RideRadarTapeGeometry {
    /// where a rider makes decisions, so the near field is expanded.
    static let nearFieldMeters: Double = 40
 
-   /// How much of the tape the near field occupies.
+   /// How much of the compact tape the near field occupies.
    static let nearFieldFraction: Double = 0.6
+
+   /// Full-page road: a milder bias so a pack of cars can occupy the height
+   /// instead of stacking past 40 m. Still expanded vs linear (40 / 140 ≈ 0.29).
+   static let pageNearFieldFraction: Double = 0.36
 
    // MARK: - Mapping
 
    /// Fraction of the tape between the rider (0) and the far edge (1).
    ///
-   /// Piecewise-linear: 0–40 m spreads across the near 60% of the tape,
-   /// 40–140 m compresses into the remaining 40%. Clamped at both ends so a
+   /// Piecewise-linear: 0–40 m spreads across the near field, 40–140 m
+   /// compresses into the remainder. Clamped at both ends so a
    /// sentinel-adjacent reading can never draw outside the tape.
-   static func fraction(forDistance distance: Double) -> Double {
+   static func fraction(
+      forDistance distance: Double,
+      nearFieldFraction: Double = nearFieldFraction
+   ) -> Double {
       guard distance > 0 else { return 0 }
       guard distance < maxRangeMeters else { return 1 }
 
@@ -42,6 +49,11 @@ nonisolated enum RideRadarTapeGeometry {
 
       let farProgress = (distance - nearFieldMeters) / (maxRangeMeters - nearFieldMeters)
       return nearFieldFraction + farProgress * (1 - nearFieldFraction)
+   }
+
+   /// Same mapping as the tape, tuned for the full-page road.
+   static func pageFraction(forDistance distance: Double) -> Double {
+      fraction(forDistance: distance, nearFieldFraction: pageNearFieldFraction)
    }
 
    /// Y of a vehicle pip in a tape of `height`, measured top-down as SwiftUI

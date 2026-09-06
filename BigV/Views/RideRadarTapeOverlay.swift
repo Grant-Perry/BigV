@@ -12,7 +12,8 @@ import SwiftUI
 /// speed hero and the tiles every time a radar connected cost more than it was
 /// worth, and it squeezed the status chips into ellipses.
 ///
-/// Never hit-testable — the tiles and buttons underneath keep every tap.
+/// Double-tap walks the tape clockwise. The strip takes those hits so the
+/// gesture can fire; everything beside it still belongs to the host.
 struct RideRadarTapeOverlay: ViewModifier {
 
    let placement: RideRadarPlacement
@@ -20,6 +21,7 @@ struct RideRadarTapeOverlay: ViewModifier {
    let isVisible: Bool
    var isDimmed = false
    var unitSystem: RideUnitSystem = .current
+   var onCyclePlacement: (() -> Void)?
 
    /// Cross-axis size of the tape. Defaults to the cockpit scale.
    var thickness: CGFloat?
@@ -50,6 +52,7 @@ struct RideRadarTapeOverlay: ViewModifier {
          }
          .animation(.smooth(duration: 0.3), value: isVisible)
          .animation(.smooth(duration: 0.3), value: placement)
+         .sensoryFeedback(.selection, trigger: placement)
    }
 
    private var tape: some View {
@@ -58,7 +61,8 @@ struct RideRadarTapeOverlay: ViewModifier {
          isDimmed: isDimmed,
          unitSystem: unitSystem,
          placement: placement,
-         thickness: thickness ?? placement.cockpitThickness
+         thickness: thickness ?? placement.cockpitThickness,
+         onCyclePlacement: onCyclePlacement
       )
       .frame(
          maxWidth: placement.isVertical ? nil : length,
@@ -66,7 +70,7 @@ struct RideRadarTapeOverlay: ViewModifier {
       )
       .padding(placement.isVertical ? .vertical : .horizontal, inset)
       .padding(edge ?? placement.overlayEdge, edgeInset)
-      .allowsHitTesting(false)
+      .allowsHitTesting(onCyclePlacement != nil)
    }
 }
 
@@ -79,6 +83,7 @@ extension View {
       isVisible: Bool,
       isDimmed: Bool = false,
       unitSystem: RideUnitSystem = .current,
+      onCyclePlacement: (() -> Void)? = nil,
       thickness: CGFloat? = nil,
       length: CGFloat? = nil,
       inset: CGFloat = 2,
@@ -93,6 +98,7 @@ extension View {
             isVisible: isVisible,
             isDimmed: isDimmed,
             unitSystem: unitSystem,
+            onCyclePlacement: onCyclePlacement,
             thickness: thickness,
             length: length,
             inset: inset,

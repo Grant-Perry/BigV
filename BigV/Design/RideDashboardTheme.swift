@@ -50,6 +50,12 @@ enum RideDashboardTheme {
       )
    }
 
+   /// Ink for text and glyphs sitting on a filled accent — a selected segment,
+   /// a solid pill. Night's accents are bright, so the label goes near-black;
+   /// day's are deepened, so it goes white. Either way the contrast is the
+   /// accent's, not the ground's.
+   static let onAccent = dynamic(dark: RideChromeTokens.void, light: .white)
+
    private static let lightInk = Color(red: 0.055, green: 0.065, blue: 0.085)
 
    private static func dayLevel(_ level: Double) -> Double {

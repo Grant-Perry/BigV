@@ -35,6 +35,16 @@ enum RideRadarPlacement: String, CaseIterable, Sendable, Identifiable {
    var isVertical: Bool {
       self == .leading || self == .trailing
    }
+
+   /// Next edge walking the bezel clockwise: bottom → left → top → right.
+   var nextClockwise: RideRadarPlacement {
+      switch self {
+         case .bottom: .leading
+         case .leading: .top
+         case .top: .trailing
+         case .trailing: .bottom
+      }
+   }
 }
 
 // MARK: - Tone Style

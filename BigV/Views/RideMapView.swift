@@ -34,6 +34,7 @@ struct RideMapView: View {
          isVisible: rideViewModel.showsRadarTape,
          isDimmed: rideViewModel.isRadarDimmed,
          unitSystem: rideViewModel.unitSystem,
+         onCyclePlacement: rideViewModel.cycleRadarPlacement,
          thickness: mapTapeThickness,
          length: mapTapeLength,
          inset: 10,

@@ -103,6 +103,15 @@ struct RoutePreviewStageView: View {
                !selected.climbs.isEmpty {
                RouteClimbListView(route: selected)
             }
+
+            if showsOpenMeteoCredit {
+               Text("ELEVATION © OPEN-METEO")
+                  .font(.system(size: 8, weight: .semibold))
+                  .kerning(0.6)
+                  .foregroundStyle(RideDashboardTheme.ink(0.25))
+                  .frame(maxWidth: .infinity, alignment: .trailing)
+                  .padding(.top, 2)
+            }
          }
          .padding(.horizontal, 16)
       }
@@ -166,6 +175,14 @@ struct RoutePreviewStageView: View {
          }
       }
       .padding(.horizontal, 16)
+   }
+
+   // MARK: - Attribution
+
+   /// Open-Meteo's license requires a credit wherever their elevation profile shows.
+   private var showsOpenMeteoCredit: Bool {
+      routePlannerViewModel.candidates.contains { $0.hasElevationProfile || !$0.climbs.isEmpty }
+         || routePlannerViewModel.isEnrichingElevation
    }
 }
 
