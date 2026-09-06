@@ -33,6 +33,12 @@ final class RideSessionManager {
    /// than leaving them to work it out from a distance that is not zero.
    private(set) var recoveredRidePulse = 0
 
+   /// Bumps when the rider cuts a lap by hand, so the cockpit can confirm it
+   /// landed without making them wait for ride end.
+   private(set) var lapMarkedPulse = 0
+   private(set) var lastMarkedLapIndex = 0
+   private(set) var lastMarkedLapDistance: Double = 0
+
    // MARK: - Private Properties
 
    private let locationManager: RideLocationManager
@@ -712,6 +718,9 @@ final class RideSessionManager {
       ) else { return }
 
       persist(lap)
+      lastMarkedLapIndex = lap.index
+      lastMarkedLapDistance = lap.distance
+      lapMarkedPulse &+= 1
    }
 
    /// Records a completed climb split cut by the climb model.

@@ -52,9 +52,27 @@ final class RideViewModel {
    /// Bumps when the app picked a ride back up after being killed mid-ride.
    var recoveredRidePulse: Int { rideSessionManager.recoveredRidePulse }
 
+   /// Bumps when the rider presses LAP and a split is saved.
+   var lapMarkedPulse: Int { rideSessionManager.lapMarkedPulse }
+
+   var lastMarkedLapIndex: Int { rideSessionManager.lastMarkedLapIndex }
+
+   var lastMarkedLapDistanceText: String {
+      RideFormatters.distance(rideSessionManager.lastMarkedLapDistance, system: unitSystem)
+   }
+
+   /// Which live cockpit page the rider is on inside the dashboard tab.
+   var selectedCockpitPage: RidePage = .dashboard
+
    func presentAccessPaywallIfLocked() {
       guard !canBeginRide else { return }
       isShowingAccessPaywall = true
+   }
+
+   func requestCockpitHome() {
+      withAnimation {
+         selectedCockpitPage = .dashboard
+      }
    }
 
    // MARK: - Units
@@ -278,6 +296,7 @@ final class RideViewModel {
    func reset() {
       clearSelectedMetric()
       clearLiveRadarTimeline()
+      selectedCockpitPage = .dashboard
       rideSessionManager.reset()
    }
 
@@ -286,6 +305,7 @@ final class RideViewModel {
       guard canBeginRide else { return }
       clearSelectedMetric()
       clearLiveRadarTimeline()
+      selectedCockpitPage = .dashboard
       rideSessionManager.reset()
       rideSessionManager.start()
    }

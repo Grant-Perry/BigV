@@ -27,6 +27,10 @@ struct RideCockpitView: View {
    /// coming back does not re-announce a recovery from an hour ago.
    @State private var acknowledgedRecoveryPulse = 0
 
+   @State private var isShowingLapNotice = false
+   @State private var acknowledgedLapPulse = 0
+   @State private var lapNoticeDismissTask: Task<Void, Never>?
+
    var body: some View {
       Group {
          if rideViewModel.isFinished {
@@ -61,8 +65,13 @@ struct RideCockpitView: View {
             if isShowingRecoveryNotice {
                recoveryBanner
             }
+
+            if isShowingLapNotice {
+               lapBanner
+            }
          }
       }
+      .sensoryFeedback(.impact(weight: .medium), trigger: rideViewModel.lapMarkedPulse)
       .sheet(isPresented: accessPaywallBinding) {
          if let plusStore = rideViewModel.plusStore {
             RideAccessPaywallView(plusStore: plusStore) {
@@ -80,6 +89,47 @@ struct RideCockpitView: View {
       .onChange(of: rideViewModel.recoveredRidePulse) { _, _ in
          showRecoveryNoticeIfNeeded()
       }
+      .onChange(of: rideViewModel.lapMarkedPulse) { _, _ in
+         showLapNoticeIfNeeded()
+      }
+   }
+
+   // MARK: - Lap Notice
+
+   private func showLapNoticeIfNeeded() {
+      let pulse = rideViewModel.lapMarkedPulse
+      guard pulse > 0, pulse != acknowledgedLapPulse else { return }
+
+      acknowledgedLapPulse = pulse
+      lapNoticeDismissTask?.cancel()
+      withAnimation { isShowingLapNotice = true }
+
+      lapNoticeDismissTask = Task {
+         try? await Task.sleep(for: .seconds(3))
+         guard !Task.isCancelled else { return }
+         withAnimation { isShowingLapNotice = false }
+      }
+   }
+
+   private var lapBanner: some View {
+      HStack(spacing: 8) {
+         Image(systemName: "flag.fill")
+            .font(.footnote.weight(.bold))
+
+         Text(
+            "Lap \(rideViewModel.lastMarkedLapIndex) marked · \(rideViewModel.lastMarkedLapDistanceText) \(rideViewModel.unitSystem.distanceUnit)"
+         )
+         .font(.caption.weight(.semibold))
+         .multilineTextAlignment(.leading)
+      }
+      .foregroundStyle(.white)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(12)
+      .background(RideDashboardTheme.ice.opacity(0.88), in: .rect(cornerRadius: 12))
+      .padding(.horizontal, 16)
+      .padding(.top, 8)
+      .transition(.opacity.combined(with: .move(edge: .top)))
+      .accessibilityIdentifier("dashboard.banner.lapMarked")
    }
 
    // MARK: - Recovery Notice

@@ -10,13 +10,12 @@ import SwiftUI
 /// The dashboard drawer is the primary map. This page is the expanded map.
 struct RideLivePagerView: View {
 
-   let rideViewModel: RideViewModel
+   @Bindable var rideViewModel: RideViewModel
    let rideMapViewModel: RideMapViewModel
    let routeGuidanceViewModel: RouteGuidanceViewModel
    let onShowRadar: () -> Void
 
    @Environment(RideClimbModel.self) private var rideClimbModel
-   @State private var selectedPage: RidePage = .dashboard
    @State private var isMapPageMounted = false
 
    /// The radar page exists only when a radar does — no rider without one
@@ -31,7 +30,7 @@ struct RideLivePagerView: View {
 
    var body: some View {
       VStack(spacing: 0) {
-         TabView(selection: $selectedPage) {
+         TabView(selection: $rideViewModel.selectedCockpitPage) {
             ForEach(pages) { ridePage in
                page(for: ridePage)
                   .tag(ridePage)
@@ -42,21 +41,23 @@ struct RideLivePagerView: View {
          bottomStrip
       }
       .background(Color.clear)
-      .onChange(of: selectedPage) { _, page in
+      .onChange(of: rideViewModel.selectedCockpitPage) { _, page in
          if page == .map { isMapPageMounted = true }
          routeGuidanceViewModel.collapseTurnList()
       }
       .onChange(of: pages) { _, available in
          // A radar that appears or disappears mid-ride reorders the deck under
          // the rider; keep them on the page they were reading.
-         guard !available.contains(selectedPage) else { return }
-         selectedPage = .dashboard
+         guard !available.contains(rideViewModel.selectedCockpitPage) else { return }
+         rideViewModel.selectedCockpitPage = .dashboard
       }
       // A categorized climb starting pulls the dashboard onto the climb page.
       // Only the dashboard: a rider reading the map or the radar chose to.
       .onChange(of: rideClimbModel.climbStartPulse) { _, _ in
-         guard rideClimbModel.isAutoSwitchEnabled, selectedPage == .dashboard else { return }
-         withAnimation { selectedPage = .climb }
+         guard rideClimbModel.isAutoSwitchEnabled,
+               rideViewModel.selectedCockpitPage == .dashboard
+         else { return }
+         withAnimation { rideViewModel.selectedCockpitPage = .climb }
       }
    }
 
@@ -67,7 +68,11 @@ struct RideLivePagerView: View {
    /// twenty points for no extra information.
    private var bottomStrip: some View {
       VStack(spacing: 4) {
-         RidePageIndicatorView(pages: pages, selectedPage: selectedPage)
+         RidePageIndicatorView(
+            pages: pages,
+            selectedPage: rideViewModel.selectedCockpitPage,
+            onSelect: { rideViewModel.selectedCockpitPage = $0 }
+         )
 
          RideAppFooterView(style: .compact)
       }
@@ -79,12 +84,12 @@ struct RideLivePagerView: View {
 
    /// Moves one page along the deck, stopping at either end.
    private func turnPage(by offset: Int) {
-      guard let index = pages.firstIndex(of: selectedPage) else { return }
+      guard let index = pages.firstIndex(of: rideViewModel.selectedCockpitPage) else { return }
 
       let destination = index + offset
       guard pages.indices.contains(destination) else { return }
 
-      selectedPage = pages[destination]
+      rideViewModel.selectedCockpitPage = pages[destination]
    }
 
    /// The map page pans everywhere now, so a drag anywhere in it is a pan and
@@ -112,8 +117,8 @@ struct RideLivePagerView: View {
                rideViewModel: rideViewModel,
                rideMapViewModel: rideMapViewModel,
                routeGuidanceViewModel: routeGuidanceViewModel,
-               showsDrawerMap: selectedPage == .dashboard,
-               onExpandMap: { selectedPage = .map },
+               showsDrawerMap: rideViewModel.selectedCockpitPage == .dashboard,
+               onExpandMap: { rideViewModel.selectedCockpitPage = .map },
                onShowRadar: onShowRadar,
                onSwipeForward: { turnPage(by: 1) }
             )
@@ -128,7 +133,7 @@ struct RideLivePagerView: View {
                      rideViewModel: rideViewModel,
                      rideMapViewModel: rideMapViewModel,
                      routeGuidanceViewModel: routeGuidanceViewModel,
-                     onCollapse: { selectedPage = .dashboard }
+                     onCollapse: { rideViewModel.requestCockpitHome() }
                   )
                } else {
                   Color.clear
@@ -153,16 +158,30 @@ private struct RidePageIndicatorView: View {
 
    let pages: [RidePage]
    let selectedPage: RidePage
+   var onSelect: (RidePage) -> Void = { _ in }
 
    var body: some View {
-      HStack(spacing: 6) {
+      HStack(spacing: 0) {
          ForEach(pages) { page in
-            Capsule()
-               .fill(page == selectedPage ? RideDashboardTheme.ice.opacity(0.9) : RideDashboardTheme.ink(0.22))
-               .frame(width: page == selectedPage ? 18 : 6, height: 6)
+            Button {
+               onSelect(page)
+            } label: {
+               Capsule()
+                  .fill(page == selectedPage ? RideDashboardTheme.ice.opacity(0.9) : RideDashboardTheme.ink(0.22))
+                  .frame(width: page == selectedPage ? 18 : 6, height: 6)
+                  // A 6-point dot is a target no gloved thumb can hit on a
+                  // moving bike, so each one carries a pad far larger than the
+                  // mark it draws. The spacing lives here rather than between
+                  // the dots, so the pads meet instead of leaving dead gaps.
+                  .frame(width: 30, height: 26)
+                  .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(page.title)
+            .accessibilityAddTraits(page == selectedPage ? [.isButton, .isSelected] : .isButton)
          }
       }
-      .accessibilityElement(children: .ignore)
+      .accessibilityElement(children: .contain)
       .accessibilityLabel("Page \(selectedPage.title)")
    }
 }

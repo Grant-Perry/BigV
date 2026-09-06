@@ -34,8 +34,29 @@ struct RideRootView: View {
    @State private var selectedTab: RideTab = .dashboard
    @State private var isShowingRadarPairing = false
 
+   /// Tapping Dashboard in the tab bar always lands on the speed hero, whether
+   /// the rider is coming from another tab or is already on the dashboard tab
+   /// and has swiped to the radar, map or climb page.
+   ///
+   /// The setter is the only place a re-tap can be caught. SwiftUI fires it on
+   /// every tab-bar tap, including one that does not change the selection, which
+   /// `onChange(of:)` by definition never sees. Reaching into `UITabBar` for the
+   /// underlying buttons — the old UIKit trick — finds nothing to attach to
+   /// under Liquid Glass: the bar's only subview is a private platter view.
+   private var tabSelection: Binding<RideTab> {
+      Binding(
+         get: { selectedTab },
+         set: { tab in
+            if tab == .dashboard {
+               rideViewModel.requestCockpitHome()
+            }
+            selectedTab = tab
+         }
+      )
+   }
+
    var body: some View {
-      TabView(selection: $selectedTab) {
+      TabView(selection: tabSelection) {
          Tab(RideTab.dashboard.title, systemImage: RideTab.dashboard.symbolName, value: .dashboard) {
             RideCockpitView(
                rideViewModel: rideViewModel,

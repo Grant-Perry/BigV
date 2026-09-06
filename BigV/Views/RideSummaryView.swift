@@ -80,21 +80,32 @@ struct RideSummaryView: View {
 
    private var controls: some View {
       HStack(spacing: 10) {
-         control("DONE", tint: RideDashboardTheme.graphite, action: rideViewModel.reset)
-         control("NEW RIDE", tint: RideDashboardTheme.go, action: rideViewModel.startNewRide)
+         control("DONE", tint: RideDashboardTheme.ink, isPrimary: false, action: rideViewModel.reset)
+         control("NEW RIDE", tint: RideDashboardTheme.go, isPrimary: true, action: rideViewModel.startNewRide)
       }
    }
 
-   private func control(_ title: String, tint: Color, action: @escaping () -> Void) -> some View {
-      Button(action: action) {
+   @ViewBuilder
+   private func control(
+      _ title: String,
+      tint: Color,
+      isPrimary: Bool,
+      action: @escaping () -> Void
+   ) -> some View {
+      let button = Button(action: action) {
          Text(title)
             .font(.subheadline.weight(.bold))
             .kerning(1)
             .frame(maxWidth: .infinity)
       }
-      .buttonStyle(.borderedProminent)
       .controlSize(.extraLarge)
       .tint(tint)
+
+      if isPrimary {
+         button.buttonStyle(.borderedProminent)
+      } else {
+         button.buttonStyle(.bordered)
+      }
    }
 }
 

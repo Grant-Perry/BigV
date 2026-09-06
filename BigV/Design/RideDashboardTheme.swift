@@ -126,11 +126,18 @@ enum RideDashboardTheme {
 
    /// One colour that answers to the trait collection, so `.opacity`,
    /// gradients and `.shadow` all stay scheme-aware for free.
-   static func dynamic(dark: Color, light: Color) -> Color {
+   nonisolated static func dynamic(dark: Color, light: Color) -> Color {
       dynamic(dark: UIColor(dark), light: UIColor(light))
    }
 
-   static func dynamic(dark: UIColor, light: UIColor) -> Color {
+   /// The resolver closure must be `nonisolated`.
+   ///
+   /// UIKit calls it on whatever thread is resolving the colour, and SwiftUI
+   /// resolves colours on its own off-main render thread. A main-actor-isolated
+   /// closure therefore trips the Swift 6 isolation check and takes the app down
+   /// with `EXC_BREAKPOINT` — mid-ride, from a display-link tick, with no user
+   /// action to blame. Reading two captured colours needs no actor at all.
+   nonisolated static func dynamic(dark: UIColor, light: UIColor) -> Color {
       Color(uiColor: UIColor { traits in
          traits.userInterfaceStyle == .dark ? dark : light
       })
