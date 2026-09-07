@@ -1591,10 +1591,15 @@ sup.tm {
   top: -0.12em;
 }
 
+h1 sup.tm,
 h2 sup.tm,
 .eyebrow sup.tm {
   font-size: 0.32em;
   top: -0.28em;
+}
+
+.hero h1 sup.tm {
+  left: -0.58em;
 }
 
 .legal-page {
