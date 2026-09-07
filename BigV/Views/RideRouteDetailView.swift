@@ -116,7 +116,7 @@ struct RideRouteDetailView: View {
       }
       .overlay(alignment: .topLeading) {
          if rideDetailViewModel.route.isDrawable {
-            RideRouteMapLegend(showsVehicles: !rideDetailViewModel.radarPasses.isEmpty)
+            RideRouteMapLegend(radarPasses: rideDetailViewModel.radarPasses)
                .padding(10)
                .allowsHitTesting(false)
          }

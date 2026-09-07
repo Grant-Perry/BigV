@@ -5,22 +5,26 @@
 
 import SwiftUI
 
-/// Names the dots a route map draws, so nobody has to guess which one is the
-/// finish and which one is a car.
+/// Names the marks a route map draws, so nobody has to guess which one is
+/// the finish and which one is a car.
 ///
-/// Overlaid on the hero and detail maps. The vehicle entry appears only when
-/// the ride actually recorded radar passes, so a radar-less map stays quiet.
+/// Overlaid on the hero and detail maps. Pass entries appear only for the
+/// tiers that ride actually plotted, so a radar-less map stays quiet.
 struct RideRouteMapLegend: View {
 
-   var showsVehicles = false
+   var radarPasses: [RideRadarPassAnnotation] = []
 
    var body: some View {
       HStack(spacing: 10) {
-         entry(.green, label: "Start")
-         entry(.red, label: "Finish")
+         entry(.start, label: "Start")
+         entry(.finish, label: "Finish")
 
-         if showsVehicles {
-            entry(RideDashboardTheme.amber, label: "Vehicle")
+         if showsOrdinaryPasses {
+            entry(.vehiclePass, label: "Pass")
+         }
+
+         if showsFastPasses {
+            entry(.fastPass, label: "Fast")
          }
       }
       .padding(.horizontal, 10)
@@ -31,23 +35,34 @@ struct RideRouteMapLegend: View {
             .strokeBorder(RideDashboardTheme.ink(0.12), lineWidth: 0.5)
       }
       .accessibilityElement(children: .combine)
-      .accessibilityLabel(
-         showsVehicles
-            ? "Map legend: green start, red finish, amber vehicle passes"
-            : "Map legend: green start, red finish"
-      )
+      .accessibilityLabel(accessibilityText)
    }
 
-   private func entry(_ color: Color, label: String) -> some View {
+   // MARK: - Entries
+
+   private var showsOrdinaryPasses: Bool {
+      radarPasses.contains { $0.tier == .approaching }
+   }
+
+   private var showsFastPasses: Bool {
+      radarPasses.contains { $0.tier == .high }
+   }
+
+   private func entry(_ kind: RideRouteMapMark.Kind, label: String) -> some View {
       HStack(spacing: 4) {
-         Circle()
-            .fill(color)
-            .frame(width: 6, height: 6)
+         RideRouteMapMark(kind: kind, role: .legend)
 
          Text(label)
             .font(.system(size: 10, weight: .semibold))
             .foregroundStyle(RideDashboardTheme.ink(0.75))
       }
+   }
+
+   private var accessibilityText: String {
+      var parts = ["green start", "checkered finish"]
+      if showsOrdinaryPasses { parts.append("amber vehicle passes") }
+      if showsFastPasses { parts.append("red diamond fast approaches") }
+      return "Map legend: " + parts.joined(separator: ", ")
    }
 }
 
@@ -56,7 +71,17 @@ struct RideRouteMapLegend: View {
       Color.black
       VStack(spacing: 12) {
          RideRouteMapLegend()
-         RideRouteMapLegend(showsVehicles: true)
+         RideRouteMapLegend(
+            radarPasses: [
+               RideRadarPassAnnotation(id: 0, latitude: 0, longitude: 0, tier: .approaching)
+            ]
+         )
+         RideRouteMapLegend(
+            radarPasses: [
+               RideRadarPassAnnotation(id: 0, latitude: 0, longitude: 0, tier: .approaching),
+               RideRadarPassAnnotation(id: 1, latitude: 0, longitude: 0, tier: .high)
+            ]
+         )
       }
    }
    .preferredColorScheme(.dark)

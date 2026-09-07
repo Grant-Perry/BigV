@@ -52,7 +52,7 @@ struct RideHistoryHeroCard: View {
       .clipShape(.rect(cornerRadius: 16, style: .continuous))
       .overlay(alignment: .topLeading) {
          if route.isDrawable {
-            RideRouteMapLegend(showsVehicles: false)
+            RideRouteMapLegend()
                .padding(8)
          }
       }

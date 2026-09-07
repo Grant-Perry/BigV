@@ -24,7 +24,7 @@ struct RideDetailFullMapView: View {
          chrome
       }
       .overlay(alignment: .bottomTrailing) {
-         RideRouteMapLegend(showsVehicles: !radarPasses.isEmpty)
+         RideRouteMapLegend(radarPasses: radarPasses)
             .padding(.horizontal, 16)
             .padding(.bottom, 8)
             .allowsHitTesting(false)
