@@ -15,6 +15,9 @@ struct RideDashboardView: View {
    let onExpandMap: () -> Void
    let onShowRadar: () -> Void
 
+   /// A tap on the tape: the Traffic page, where the same road is readable.
+   var onShowTraffic: () -> Void = {}
+
    /// Turning the page is the dashboard's job now, not the pager's: the map
    /// drawer pans, so a page-turning drag laid over the whole screen would
    /// fight every pan the rider makes. Recognised above the drawer instead.
@@ -43,6 +46,7 @@ struct RideDashboardView: View {
                showsDrawerMap: showsDrawerMap,
                onExpandMap: onExpandMap,
                onShowRadar: onShowRadar,
+               onShowTraffic: onShowTraffic,
                onSwipeForward: onSwipeForward,
                isDrawerOpen: $isDrawerOpen
             )
@@ -96,6 +100,7 @@ struct RideDashboardView: View {
             isDimmed: rideViewModel.isRadarDimmed,
             unitSystem: rideViewModel.unitSystem,
             onCyclePlacement: rideViewModel.cycleRadarPlacement,
+            onTap: onShowTraffic,
             inset: 10,
             edgeInset: 8,
             alignment: .top,
@@ -208,7 +213,8 @@ struct RideDashboardView: View {
          isVisible: rideViewModel.showsRadarTape && rideViewModel.radarPlacement != .bottom,
          isDimmed: rideViewModel.isRadarDimmed,
          unitSystem: rideViewModel.unitSystem,
-         onCyclePlacement: rideViewModel.cycleRadarPlacement
+         onCyclePlacement: rideViewModel.cycleRadarPlacement,
+         onTap: onShowTraffic
       )
    }
 }

@@ -8,7 +8,9 @@ import SwiftUI
 /// The speed hero — always visible; live metric charts sit beneath it.
 ///
 /// Portrait gives the hero AVG and MAX as corner chips. Landscape carries
-/// those in its grid, so the hero there is speed and heading alone.
+/// those in its grid, so the hero there is speed and heading alone — and so
+/// does portrait, chip by chip, once the rider moves that speed onto a card:
+/// one figure, one place.
 struct RideDashboardInstrumentHero: View {
 
    let rideViewModel: RideViewModel
@@ -25,8 +27,8 @@ struct RideDashboardInstrumentHero: View {
          isDimmed: isDimmed,
          isExpanded: isExpanded,
          layout: layout,
-         averageValue: layout == .portrait ? rideViewModel.averageSpeed : nil,
-         maximumValue: layout == .portrait ? rideViewModel.maximumSpeed : nil,
+         averageValue: showsChip(for: .averageSpeed) ? rideViewModel.averageSpeed : nil,
+         maximumValue: showsChip(for: .maximumSpeed) ? rideViewModel.maximumSpeed : nil,
          isSpeedChartSelected: rideViewModel.selectedMetric == .speed,
          onSelectSpeedChart: { rideViewModel.selectMetric(.speed) }
       )
@@ -37,5 +39,9 @@ struct RideDashboardInstrumentHero: View {
 
    private var isDimmed: Bool {
       rideViewModel.isPaused
+   }
+
+   private func showsChip(for metric: RideCockpitMetric) -> Bool {
+      layout == .portrait && !rideViewModel.cockpitLayout.dashboardTiles.contains(metric)
    }
 }

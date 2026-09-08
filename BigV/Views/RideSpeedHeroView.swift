@@ -17,6 +17,11 @@ struct RideSpeedHeroView: View {
    enum Layout: Sendable {
       case portrait
       case landscape
+
+      /// The Traffic page's instrument column: half the dashboard's width,
+      /// beside the radar road. Speed and heading only — the AVG and MAX
+      /// chips need a width this column does not have.
+      case column
    }
 
    let value: String
@@ -55,6 +60,10 @@ struct RideSpeedHeroView: View {
          case .landscape:
             let byHeight = (size.height - 18 - ribbon) / 1.18
             return min(max(byHeight, 44), 80)
+         case .column:
+            let byHeight = (size.height - 18 - ribbon) / 1.18
+            let byWidth = (size.width - 28 - 56) / 2.15
+            return min(max(min(byHeight, byWidth), 56), 120)
       }
    }
 
@@ -117,6 +126,7 @@ struct RideSpeedHeroView: View {
       switch layout {
          case .portrait: isExpanded ? 260 : 196
          case .landscape: 150
+         case .column: 170
       }
    }
 
@@ -136,10 +146,18 @@ struct RideSpeedHeroView: View {
             .accessibilityValue("\(value) \(unit)")
 
          Text(unit)
-            .font(layout == .landscape ? .headline.weight(.bold) : (isExpanded ? .title.weight(.bold) : .title2.weight(.bold)))
+            .font(unitFont)
             .foregroundStyle(isDimmed ? RideDashboardTheme.ink(0.28) : RideDashboardTheme.amber)
       }
       .frame(maxWidth: .infinity)
+   }
+
+   private var unitFont: Font {
+      switch layout {
+         case .landscape: .headline.weight(.bold)
+         case .column: .title3.weight(.bold)
+         case .portrait: isExpanded ? .title.weight(.bold) : .title2.weight(.bold)
+      }
    }
 
    // MARK: - Satellites

@@ -20,7 +20,9 @@ struct RideSettingsPlusCard: View {
    @State private var isShowingManageSubscriptions = false
 
    var body: some View {
-      RideSettingsCard(title: "BIGVELO") {
+      RideSettingsCard {
+         RideWordmark(pointSize: 22)
+
          statusRow
 
          if let fraction = plusStore.trialFractionRemaining {

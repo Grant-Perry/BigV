@@ -52,6 +52,7 @@ final class RideBackupManager {
    private let unitsSettings: RideUnitsSettings
    private let radarSettings: RideRadarSettings
    private let onboardingSettings: RideOnboardingSettings
+   private let cockpitLayoutSettings: RideCockpitLayoutSettings
 
    // MARK: - Initialization
 
@@ -59,12 +60,14 @@ final class RideBackupManager {
       rideStorageManager: RideStorageManager,
       unitsSettings: RideUnitsSettings,
       radarSettings: RideRadarSettings,
-      onboardingSettings: RideOnboardingSettings
+      onboardingSettings: RideOnboardingSettings,
+      cockpitLayoutSettings: RideCockpitLayoutSettings
    ) {
       self.rideStorageManager = rideStorageManager
       self.unitsSettings = unitsSettings
       self.radarSettings = radarSettings
       self.onboardingSettings = onboardingSettings
+      self.cockpitLayoutSettings = cockpitLayoutSettings
    }
 
    // MARK: - Export
@@ -167,7 +170,9 @@ final class RideBackupManager {
          radarToneStyle: radarSettings.toneStyle.rawValue,
          radarClearTone: radarSettings.clearToneEnabled,
          radarOverlayEnabled: radarSettings.overlayEnabled,
-         radarDisclaimerAcknowledged: radarSettings.hasAcknowledgedDisclaimer
+         radarDisclaimerAcknowledged: radarSettings.hasAcknowledgedDisclaimer,
+         cockpitDashboardTiles: cockpitLayoutSettings.dashboardTiles.map(\.rawValue),
+         cockpitTrafficTiles: cockpitLayoutSettings.trafficTiles.map(\.rawValue)
       )
    }
 
@@ -193,6 +198,11 @@ final class RideBackupManager {
       radarSettings.clearToneEnabled = preferences.radarClearTone
       radarSettings.overlayEnabled = preferences.radarOverlayEnabled
       radarSettings.hasAcknowledgedDisclaimer = preferences.radarDisclaimerAcknowledged
+
+      cockpitLayoutSettings.restore(
+         dashboard: preferences.cockpitDashboardTiles,
+         traffic: preferences.cockpitTrafficTiles
+      )
    }
 
    // MARK: - Encoding

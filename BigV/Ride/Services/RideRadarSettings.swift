@@ -36,6 +36,15 @@ enum RideRadarPlacement: String, CaseIterable, Sendable, Identifiable {
       self == .leading || self == .trailing
    }
 
+   /// Which side of the Traffic page the road column takes.
+   ///
+   /// The road is always vertical there, so only a left-hand tape moves it:
+   /// the rider who parked the tape on the left reads traffic on the left.
+   /// Top, bottom and right all put the road on the right, beside the hero.
+   var trafficRoadLeads: Bool {
+      self == .leading
+   }
+
    /// Next edge walking the bezel clockwise: bottom → left → top → right.
    var nextClockwise: RideRadarPlacement {
       switch self {

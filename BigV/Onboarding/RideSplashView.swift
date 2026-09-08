@@ -56,8 +56,8 @@ struct RideSplashView: View {
       VStack(spacing: 16) {
          Spacer()
 
-         RideWordmark(pointSize: 68)
-            .minimumScaleFactor(0.7)
+         RideWordmark(pointSize: 78, chrome: .splash)
+            .minimumScaleFactor(0.65)
             .lineLimit(1)
 
          Spacer()

@@ -5,16 +5,18 @@
 
 import SwiftUI
 
-/// The RIDING section: radar, climb auto-switch and auto-lap.
+/// The RIDING section: radar, climb auto-switch, auto-lap, and the way back
+/// to the stock card layout.
 ///
-/// Grouped because all three are about what the cockpit does on its own while
-/// the rider keeps their hands on the bars, which is also why radar sits here
-/// as a row rather than as a card of its own further down the page.
+/// Grouped because all of these are about what the cockpit does on its own
+/// while the rider keeps their hands on the bars, which is also why radar sits
+/// here as a row rather than as a card of its own further down the page.
 struct RideSettingsRidingCard: View {
 
    @Bindable var unitsSettings: RideUnitsSettings
    @Bindable var climbSettings: RideClimbSettings
    @Bindable var lapSettings: RideLapSettings
+   let cockpitLayoutSettings: RideCockpitLayoutSettings
    let onShowRadar: () -> Void
 
    var body: some View {
@@ -42,6 +44,19 @@ struct RideSettingsRidingCard: View {
             selection: $lapSettings.autoLapUnits,
             segments: autoLapSegments
          )
+
+         RideSettingsDivider()
+
+         // A layout built by holding cards with a gloved thumb is easy to
+         // scramble, so the way back is one row, not a rebuild by hand.
+         RideSettingsNavRow(
+            title: "Reset Card Layout",
+            detail: "Put every dashboard and traffic card back where it started",
+            showsChevron: false,
+            identifier: "settings.button.resetCardLayout"
+         ) {
+            cockpitLayoutSettings.reset()
+         }
       }
    }
 
@@ -85,6 +100,7 @@ struct RideSettingsRidingCard: View {
          unitsSettings: RideUnitsSettings(),
          climbSettings: RideClimbSettings(),
          lapSettings: RideLapSettings(),
+         cockpitLayoutSettings: RideCockpitLayoutSettings(),
          onShowRadar: {}
       )
       .padding(16)

@@ -28,6 +28,7 @@ struct RideRootView: View {
    let rideClimbSettings: RideClimbSettings
    let rideLapSettings: RideLapSettings
    let rideAppearanceSettings: RideAppearanceSettings
+   let rideCockpitLayoutSettings: RideCockpitLayoutSettings
 
    @Environment(RideClimbModel.self) private var rideClimbModel
    @Environment(\.scenePhase) private var scenePhase
@@ -91,6 +92,7 @@ struct RideRootView: View {
                climbSettings: rideClimbSettings,
                lapSettings: rideLapSettings,
                appearanceSettings: rideAppearanceSettings,
+               cockpitLayoutSettings: rideCockpitLayoutSettings,
                onShowRadar: { isShowingRadarPairing = true },
                onFinishSetup: { selectedTab = .dashboard }
             )

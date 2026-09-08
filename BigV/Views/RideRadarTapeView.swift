@@ -32,6 +32,11 @@ struct RideRadarTapeView: View {
    /// Double-tap walks the tape clockwise around the screen.
    var onCyclePlacement: (() -> Void)?
 
+   /// Single tap opens the Traffic page — the tape at a size you can read.
+   /// Declared after the double-tap so a second tap is never eaten as two
+   /// singles.
+   var onTap: (() -> Void)?
+
    static let compactWidth: CGFloat = 48
 
    /// Portrait-dashboard ribbon: slightly wider than the compact strip.
@@ -78,13 +83,15 @@ struct RideRadarTapeView: View {
       }
       .contentShape(.rect)
       .onTapGesture(count: 2) { onCyclePlacement?() }
+      .onTapGesture { onTap?() }
       .animation(.smooth(duration: 0.25), value: tracks)
       .accessibilityElement(children: .ignore)
       .accessibilityLabel("Rear radar")
       .accessibilityValue(accessibilitySummary)
-      .accessibilityHint("Moves the tape clockwise")
+      .accessibilityHint(onTap == nil ? "Moves the tape clockwise" : "Opens the traffic page")
       .accessibilityAddTraits(.isButton)
       .accessibilityAction(named: "Move clockwise") { onCyclePlacement?() }
+      .accessibilityAction(named: "Open traffic page") { onTap?() }
       .accessibilityIdentifier("ride.radar")
    }
 
@@ -416,23 +423,5 @@ private extension String {
          )
       }
       .padding()
-   }
-}
-
-private extension RideRadarTracker.Track {
-
-   static func preview(id: UInt8, distance: Double, tier: RideRadarThreatTier) -> Self {
-      Self(
-         id: id,
-         distanceMeters: distance,
-         closingSpeedMetersPerSecond: tier == .high ? 9 : 4,
-         timeToContact: distance / 8,
-         tier: tier,
-         firstSeenAt: .now,
-         lastSeenAt: .now,
-         minimumDistanceMeters: distance,
-         maximumClosingSpeedMetersPerSecond: 9,
-         peakTier: tier
-      )
    }
 }

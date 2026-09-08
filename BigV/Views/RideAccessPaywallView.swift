@@ -20,6 +20,8 @@ struct RideAccessPaywallView: View {
       NavigationStack {
          ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+               RideWordmark(pointSize: 34)
+
                Text(plusStore.accessHeadline)
                   .font(.title2.weight(.bold))
                   .foregroundStyle(RideDashboardTheme.ink)

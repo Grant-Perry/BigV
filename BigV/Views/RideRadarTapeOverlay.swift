@@ -23,6 +23,9 @@ struct RideRadarTapeOverlay: ViewModifier {
    var unitSystem: RideUnitSystem = .current
    var onCyclePlacement: (() -> Void)?
 
+   /// Single tap: the Traffic page, where the same road is readable.
+   var onTap: (() -> Void)?
+
    /// Cross-axis size of the tape. Defaults to the cockpit scale.
    var thickness: CGFloat?
 
@@ -62,7 +65,8 @@ struct RideRadarTapeOverlay: ViewModifier {
          unitSystem: unitSystem,
          placement: placement,
          thickness: thickness ?? placement.cockpitThickness,
-         onCyclePlacement: onCyclePlacement
+         onCyclePlacement: onCyclePlacement,
+         onTap: onTap
       )
       .frame(
          maxWidth: placement.isVertical ? nil : length,
@@ -70,7 +74,7 @@ struct RideRadarTapeOverlay: ViewModifier {
       )
       .padding(placement.isVertical ? .vertical : .horizontal, inset)
       .padding(edge ?? placement.overlayEdge, edgeInset)
-      .allowsHitTesting(onCyclePlacement != nil)
+      .allowsHitTesting(onCyclePlacement != nil || onTap != nil)
    }
 }
 
@@ -84,6 +88,7 @@ extension View {
       isDimmed: Bool = false,
       unitSystem: RideUnitSystem = .current,
       onCyclePlacement: (() -> Void)? = nil,
+      onTap: (() -> Void)? = nil,
       thickness: CGFloat? = nil,
       length: CGFloat? = nil,
       inset: CGFloat = 2,
@@ -99,6 +104,7 @@ extension View {
             isDimmed: isDimmed,
             unitSystem: unitSystem,
             onCyclePlacement: onCyclePlacement,
+            onTap: onTap,
             thickness: thickness,
             length: length,
             inset: inset,

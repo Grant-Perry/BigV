@@ -18,6 +18,7 @@ struct RideHeartRateMetricTile: View {
    var isSelected: Bool = false
    var isCompact: Bool = false
    var action: (() -> Void)?
+   var onLongPress: (() -> Void)?
 
    var body: some View {
       Group {
@@ -30,6 +31,7 @@ struct RideHeartRateMetricTile: View {
             tileContent
          }
       }
+      .rideCardLongPress(onLongPress)
       .overlay {
          if isSelected {
             RoundedRectangle(cornerRadius: RideDashboardTheme.cardRadius, style: .continuous)

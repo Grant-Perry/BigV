@@ -30,6 +30,7 @@ struct BigVApp: App {
    @State private var rideClimbSettings: RideClimbSettings
    @State private var rideLapSettings: RideLapSettings
    @State private var rideAppearanceSettings: RideAppearanceSettings
+   @State private var rideCockpitLayoutSettings: RideCockpitLayoutSettings
    @State private var rideBackToStartModel: RideBackToStartModel
 
    /// The summary and history detail each get their own route view model so a
@@ -73,6 +74,10 @@ struct BigVApp: App {
       let rideUnitsSettings = RideUnitsSettings()
       let rideClimbSettings = RideClimbSettings()
       let rideLapSettings = RideLapSettings()
+
+      // Which metric sits in which card. One store, read by every cockpit
+      // surface and written by the long-press picker.
+      let rideCockpitLayoutSettings = RideCockpitLayoutSettings()
       let routeFavoriteStore = RouteFavoriteStore()
 
       // Route planning and weather both need "where is the rider" while idle,
@@ -112,9 +117,11 @@ struct BigVApp: App {
          rideSessionManager: rideSessionManager,
          rideRadarSettings: rideRadarSettings,
          rideUnitsSettings: rideUnitsSettings,
+         rideCockpitLayoutSettings: rideCockpitLayoutSettings,
          plusStore: bigVeloPlusStore
       )
       _rideViewModel = State(initialValue: rideViewModel)
+      _rideCockpitLayoutSettings = State(initialValue: rideCockpitLayoutSettings)
       _rideUnitsSettings = State(initialValue: rideUnitsSettings)
       let rideOnboardingSettings = RideOnboardingSettings()
       _rideOnboardingSettings = State(initialValue: rideOnboardingSettings)
@@ -192,7 +199,8 @@ struct BigVApp: App {
                rideStorageManager: rideStorageManager,
                unitsSettings: rideUnitsSettings,
                radarSettings: rideRadarSettings,
-               onboardingSettings: rideOnboardingSettings
+               onboardingSettings: rideOnboardingSettings,
+               cockpitLayoutSettings: rideCockpitLayoutSettings
             ),
             isRideInProgress: {
                rideViewModel.isRecording
@@ -247,7 +255,8 @@ struct BigVApp: App {
                rideBackupViewModel: rideBackupViewModel,
                rideClimbSettings: rideClimbSettings,
                rideLapSettings: rideLapSettings,
-               rideAppearanceSettings: rideAppearanceSettings
+               rideAppearanceSettings: rideAppearanceSettings,
+               rideCockpitLayoutSettings: rideCockpitLayoutSettings
             )
          }
          .environment(rideAppearanceSettings)

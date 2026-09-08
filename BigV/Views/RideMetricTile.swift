@@ -23,6 +23,10 @@ struct RideMetricTile: View {
    /// padding both come down and the gutter alternation stops meaning anything.
    var isCompact: Bool = false
 
+   /// Holding the card opens the picker that decides what it shows. Alongside
+   /// the tap rather than instead of it, so a chartable card still charts.
+   var onLongPress: (() -> Void)?
+
    var body: some View {
       Group {
          if let action {
@@ -34,6 +38,7 @@ struct RideMetricTile: View {
             tileContent
          }
       }
+      .rideCardLongPress(onLongPress)
       .overlay {
          if isSelected {
             RoundedRectangle(cornerRadius: RideDashboardTheme.cardRadius, style: .continuous)
@@ -100,5 +105,47 @@ struct RideMetricTile: View {
          RideMetricTile(title: "RIDE TIME", value: "1:12:04", gutterAlignment: .leading)
       }
       .padding()
+   }
+}
+
+// MARK: - Long Press
+
+/// The hold that opens the card picker, as a UIKit recognizer.
+///
+/// UIKit rather than SwiftUI's `LongPressGesture` because the dashboard's
+/// cards live inside a scroll view, and a `UILongPressGestureRecognizer`
+/// negotiates with a scroll view the way every UIKit long press does: a
+/// still finger fires it, a moving one scrolls, and neither is lost to the
+/// other. Recognising cancels the touch for the card beneath, so a chartable
+/// card held down does not also toggle its chart on release.
+private struct RideCardLongPressRecognizer: UIGestureRecognizerRepresentable {
+
+   let onPress: () -> Void
+
+   func makeUIGestureRecognizer(context: Context) -> UILongPressGestureRecognizer {
+      let recognizer = UILongPressGestureRecognizer()
+      recognizer.minimumPressDuration = 0.45
+      recognizer.allowableMovement = 12
+      return recognizer
+   }
+
+   func handleUIGestureRecognizerAction(_ recognizer: UILongPressGestureRecognizer, context: Context) {
+      guard recognizer.state == .began else { return }
+      onPress()
+   }
+}
+
+extension View {
+
+   /// The hold that opens the card picker. Alongside whatever the card
+   /// already does on a tap, and absent entirely when the host passes
+   /// nothing, so cards outside the cockpit keep behaving as plain glass.
+   @ViewBuilder
+   func rideCardLongPress(_ onLongPress: (() -> Void)?) -> some View {
+      if let onLongPress {
+         gesture(RideCardLongPressRecognizer(onPress: onLongPress))
+      } else {
+         self
+      }
    }
 }

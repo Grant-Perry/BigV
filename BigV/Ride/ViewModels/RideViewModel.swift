@@ -22,6 +22,10 @@ final class RideViewModel {
    private let rideUnitsSettings: RideUnitsSettings
    let plusStore: BigVeloPlusStore?
 
+   /// Which metric sits in which cockpit card. Views read it to lay the
+   /// cards out; the long-press picker writes it.
+   let cockpitLayout: RideCockpitLayoutSettings
+
    /// Magnetometer for the ribbon while the bike is stopped. Owned here so the
    /// dashboard can start and stop it with its own lifecycle.
    private let compassHeadingSource = RideCompassHeadingSource()
@@ -33,11 +37,13 @@ final class RideViewModel {
       rideSessionManager: RideSessionManager = RideSessionManager(),
       rideRadarSettings: RideRadarSettings = RideRadarSettings(),
       rideUnitsSettings: RideUnitsSettings = RideUnitsSettings(),
+      rideCockpitLayoutSettings: RideCockpitLayoutSettings = RideCockpitLayoutSettings(),
       plusStore: BigVeloPlusStore? = nil
    ) {
       self.rideSessionManager = rideSessionManager
       self.rideRadarSettings = rideRadarSettings
       self.rideUnitsSettings = rideUnitsSettings
+      self.cockpitLayout = rideCockpitLayoutSettings
       self.plusStore = plusStore
    }
 
@@ -62,7 +68,16 @@ final class RideViewModel {
    }
 
    /// Which live cockpit page the rider is on inside the dashboard tab.
-   var selectedCockpitPage: RidePage = .dashboard
+   ///
+   /// Leaving the dashboard parks any open live chart: the page deck keeps the
+   /// dashboard mounted, and a Charts rebuild walking SwiftData on this actor
+   /// is what starved radar ingest while the rider was looking at the road.
+   var selectedCockpitPage: RidePage = .dashboard {
+      didSet {
+         guard selectedCockpitPage != oldValue else { return }
+         syncLiveChartVisibility()
+      }
+   }
 
    func presentAccessPaywallIfLocked() {
       guard !canBeginRide else { return }
@@ -70,9 +85,39 @@ final class RideViewModel {
    }
 
    func requestCockpitHome() {
+      showCockpitPage(.dashboard)
+   }
+
+   /// Turns the deck to a page the rider tapped for — the tape to Traffic,
+   /// the Traffic road to Radar — with the same slide a swipe would give.
+   func showCockpitPage(_ page: RidePage) {
       withAnimation {
-         selectedCockpitPage = .dashboard
+         selectedCockpitPage = page
       }
+   }
+
+   // MARK: - Card Swap
+
+   /// The card the rider is holding down, while the picker is up. `nil` when
+   /// no picker is showing.
+   private(set) var metricSwapRequest: RideCockpitMetricSwapRequest?
+
+   func requestMetricSwap(_ metric: RideCockpitMetric, on surface: RideCockpitSurface) {
+      metricSwapRequest = RideCockpitMetricSwapRequest(metric: metric, surface: surface)
+   }
+
+   func cancelMetricSwap() {
+      metricSwapRequest = nil
+   }
+
+   /// The picker's answer: put `target` where the held card is. Swaps if the
+   /// target is already on that screen, replaces if not, and refuses anything
+   /// the guard forbids. The picker closes either way.
+   func resolveMetricSwap(with target: RideCockpitMetric, available: Set<RideCockpitMetric>) {
+      defer { metricSwapRequest = nil }
+      guard let request = metricSwapRequest else { return }
+
+      cockpitLayout.apply(target, for: request.metric, on: request.surface, available: available)
    }
 
    // MARK: - Units
@@ -331,12 +376,20 @@ final class RideViewModel {
    private var lastLiveChartSampleCount = 0
    private var lastLiveHeartRateRingCount = 0
    private var lastLiveChartRefresh = Date.distantPast
+   private var lastLiveRadarPassCount = -1
 
-   /// How often open live surfaces rebuild while visible.
+   /// How often open live metric charts rebuild while visible.
    private let liveChartRefreshInterval: TimeInterval = 1.5
 
-   private var isLiveChartSurfaceVisible: Bool {
-      selectedMetric != nil || isLiveRadarTimelineVisible
+   /// Metric chart is on screen — the only case that needs a polling loop.
+   private var isLiveMetricChartVisible: Bool {
+      selectedCockpitPage == .dashboard && selectedMetric != nil
+   }
+
+   /// Timeline card is on screen. The chip stays selected even after a swipe
+   /// away; the card itself does not, so it cannot keep working off-stage.
+   var showsLiveRadarTimeline: Bool {
+      selectedCockpitPage == .dashboard && isLiveRadarTimelineVisible
    }
 
    /// Toggles a metric chart under the speed hero. Tap again to dismiss.
@@ -369,14 +422,26 @@ final class RideViewModel {
 
       clearSelectedMetric()
       isLiveRadarTimelineVisible = true
-      refreshLiveReports(force: true)
-      startLiveChartLoopIfNeeded()
+      lastLiveRadarPassCount = -1
+      refreshLiveRadarTimelineIfNeeded()
    }
 
    func clearLiveRadarTimeline() {
       isLiveRadarTimelineVisible = false
       liveRadarReport = nil
+      lastLiveRadarPassCount = -1
       stopLiveChartLoopIfIdle()
+   }
+
+   /// Rebuilds the timeline only when a new pass lands — never on a timer.
+   func refreshLiveRadarTimelineIfNeeded() {
+      guard showsLiveRadarTimeline else { return }
+
+      let passCount = radarPassCount
+      guard passCount != lastLiveRadarPassCount || liveRadarReport == nil else { return }
+
+      lastLiveRadarPassCount = passCount
+      refreshRadarReport()
    }
 
    /// Drops live chart surfaces when the ride is no longer active.
@@ -385,6 +450,22 @@ final class RideViewModel {
          clearSelectedMetric()
          clearLiveRadarTimeline()
          return
+      }
+   }
+
+   /// Parks chart work when the rider leaves the dashboard, and picks it up
+   /// again on return without discarding what they had open.
+   func syncLiveChartVisibility() {
+      if isLiveMetricChartVisible {
+         refreshLiveReports(force: true)
+         startLiveChartLoopIfNeeded()
+      } else {
+         pauseLiveChartLoop()
+      }
+
+      if showsLiveRadarTimeline {
+         lastLiveRadarPassCount = -1
+         refreshLiveRadarTimelineIfNeeded()
       }
    }
 
@@ -397,7 +478,7 @@ final class RideViewModel {
    }
 
    private func startLiveChartLoopIfNeeded() {
-      guard isLiveChartSurfaceVisible else { return }
+      guard isLiveMetricChartVisible else { return }
       guard liveChartTask == nil else { return }
 
       liveChartTask = Task { @MainActor [weak self] in
@@ -410,11 +491,15 @@ final class RideViewModel {
       }
    }
 
-   private func stopLiveChartLoopIfIdle() {
-      guard !isLiveChartSurfaceVisible else { return }
-
+   private func pauseLiveChartLoop() {
       liveChartTask?.cancel()
       liveChartTask = nil
+   }
+
+   private func stopLiveChartLoopIfIdle() {
+      guard !isLiveMetricChartVisible else { return }
+
+      pauseLiveChartLoop()
       lastLiveChartSampleCount = 0
       lastLiveHeartRateRingCount = 0
       lastLiveChartRefresh = .distantPast
@@ -433,7 +518,7 @@ final class RideViewModel {
    }
 
    private func refreshLiveReports(force: Bool) {
-      guard isLiveChartSurfaceVisible else { return }
+      guard isLiveMetricChartVisible else { return }
 
       let sampleCount = rideSessionManager.activeSampleCount
       let ringCount = rideSessionManager.heartRateRingSampleCount
@@ -448,12 +533,8 @@ final class RideViewModel {
       lastLiveHeartRateRingCount = ringCount
       lastLiveChartRefresh = .now
 
-      if selectedMetric != nil {
+      if isLiveMetricChartVisible {
          refreshMetricReports()
-      }
-
-      if isLiveRadarTimelineVisible {
-         refreshRadarReport()
       }
    }
 

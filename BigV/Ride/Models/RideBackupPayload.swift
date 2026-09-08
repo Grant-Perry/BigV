@@ -33,6 +33,11 @@ nonisolated struct RideBackupPayload: Codable, Sendable {
       var radarClearTone: Bool
       var radarOverlayEnabled: Bool
       var radarDisclaimerAcknowledged: Bool
+
+      /// Which metric sits in which cockpit card. Optional: backups from
+      /// before cards could move have no layout, and decode as-is.
+      var cockpitDashboardTiles: [String]?
+      var cockpitTrafficTiles: [String]?
    }
 
    // MARK: - Ride

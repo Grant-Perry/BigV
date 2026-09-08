@@ -25,6 +25,7 @@ struct RideSettingsView: View {
    @Bindable var climbSettings: RideClimbSettings
    @Bindable var lapSettings: RideLapSettings
    @Bindable var appearanceSettings: RideAppearanceSettings
+   let cockpitLayoutSettings: RideCockpitLayoutSettings
    let onShowRadar: () -> Void
    let onFinishSetup: () -> Void
 
@@ -44,6 +45,7 @@ struct RideSettingsView: View {
                   unitsSettings: unitsSettings,
                   climbSettings: climbSettings,
                   lapSettings: lapSettings,
+                  cockpitLayoutSettings: cockpitLayoutSettings,
                   onShowRadar: onShowRadar
                )
 
@@ -83,9 +85,7 @@ struct RideSettingsView: View {
 
    private var header: some View {
       VStack(spacing: 8) {
-         Image(systemName: "bicycle")
-            .font(.system(size: 34, weight: .semibold))
-            .foregroundStyle(RideDashboardTheme.ice)
+         RideWordmark(pointSize: 36)
 
          Text("A couple of choices and the cockpit is yours.")
             .font(.footnote)
@@ -159,7 +159,8 @@ struct RideSettingsView: View {
          rideStorageManager: storage,
          unitsSettings: units,
          radarSettings: radar,
-         onboardingSettings: onboarding
+         onboardingSettings: onboarding,
+         cockpitLayoutSettings: RideCockpitLayoutSettings()
       ),
       isRideInProgress: { false },
       onHistoryChanged: {}
@@ -173,6 +174,7 @@ struct RideSettingsView: View {
       climbSettings: RideClimbSettings(),
       lapSettings: RideLapSettings(),
       appearanceSettings: RideAppearanceSettings(),
+      cockpitLayoutSettings: RideCockpitLayoutSettings(),
       onShowRadar: {},
       onFinishSetup: {}
    )

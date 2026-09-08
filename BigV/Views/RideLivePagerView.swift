@@ -25,7 +25,15 @@ struct RideLivePagerView: View {
    /// Filtered rather than listed, so `RidePage`'s declaration order stays the
    /// single place swipe order is decided.
    private var pages: [RidePage] {
-      RidePage.allCases.filter { $0 != .radar || rideViewModel.isRadarAvailable }
+      RidePage.allCases.filter { !$0.requiresRadar || rideViewModel.isRadarAvailable }
+   }
+
+   private var readouts: RideCockpitMetricReadouts {
+      RideCockpitMetricReadouts(
+         rideViewModel: rideViewModel,
+         rideClimbModel: rideClimbModel,
+         routeGuidanceViewModel: routeGuidanceViewModel
+      )
    }
 
    var body: some View {
@@ -41,9 +49,18 @@ struct RideLivePagerView: View {
          bottomStrip
       }
       .background(Color.clear)
+      .overlay(alignment: .top) {
+         metricPicker
+      }
+      .animation(.smooth(duration: 0.28), value: rideViewModel.metricSwapRequest)
+      .sensoryFeedback(.impact(weight: .medium), trigger: rideViewModel.metricSwapRequest) { _, request in
+         request != nil
+      }
       .onChange(of: rideViewModel.selectedCockpitPage) { _, page in
          if page == .map { isMapPageMounted = true }
          routeGuidanceViewModel.collapseTurnList()
+         // A card held on one page is not a card held on the next.
+         rideViewModel.cancelMetricSwap()
       }
       .onChange(of: pages) { _, available in
          // A radar that appears or disappears mid-ride reorders the deck under
@@ -58,6 +75,34 @@ struct RideLivePagerView: View {
                rideViewModel.selectedCockpitPage == .dashboard
          else { return }
          withAnimation { rideViewModel.selectedCockpitPage = .climb }
+      }
+   }
+
+   // MARK: - Card Picker
+
+   /// Dropped over the deck, not the page: a card can be held on the
+   /// dashboard or the Traffic page, and the picker reads the same either
+   /// way. Over the deck alone, so the page dots stay put and the tab bar
+   /// stays the tab bar.
+   @ViewBuilder
+   private var metricPicker: some View {
+      if let request = rideViewModel.metricSwapRequest {
+         let readouts = readouts
+         let available = readouts.available
+
+         RideCockpitMetricPickerView(
+            request: request,
+            choices: rideViewModel.cockpitLayout.choices(
+               for: request.metric,
+               on: request.surface,
+               available: available
+            ),
+            readouts: readouts,
+            onSelect: { rideViewModel.resolveMetricSwap(with: $0, available: available) },
+            onCancel: { rideViewModel.cancelMetricSwap() }
+         )
+         .transition(.move(edge: .top).combined(with: .opacity))
+         .zIndex(1)
       }
    }
 
@@ -120,6 +165,19 @@ struct RideLivePagerView: View {
                showsDrawerMap: rideViewModel.selectedCockpitPage == .dashboard,
                onExpandMap: { rideViewModel.selectedCockpitPage = .map },
                onShowRadar: onShowRadar,
+               onShowTraffic: { rideViewModel.showCockpitPage(.traffic) },
+               onSwipeForward: { turnPage(by: 1) }
+            )
+
+         case .traffic:
+            RideTrafficPageView(
+               rideViewModel: rideViewModel,
+               rideMapViewModel: rideMapViewModel,
+               routeGuidanceViewModel: routeGuidanceViewModel,
+               showsDrawerMap: rideViewModel.selectedCockpitPage == .traffic,
+               onExpandMap: { rideViewModel.selectedCockpitPage = .map },
+               onShowRadar: onShowRadar,
+               onShowRadarPage: { rideViewModel.showCockpitPage(.radar) },
                onSwipeForward: { turnPage(by: 1) }
             )
 

@@ -18,6 +18,7 @@ struct RideDashboardLandscapeView: View {
    let showsDrawerMap: Bool
    let onExpandMap: () -> Void
    let onShowRadar: () -> Void
+   var onShowTraffic: () -> Void = {}
    var onSwipeForward: () -> Void = {}
 
    @Binding var isDrawerOpen: Bool
@@ -58,6 +59,7 @@ struct RideDashboardLandscapeView: View {
                isDimmed: rideViewModel.isRadarDimmed,
                unitSystem: rideViewModel.unitSystem,
                onCyclePlacement: rideViewModel.cycleRadarPlacement,
+               onTap: onShowTraffic,
                thickness: compactTapeThickness,
                inset: 6
             )

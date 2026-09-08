@@ -16,16 +16,16 @@
 	<dict>
 		<key>UIColorName</key>
 		<dict>
-			<key>UIColorNameType</key>
-			<string>Developer</string>
-			<key>UIRedComponent</key>
-			<string>0.015</string>
-			<key>UIGreenComponent</key>
-			<string>0.016</string>
-			<key>UIBlueComponent</key>
-			<string>0.020</string>
 			<key>UIAlphaComponent</key>
 			<string>1.0</string>
+			<key>UIBlueComponent</key>
+			<string>0.020</string>
+			<key>UIColorNameType</key>
+			<string>Developer</string>
+			<key>UIGreenComponent</key>
+			<string>0.016</string>
+			<key>UIRedComponent</key>
+			<string>0.015</string>
 		</dict>
 	</dict>
 </dict>

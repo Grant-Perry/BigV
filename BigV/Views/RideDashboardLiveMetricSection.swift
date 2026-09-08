@@ -12,12 +12,13 @@ struct RideDashboardLiveMetricSection: View {
 
    var body: some View {
       VStack(spacing: 8) {
-         if let metric = rideViewModel.selectedMetric {
+         if rideViewModel.selectedCockpitPage == .dashboard,
+            let metric = rideViewModel.selectedMetric {
             metricSection(metric)
                .transition(.opacity.combined(with: .move(edge: .top)))
          }
 
-         if rideViewModel.isLiveRadarTimelineVisible {
+         if rideViewModel.showsLiveRadarTimeline {
             RideLiveRadarTimelineStrip(
                report: rideViewModel.liveRadarReport,
                onDismiss: { rideViewModel.clearLiveRadarTimeline() }
@@ -25,8 +26,26 @@ struct RideDashboardLiveMetricSection: View {
             .transition(.opacity.combined(with: .move(edge: .top)))
          }
       }
+      .padding(tapeGutter, tapeGutterInset)
       .animation(.easeInOut(duration: 0.25), value: rideViewModel.selectedMetric)
-      .animation(.easeInOut(duration: 0.25), value: rideViewModel.isLiveRadarTimelineVisible)
+      .animation(.easeInOut(duration: 0.25), value: rideViewModel.showsLiveRadarTimeline)
+      .onChange(of: rideViewModel.radarPassCount) {
+         rideViewModel.refreshLiveRadarTimelineIfNeeded()
+      }
+   }
+
+   /// Keeps the timeline X off the vertical tape so a dismiss is not a tape hit.
+   private var tapeGutter: Edge.Set {
+      switch rideViewModel.radarPlacement {
+         case .leading: .leading
+         case .trailing: .trailing
+         case .top, .bottom: []
+      }
+   }
+
+   private var tapeGutterInset: CGFloat {
+      guard rideViewModel.showsRadarTape, !tapeGutter.isEmpty else { return 0 }
+      return rideViewModel.radarPlacement.cockpitThickness
    }
 
    @ViewBuilder

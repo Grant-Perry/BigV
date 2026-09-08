@@ -6,6 +6,7 @@
 import SwiftUI
 
 /// The marketing lockup face — Outfit ExtraBold, bundled next to this file.
+/// Same cut as bigvelo.com (`font-weight: 800`).
 ///
 /// PostScript name is `Outfit-ExtraBold`. Register the TTF in `UIAppFonts`
 /// or SwiftUI falls back to a system rounded that is not the site.
