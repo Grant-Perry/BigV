@@ -43,6 +43,11 @@ struct RideRadarRoadView: View {
    private var laneInset: CGFloat { isColumn ? 14 : 26 }
    private var cornerRadius: CGFloat { isColumn ? 18 : 24 }
 
+   /// The car a rider is actually reacting to — distance and speed live on it.
+   private var closestTrackID: UInt8? {
+      tracks.min { $0.distanceMeters < $1.distanceMeters }?.id
+   }
+
    var body: some View {
       GeometryReader { proxy in
          let size = proxy.size
@@ -57,7 +62,8 @@ struct RideRadarRoadView: View {
                   track: track,
                   isDimmed: isDimmed,
                   unitSystem: unitSystem,
-                  style: style
+                  style: style,
+                  showsSpeed: track.id == closestTrackID
                )
                .position(vehiclePosition(for: track, in: size))
             }
@@ -216,8 +222,17 @@ struct RideRadarRoadView: View {
          ? "closing fast from behind"
          : "approaching from behind"
 
-      guard let nearest = tracks.map(\.distanceMeters).min() else { return "\(count) \(urgency)" }
-      return "\(count) \(urgency), nearest \(RideFormatters.radarDistance(nearest, system: unitSystem))"
+      guard let nearest = tracks.min(by: { $0.distanceMeters < $1.distanceMeters }) else {
+         return "\(count) \(urgency)"
+      }
+
+      let range = RideFormatters.radarDistance(nearest.distanceMeters, system: unitSystem)
+      guard nearest.closingSpeedMetersPerSecond > 0 else {
+         return "\(count) \(urgency), nearest \(range)"
+      }
+
+      let closing = RideFormatters.speed(nearest.closingSpeedMetersPerSecond, system: unitSystem)
+      return "\(count) \(urgency), nearest \(range), closing \(closing) \(unitSystem.speedUnit)"
    }
 }
 
@@ -250,14 +265,16 @@ private nonisolated struct RideRadarRoadShape: Shape {
 /// One car on the road: a rear-view glyph, tier colour, and — for the high
 /// tier — a halo ring so escalation is a shape change, never colour alone.
 ///
-/// On the page the distance rides beside the car. In the column there is no
-/// room beside it, so the number hangs underneath instead.
+/// On the page the numbers ride beside the car. In the column there is no
+/// room beside it, so they hang underneath instead. Only the closest car
+/// carries speed — the number a rider is reacting to.
 private struct RideRadarVehicleMark: View {
 
    let track: RideRadarTracker.Track
    let isDimmed: Bool
    let unitSystem: RideUnitSystem
    let style: RideRadarRoadView.Style
+   var showsSpeed = false
 
    /// Nearer vehicles draw larger, reinforcing the perspective.
    private var scale: CGFloat {
@@ -299,13 +316,30 @@ private struct RideRadarVehicleMark: View {
    }
 
    private var label: some View {
-      Text(RideFormatters.radarDistance(track.distanceMeters, system: unitSystem))
-         .font(.system(size: style == .column ? 22 : 32, weight: .bold, design: .rounded))
-         .monospacedDigit()
-         .kerning(style == .column ? 0.8 : 1.4)
-         .foregroundStyle(isDimmed ? RideDashboardTheme.ink(0.35) : RideDashboardTheme.ink)
-         .shadow(color: .black.opacity(0.8), radius: 6, y: 1)
-         .fixedSize()
+      VStack(alignment: style == .column ? .center : .leading, spacing: 0) {
+         Text(RideFormatters.radarDistance(track.distanceMeters, system: unitSystem))
+            .font(.system(size: style == .column ? 15 : 18, weight: .bold, design: .rounded))
+            .monospacedDigit()
+            .kerning(0.6)
+
+         if let speedText {
+            Text(speedText)
+               .font(.system(size: style == .column ? 11 : 13, weight: .semibold, design: .rounded))
+               .monospacedDigit()
+               .kerning(0.4)
+         }
+      }
+      .foregroundStyle(isDimmed ? RideDashboardTheme.ink(0.35) : RideDashboardTheme.ink)
+      .shadow(color: .black.opacity(0.8), radius: 6, y: 1)
+      .fixedSize()
+   }
+
+   /// Closing speed of this car, only when it is the nearest and actually
+   /// closing. Falling-back and parked-in-the-draft read as silence.
+   private var speedText: String? {
+      guard showsSpeed, track.closingSpeedMetersPerSecond > 0 else { return nil }
+      let value = RideFormatters.speed(track.closingSpeedMetersPerSecond, system: unitSystem)
+      return "\(value) \(unitSystem.speedUnit)"
    }
 
    private var color: Color {
