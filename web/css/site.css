@@ -138,6 +138,7 @@ button { font: inherit; cursor: pointer; border: 0; background: none; color: inh
 .nav-cta {
   display: inline-flex;
   align-items: center;
+  gap: 7px;
   padding: 9px 16px;
   border-radius: 999px;
   background: var(--ember-grad);
@@ -146,6 +147,18 @@ button { font: inherit; cursor: pointer; border: 0; background: none; color: inh
   font-size: 13.5px;
   white-space: nowrap;
   box-shadow: 0 8px 20px rgba(255, 122, 31, 0.32);
+}
+
+.tf-icon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.28));
+}
+
+.nav-cta .tf-icon {
+  width: 20px;
+  height: 20px;
 }
 
 .nav-cta:hover { filter: brightness(1.06); }
@@ -1517,6 +1530,10 @@ button { font: inherit; cursor: pointer; border: 0; background: none; color: inh
   font-size: 14.5px;
 }
 
+.pricing-cta {
+  margin-top: 28px;
+}
+
 /* MARK: - Closer */
 
 .closer {
@@ -1703,6 +1720,10 @@ h2 sup.tm,
   .hero-stats { grid-template-columns: 1fr 1fr; }
   .shot-rail { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .plan.is-featured { transform: none; }
+}
+
+@media (max-width: 480px) {
+  .nav-cta-full { display: none; }
 }
 
 @media (max-width: 640px) {
