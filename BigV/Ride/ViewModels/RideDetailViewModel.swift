@@ -10,9 +10,10 @@ import SwiftData
 ///
 /// Reads the stored row once and projects it into display-ready reports:
 /// route, headline numbers, elevation and speed profiles, the heart rate
-/// story, the sky it was ridden under and the traffic behind. Heart rate
-/// prefers the ride's own samples and falls back to Apple Health, so rides
-/// recorded before samples carried a pulse still get their chart.
+/// story, the sky it was ridden under, the traffic behind, and a drawable
+/// slice for each lap and climb. Heart rate prefers the ride's own samples
+/// and falls back to Apple Health, so rides recorded before samples carried
+/// a pulse still get their chart.
 @Observable
 @MainActor
 final class RideDetailViewModel {
@@ -32,6 +33,10 @@ final class RideDetailViewModel {
    private(set) var weather: RideDetailWeatherReport?
    private(set) var radar: RideRadarReport?
    private(set) var laps: RideLapsReport?
+
+   /// Drawable slices for each lap and climb, cut at load so scrubbing the
+   /// list never walks samples on the finger's clock.
+   private(set) var splitSegments: [RideSplitSegment] = []
 
    /// Ready after load when the ride has a drawable track. Share from the
    /// detail toolbar — this is the GPX other apps can open, not the JSON backup.
@@ -79,6 +84,11 @@ final class RideDetailViewModel {
       radar = RideChartSeriesBuilder.radarReport(for: ride, system: system)
       heartRate = RideChartSeriesBuilder.heartRateReport(for: ride, samples: samples)
       laps = RideLapsReportBuilder.report(for: ride, system: system)
+      splitSegments = RideSplitSegmentBuilder.segments(
+         laps: ride.laps.sorted { $0.index < $1.index },
+         climbs: ride.climbSplits.sorted { $0.index < $1.index },
+         samples: samples
+      )
       gpxShareURL = Self.writeGPXFile(ride: ride, samples: samples, title: titleText)
       isLoaded = true
 
@@ -101,6 +111,7 @@ final class RideDetailViewModel {
       weather = nil
       radar = nil
       laps = nil
+      splitSegments = []
       gpxShareURL = nil
    }
 

@@ -5,9 +5,9 @@
 
 import SwiftUI
 
-/// The four marks a saved-route map can draw. Shape carries the meaning;
-/// colour only reinforces it, so finish and a fast pass can never be the
-/// same red circle.
+/// Marks a saved-route map can draw. Shape carries the meaning; colour only
+/// reinforces it, so finish and a fast pass can never be the same red circle.
+/// A highlighted split uses a filled disc at its start and a ring at its end.
 struct RideRouteMapMark: View {
 
    enum Kind {
@@ -15,6 +15,8 @@ struct RideRouteMapMark: View {
       case finish
       case vehiclePass
       case fastPass
+      case splitStart
+      case splitEnd
    }
 
    enum Role {
@@ -24,6 +26,7 @@ struct RideRouteMapMark: View {
 
    let kind: Kind
    var role: Role = .map
+   var tint: Color = RideDashboardTheme.ice
 
    var body: some View {
       switch kind {
@@ -31,6 +34,8 @@ struct RideRouteMapMark: View {
          case .finish: finishMark
          case .vehiclePass: vehicleMark
          case .fastPass: fastMark
+         case .splitStart: splitStartMark
+         case .splitEnd: splitEndMark
       }
    }
 
@@ -75,5 +80,27 @@ struct RideRouteMapMark: View {
 
    private var passSize: CGFloat {
       role == .map ? 7 : 6
+   }
+
+   // MARK: - Split
+
+   /// Filled disc — the start of the highlighted lap or climb.
+   private var splitStartMark: some View {
+      Circle()
+         .fill(tint)
+         .stroke(.black.opacity(role == .map ? 0.7 : 0), lineWidth: 1.5)
+         .frame(width: splitSize, height: splitSize)
+   }
+
+   /// Hollow ring — the end, so start and finish stay distinct without colour.
+   private var splitEndMark: some View {
+      Circle()
+         .strokeBorder(tint, lineWidth: role == .map ? 2.5 : 1.5)
+         .background(.black.opacity(role == .map ? 0.55 : 0.4), in: .circle)
+         .frame(width: splitSize, height: splitSize)
+   }
+
+   private var splitSize: CGFloat {
+      role == .map ? 10 : 6
    }
 }

@@ -7,7 +7,8 @@ import MapKit
 import SwiftUI
 
 /// Everything a saved ride draws on a map: the route line, radar pass marks
-/// and the start/finish endpoints.
+/// and the start/finish endpoints. An optional highlight dims the full ride
+/// and lights one lap or climb.
 ///
 /// Shared by the inline detail map and the full-screen map so the two can
 /// never disagree about what a ride looks like.
@@ -15,21 +16,40 @@ struct RideRouteMapLayers: MapContent {
 
    let route: RideRoute
    var radarPasses: [RideRadarPassAnnotation] = []
+   var highlight: RideRouteMapHighlight?
 
    var body: some MapContent {
-      MapPolyline(coordinates: route.coordinates)
-         .stroke(Color.gpBreadcrumb, style: .routeLine)
+      routeLine
 
       ForEach(radarPasses) { pass in
          radarPassDot(for: pass)
       }
 
       if let start = route.startCoordinate {
-         endpoint(at: start, kind: .start, label: "Ride start")
+         endpoint(at: start, kind: .start, tint: .green, label: "Ride start")
       }
 
       if let end = route.endCoordinate {
-         endpoint(at: end, kind: .finish, label: "Ride finish")
+         endpoint(at: end, kind: .finish, tint: .green, label: "Ride finish")
+      }
+
+      if let highlight, highlight.route.isDrawable {
+         splitMarks(for: highlight)
+      }
+   }
+
+   // MARK: - Line
+
+   @MapContentBuilder
+   private var routeLine: some MapContent {
+      if let highlight, highlight.route.isDrawable {
+         MapPolyline(coordinates: route.coordinates)
+            .stroke(Color.gpBreadcrumb.opacity(0.32), style: .dimmedRouteLine)
+         MapPolyline(coordinates: highlight.route.coordinates)
+            .stroke(highlight.tint, style: .highlightRouteLine)
+      } else {
+         MapPolyline(coordinates: route.coordinates)
+            .stroke(Color.gpBreadcrumb, style: .routeLine)
       }
    }
 
@@ -54,11 +74,25 @@ struct RideRouteMapLayers: MapContent {
    private func endpoint(
       at coordinate: CLLocationCoordinate2D,
       kind: RideRouteMapMark.Kind,
+      tint: Color,
       label: String
    ) -> some MapContent {
       Annotation(label, coordinate: coordinate, anchor: .center) {
-         RideRouteMapMark(kind: kind)
+         RideRouteMapMark(kind: kind, tint: tint)
       }
       .annotationTitles(.hidden)
+   }
+
+   // MARK: - Highlighted split
+
+   @MapContentBuilder
+   private func splitMarks(for highlight: RideRouteMapHighlight) -> some MapContent {
+      if let start = highlight.route.startCoordinate {
+         endpoint(at: start, kind: .splitStart, tint: highlight.tint, label: "Split start")
+      }
+
+      if let end = highlight.route.endCoordinate {
+         endpoint(at: end, kind: .splitEnd, tint: highlight.tint, label: "Split end")
+      }
    }
 }

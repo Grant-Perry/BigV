@@ -17,21 +17,23 @@ struct RideRouteDetailView: View {
    let rideID: PersistentIdentifier
 
    @State private var isShowingFullMap = false
+   @State private var highlightedSplit: RideSplitID?
+   @State private var isScrubbingLaps = false
 
    var body: some View {
       ScrollView {
          VStack(spacing: 14) {
-            mapSection
-
-            if let header = rideDetailViewModel.header {
-               RideDetailHeroCard(header: header)
-                  .detailCardEntrance()
-            }
-
-            if let laps = rideDetailViewModel.laps {
-               RideLapsCard(report: laps)
-                  .detailCardEntrance()
-            }
+            RideDetailTrackSection(
+               route: rideDetailViewModel.route,
+               isLoaded: rideDetailViewModel.isLoaded,
+               radarPasses: rideDetailViewModel.radarPasses,
+               header: rideDetailViewModel.header,
+               laps: rideDetailViewModel.laps,
+               highlight: mapHighlight,
+               highlightedSplit: $highlightedSplit,
+               isScrubbing: $isScrubbingLaps,
+               onExpandMap: { isShowingFullMap = true }
+            )
 
             if let elevation = rideDetailViewModel.elevation {
                RideElevationCard(report: elevation)
@@ -63,6 +65,7 @@ struct RideRouteDetailView: View {
          .padding(.bottom, 24)
       }
       .scrollIndicators(.hidden)
+      .scrollDisabled(highlightedSplit != nil || isScrubbingLaps)
       .background {
          RideAtmosphereBackground(scene: .summary)
             .ignoresSafeArea()
@@ -89,70 +92,31 @@ struct RideRouteDetailView: View {
          RideDetailFullMapView(
             route: rideDetailViewModel.route,
             radarPasses: rideDetailViewModel.radarPasses,
-            titleText: rideDetailViewModel.titleText
+            titleText: rideDetailViewModel.titleText,
+            highlight: mapHighlight,
+            laps: rideDetailViewModel.laps,
+            highlightedSplit: $highlightedSplit,
+            isScrubbing: $isScrubbingLaps
          )
       }
-      .task(id: rideID) { await rideDetailViewModel.load(rideID) }
-      .onDisappear { rideDetailViewModel.clear() }
+      .task(id: rideID) {
+         highlightedSplit = nil
+         isScrubbingLaps = false
+         await rideDetailViewModel.load(rideID)
+      }
+      .onDisappear {
+         highlightedSplit = nil
+         rideDetailViewModel.clear()
+      }
    }
 
-   // MARK: - Map
+   // MARK: - Highlight
 
-   /// The inline map is a preview, not a playground: one tap opens the full
-   /// screen where every gesture works, so the scroll never fights a pan.
-   private var mapSection: some View {
-      RideRouteMapView(
-         route: rideDetailViewModel.route,
-         isLoaded: rideDetailViewModel.isLoaded,
-         height: 300,
-         radarPasses: rideDetailViewModel.radarPasses
-      )
-      .overlay {
-         if rideDetailViewModel.route.isDrawable {
-            Color.clear
-               .contentShape(.rect)
-               .onTapGesture { isShowingFullMap = true }
-         }
-      }
-      .overlay(alignment: .topLeading) {
-         if rideDetailViewModel.route.isDrawable {
-            RideRouteMapLegend(radarPasses: rideDetailViewModel.radarPasses)
-               .padding(10)
-               .allowsHitTesting(false)
-         }
-      }
-      .overlay(alignment: .bottomTrailing) {
-         if rideDetailViewModel.route.isDrawable {
-            expandHint
-         }
-      }
-      .accessibilityAddTraits(rideDetailViewModel.route.isDrawable ? .isButton : [])
-      .accessibilityHint("Opens the route at full screen")
-      .accessibilityIdentifier("detail.map")
-   }
-
-   private var expandHint: some View {
-      Image(systemName: "arrow.up.left.and.arrow.down.right")
-         .font(.caption.weight(.bold))
-         .foregroundStyle(RideDashboardTheme.ink)
-         .frame(width: 32, height: 32)
-         .rideGlassChrome(in: .circle)
-         .padding(10)
-         .allowsHitTesting(false)
-   }
-}
-
-// MARK: - Entrance
-
-private extension View {
-
-   /// Cards ease in as they enter the viewport, so scrolling the report feels
-   /// like instruments coming online rather than a list loading.
-   func detailCardEntrance() -> some View {
-      scrollTransition(.animated(.easeOut(duration: 0.25)), axis: .vertical) { content, phase in
-         content
-            .opacity(phase.isIdentity ? 1 : 0.35)
-            .scaleEffect(phase.isIdentity ? 1 : 0.97)
-      }
+   private var mapHighlight: RideRouteMapHighlight? {
+      guard let id = highlightedSplit,
+            let segment = rideDetailViewModel.splitSegments.first(where: { $0.id == id })
+      else { return nil }
+      let built = RideRouteMapHighlight(segment: segment)
+      return built.route.isDrawable ? built : nil
    }
 }

@@ -8,8 +8,9 @@ import SwiftUI
 
 /// A finished route framed by its own bounds, for the summary and saved rides.
 ///
-/// The camera is set once from the route's precomputed region rather than tracking
-/// anything, so this view does no work after it appears.
+/// History and summary pass no camera binding, so the map is set once and
+/// sits still. The detail report binds a camera when a lap is pinned, so the
+/// rider can pinch, pan and rotate around that slice.
 struct RideRouteMapView: View {
 
    let route: RideRoute
@@ -19,6 +20,14 @@ struct RideRouteMapView: View {
    /// Radar passes plotted along the route. Defaults empty so screens without
    /// radar data render the map they always did.
    var radarPasses: [RideRadarPassAnnotation] = []
+
+   /// Dims the full ride and lights one lap or climb.
+   var highlight: RideRouteMapHighlight? = nil
+
+   var interactionModes: MapInteractionModes = [.pan, .zoom]
+
+   /// Live camera for inspect mode. `nil` keeps the original one-shot frame.
+   var cameraPosition: Binding<MapCameraPosition>? = nil
 
    var body: some View {
       Group {
@@ -49,12 +58,25 @@ struct RideRouteMapView: View {
 
    // MARK: - Map
 
+   @ViewBuilder
    private func map(framing region: MKCoordinateRegion) -> some View {
-      Map(initialPosition: .region(region), interactionModes: [.pan, .zoom]) {
-         RideRouteMapLayers(route: route, radarPasses: radarPasses)
+      if let cameraPosition {
+         Map(position: cameraPosition, interactionModes: interactionModes) {
+            RideRouteMapLayers(route: route, radarPasses: radarPasses, highlight: highlight)
+         }
+         .mapStyle(.rideRoute)
+         .accessibilityLabel(mapAccessibilityLabel)
+      } else {
+         Map(initialPosition: .region(region), interactionModes: interactionModes) {
+            RideRouteMapLayers(route: route, radarPasses: radarPasses, highlight: highlight)
+         }
+         .mapStyle(.rideRoute)
+         .accessibilityLabel(mapAccessibilityLabel)
       }
-      .mapStyle(.rideRoute)
-      .accessibilityLabel("Route map")
+   }
+
+   private var mapAccessibilityLabel: String {
+      highlight == nil ? "Route map" : "Route map with a highlighted split"
    }
 
    // MARK: - Empty State
@@ -100,6 +122,8 @@ extension MapStyle {
 extension StrokeStyle {
 
    static let routeLine = StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round)
+   static let dimmedRouteLine = StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round)
+   static let highlightRouteLine = StrokeStyle(lineWidth: 6, lineCap: .round, lineJoin: .round)
 }
 
 // MARK: - Icons

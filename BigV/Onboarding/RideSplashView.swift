@@ -9,8 +9,9 @@ import UIKit
 
 /// Branded splash after the void system launch screen.
 ///
-/// Plays the 5-second trail clip with BigVelo superimposed. A tap skips
-/// immediately. Reduce Motion holds the still plate and the wordmark only.
+/// Plays the trail clip with BigVelo superimposed, then hands off after 2.5
+/// seconds. A tap skips immediately. Reduce Motion holds the still plate and
+/// the wordmark only.
 struct RideSplashView: View {
 
    var onFinished: () -> Void
@@ -21,6 +22,7 @@ struct RideSplashView: View {
    @State private var hasFinished = false
 
    private let stillHoldNanoseconds: UInt64 = 1_800_000_000
+   private static let videoHold: Duration = .seconds(2.5)
 
    var body: some View {
       ZStack {
@@ -115,7 +117,7 @@ struct RideSplashView: View {
          await withTaskGroup(of: Void.self) { group in
             group.addTask { await Self.waitForEnd(of: item) }
             group.addTask {
-               try? await Task.sleep(for: .seconds(6.2))
+               try? await Task.sleep(for: Self.videoHold)
             }
             await group.next()
             group.cancelAll()

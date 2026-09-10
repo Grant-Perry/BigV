@@ -6,44 +6,99 @@
 import MapKit
 import SwiftUI
 
-/// The saved route at full screen: every gesture unlocked, every pass visible.
+/// The saved route at full screen: every gesture unlocked, and the same
+/// Laps & Climbs piano as the report so a pin is not lost on the way in.
 ///
-/// Presented from the ride detail map. Chrome floats on Liquid Glass; the map
-/// itself is the content, so nothing else competes with it.
+/// Presented from the ride detail map. Chrome floats on Liquid Glass; the
+/// laps card docks under the map so pinch and rotate never compete with it.
 struct RideDetailFullMapView: View {
 
    let route: RideRoute
    let radarPasses: [RideRadarPassAnnotation]
    let titleText: String
+   var highlight: RideRouteMapHighlight? = nil
+   var laps: RideLapsReport? = nil
+
+   @Binding private var highlightedSplit: RideSplitID?
+   @Binding private var isScrubbing: Bool
 
    @Environment(\.dismiss) private var dismiss
+   @Environment(\.accessibilityReduceMotion) private var reduceMotion
+   @State private var cameraPosition: MapCameraPosition = .automatic
+
+   init(
+      route: RideRoute,
+      radarPasses: [RideRadarPassAnnotation],
+      titleText: String,
+      highlight: RideRouteMapHighlight? = nil,
+      laps: RideLapsReport? = nil,
+      highlightedSplit: Binding<RideSplitID?> = .constant(nil),
+      isScrubbing: Binding<Bool> = .constant(false)
+   ) {
+      self.route = route
+      self.radarPasses = radarPasses
+      self.titleText = titleText
+      self.highlight = highlight
+      self.laps = laps
+      _highlightedSplit = highlightedSplit
+      _isScrubbing = isScrubbing
+   }
 
    var body: some View {
-      ZStack(alignment: .top) {
-         map
-         chrome
+      VStack(spacing: 0) {
+         mapStage
+         lapsDock
       }
-      .overlay(alignment: .bottomTrailing) {
-         RideRouteMapLegend(radarPasses: radarPasses)
-            .padding(.horizontal, 16)
-            .padding(.bottom, 8)
-            .allowsHitTesting(false)
-      }
+      .background(RideDashboardTheme.void.ignoresSafeArea())
       .preferredColorScheme(.dark)
+      .onAppear(perform: frameCamera)
+      .onChange(of: highlightedSplit) { _, _ in
+         frameCamera()
+      }
    }
 
    // MARK: - Map
 
-   private var map: some View {
-      Map(
-         initialPosition: route.region.map { .region($0) } ?? .automatic,
-         interactionModes: .all
-      ) {
-         RideRouteMapLayers(route: route, radarPasses: radarPasses)
+   private var mapStage: some View {
+      ZStack(alignment: .top) {
+         Map(position: $cameraPosition, interactionModes: .all) {
+            RideRouteMapLayers(route: route, radarPasses: radarPasses, highlight: highlight)
+         }
+         .mapStyle(.rideRoute)
+         .ignoresSafeArea(edges: .top)
+         .accessibilityLabel("Full screen route map")
+         .accessibilityValue(highlightedSplit?.accessibilityName ?? "Full ride")
+
+         chrome
+
+         VStack {
+            Spacer()
+            HStack {
+               Spacer()
+               RideRouteMapLegend(radarPasses: radarPasses)
+                  .padding(.horizontal, 16)
+                  .padding(.bottom, 8)
+                  .allowsHitTesting(false)
+            }
+         }
       }
-      .mapStyle(.rideRoute)
-      .ignoresSafeArea()
-      .accessibilityLabel("Full screen route map")
+   }
+
+   // MARK: - Laps
+
+   @ViewBuilder
+   private var lapsDock: some View {
+      if let laps {
+         RideLapsCard(
+            report: laps,
+            highlightedSplit: $highlightedSplit,
+            isScrubbing: $isScrubbing
+         )
+         .padding(.horizontal, 16)
+         .padding(.top, 10)
+         .padding(.bottom, 12)
+         .accessibilityIdentifier("detail.fullscreen.laps")
+      }
    }
 
    // MARK: - Chrome
@@ -60,19 +115,28 @@ struct RideDetailFullMapView: View {
 
          Spacer()
 
-         Button {
-            dismiss()
-         } label: {
-            Image(systemName: "xmark")
-               .font(.subheadline.weight(.bold))
-               .foregroundStyle(RideDashboardTheme.ink)
-               .frame(width: 38, height: 38)
-         }
-         .rideGlassChrome(in: .circle)
-         .accessibilityLabel("Close map")
+         Button("Close map", systemImage: "xmark", action: { dismiss() })
+            .labelStyle(.iconOnly)
+            .font(.subheadline.weight(.bold))
+            .foregroundStyle(RideDashboardTheme.ink)
+            .frame(width: 38, height: 38)
+            .rideGlassChrome(in: .circle)
       }
       .padding(.horizontal, 16)
       .padding(.top, 8)
+   }
+
+   // MARK: - Camera
+
+   private func frameCamera() {
+      let position = RideRouteMapCamera.position(highlight: highlight, route: route)
+      if reduceMotion {
+         cameraPosition = position
+      } else {
+         withAnimation(.smooth(duration: 0.35)) {
+            cameraPosition = position
+         }
+      }
    }
 }
 
