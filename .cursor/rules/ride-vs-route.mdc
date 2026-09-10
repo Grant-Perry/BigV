@@ -1,0 +1,35 @@
+---
+description: Ride recording stays independent of Ride To navigation. Mid-ride destination changes must not end the workout.
+alwaysApply: true
+---
+
+# Ride vs Ride To
+
+Recording and navigation are separate. Ending a route must never end the ride. Searching a new destination mid-ride must not require hitting END.
+
+## Product
+
+- A ride runs until the rider explicitly END / NEW RIDE.
+- Ride To only owns the planned line and turn-by-turn.
+- `PlannedRouteManager.activate` may replace the destination while recording.
+- Stop Route is `RouteGuidanceManager.endNavigation`. It leaves the session alone.
+
+## Follow Route
+
+Ask at **Follow Route**, not in the search field.
+
+If the session is recording, paused, or acquiring GPS:
+
+- **Add to this ride** (default) — `confirm()` only. Keep clock, GPS, laps, Health. Swap the route.
+- **Start new ride** — `confirm()` first, then `RideViewModel.beginFreshRide()` so a failed plan never files the current ride.
+
+If idle, Follow Route only draws the line. START is still START.
+
+While recording, the confirm button reads **Navigate here**. Search stays available with an active route; Stop Route is on the Ride To tab, the guidance strip, and the map banner.
+
+`RideSessionManager.end()` snapshots `RideState` before the finalize task so `beginFreshRide()` can start the next session on the same turn without committing empty totals.
+
+## Do not
+
+- Start or stop `RideSessionManager` from search, preview, or Stop Route.
+- Discard a ride to change destinations. `RideRetentionPolicy` already drops rides under 50 m — that is for junk, not reroutes.

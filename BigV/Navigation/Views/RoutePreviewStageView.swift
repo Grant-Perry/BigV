@@ -15,9 +15,11 @@ import SwiftUI
 struct RoutePreviewStageView: View {
 
    let routePlannerViewModel: RoutePlannerViewModel
+   let rideViewModel: RideViewModel
    let onConfirm: () -> Void
 
    @State private var favoriteBoomTrigger = 0
+   @State private var isConfirmingFollow = false
 
    var body: some View {
       VStack(spacing: 12) {
@@ -28,6 +30,25 @@ struct RoutePreviewStageView: View {
          actions
       }
       .padding(.bottom, 14)
+      .confirmationDialog(
+         "You're already on a ride",
+         isPresented: $isConfirmingFollow,
+         titleVisibility: .visible
+      ) {
+         Button("Add to this ride") {
+            Task { await follow(startingNewRide: false) }
+         }
+         .accessibilityIdentifier("planner.button.addToRide")
+
+         Button("Start new ride") {
+            Task { await follow(startingNewRide: true) }
+         }
+         .accessibilityIdentifier("planner.button.startNewRide")
+
+         Button("Cancel", role: .cancel) {}
+      } message: {
+         Text("Add this destination to the ride that's recording, or save that ride and start a new one.")
+      }
    }
 
    // MARK: - Map
@@ -147,17 +168,13 @@ struct RoutePreviewStageView: View {
             .accessibilityIdentifier("planner.button.favorite")
 
             Button {
-               Task {
-                  if await routePlannerViewModel.confirm() {
-                     onConfirm()
-                  }
-               }
+               requestFollow()
             } label: {
                if routePlannerViewModel.isPlanningApproach {
                   ProgressView()
                      .tint(.white)
                } else {
-                  Text("Follow Route")
+                  Text(followButtonTitle)
                }
             }
             .buttonStyle(.borderedProminent)
@@ -177,6 +194,30 @@ struct RoutePreviewStageView: View {
       .padding(.horizontal, 16)
    }
 
+   // MARK: - Follow
+
+   private var followButtonTitle: String {
+      rideViewModel.isRideActive ? "Navigate here" : "Follow Route"
+   }
+
+   private func requestFollow() {
+      if rideViewModel.isRideActive {
+         isConfirmingFollow = true
+      } else {
+         Task { await follow(startingNewRide: false) }
+      }
+   }
+
+   /// Activates the chosen line first. Starting a new outing is a second
+   /// step, so a failed plan never files the ride the rider is still on.
+   private func follow(startingNewRide: Bool) async {
+      guard await routePlannerViewModel.confirm() else { return }
+      if startingNewRide {
+         rideViewModel.beginFreshRide()
+      }
+      onConfirm()
+   }
+
    // MARK: - Attribution
 
    /// Open-Meteo's license requires a credit wherever their elevation profile shows.
@@ -189,7 +230,11 @@ struct RoutePreviewStageView: View {
 #Preview {
    ZStack {
       Color.black.ignoresSafeArea()
-      RoutePreviewStageView(routePlannerViewModel: RoutePlannerViewModel()) {}
+      RoutePreviewStageView(
+         routePlannerViewModel: RoutePlannerViewModel(),
+         rideViewModel: RideViewModel(),
+         onConfirm: {}
+      )
    }
    .preferredColorScheme(.dark)
 }

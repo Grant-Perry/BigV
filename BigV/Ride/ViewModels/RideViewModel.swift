@@ -136,6 +136,10 @@ final class RideViewModel {
    var isAcquiringGPS: Bool { state.phase == .acquiringGPS }
    var isFinished: Bool { state.phase == .finished }
    var isIdle: Bool { state.phase == .idle }
+
+   /// START has been pressed and the session is still live. Navigation can
+   /// come and go without this flipping.
+   var isRideActive: Bool { phase.isActive }
    var hasGPSFix: Bool { state.hasGPSFix }
    var isMoving: Bool { state.isMoving }
 
@@ -358,6 +362,19 @@ final class RideViewModel {
       selectedCockpitPage = .dashboard
       rideSessionManager.reset()
       rideSessionManager.start()
+   }
+
+   /// Files the ride that is recording, then opens a fresh session.
+   ///
+   /// Used when Follow Route is a new outing. Will not end a live ride if
+   /// START is locked.
+   func beginFreshRide() {
+      presentAccessPaywallIfLocked()
+      guard canBeginRide else { return }
+      if isRideActive {
+         end()
+      }
+      startNewRide()
    }
 
    func flushPendingWork() { rideSessionManager.flushPendingWork() }

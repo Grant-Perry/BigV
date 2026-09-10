@@ -256,8 +256,12 @@ final class RideSessionManager {
          "Ride ended: \(state.distance) m in \(state.elapsedTime) s, \(telemetryEngine.acceptedSampleCount) samples accepted, \(telemetryEngine.rejectedSampleCount) rejected"
       )
 
+      // Snapshot now: Follow Route can start the next ride on this same turn,
+      // and commit must file the ride that just ended, not the empty one
+      // `start()` is about to publish.
+      let finishedState = state
       finalizeTask = Task { [weak self] in
-         await self?.finalizeRide()
+         await self?.finalizeRide(snapshot: finishedState)
       }
    }
 
@@ -516,11 +520,17 @@ final class RideSessionManager {
 
    // MARK: - Finalization
 
-   private func finalizeRide() async {
-      guard let commit = rideFinalizer.commit(state) else { return }
+   private func finalizeRide(snapshot: RideState) async {
+      guard let commit = rideFinalizer.commit(snapshot) else { return }
 
-      state.hasStorageFailure = commit.hasStorageFailure
-      finishedRideID = commit.ride?.persistentModelID
+      // Follow Route can start the next ride before this task runs. Commit
+      // and Health still belong to `snapshot`; live `state` is the new outing.
+      let stillShowingSummary = state.phase == .finished
+
+      if stillShowingSummary {
+         state.hasStorageFailure = commit.hasStorageFailure
+         finishedRideID = commit.ride?.persistentModelID
+      }
 
       if let committedRide = commit.ride {
          stampEndWeather(on: committedRide)
@@ -528,12 +538,14 @@ final class RideSessionManager {
 
       guard let finishedRide = commit.ride, rideFinalizer.exportsToHealth else { return }
 
-      state.healthKitExport = .exporting
-      let export = await rideFinalizer.export(finishedRide)
-      state.hasStorageFailure = export.hasStorageFailure
+      if stillShowingSummary {
+         state.healthKitExport = .exporting
+      }
 
-      // The rider may already have started over; never stamp a new ride's state.
+      let export = await rideFinalizer.export(finishedRide)
+
       guard state.phase == .finished else { return }
+      state.hasStorageFailure = export.hasStorageFailure
       state.healthKitExport = export.status
    }
 

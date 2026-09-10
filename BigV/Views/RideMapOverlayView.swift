@@ -111,7 +111,8 @@ struct RideMapOverlayView: View {
                .contentShape(.circle)
          }
          .buttonStyle(.plain)
-         .accessibilityLabel("Clear planned route")
+         .accessibilityLabel("Stop Route")
+         .accessibilityHint("Clears the route. The ride keeps recording.")
          .accessibilityIdentifier("map.button.clearRoute")
       }
       .padding(.leading, 12)

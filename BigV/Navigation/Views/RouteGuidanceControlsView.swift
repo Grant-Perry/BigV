@@ -28,7 +28,7 @@ struct RouteGuidanceControlsView: View {
             .tint(.green)
             .accessibilityIdentifier("guidance.button.done")
       } else {
-         HStack(spacing: 2) {
+         HStack(spacing: 6) {
             circleButton(
                icon: routeGuidanceViewModel.isVoiceEnabled ? .voiceOnIcon : .voiceOffIcon,
                tint: routeGuidanceViewModel.isVoiceEnabled ? RideDashboardTheme.ink(0.85) : RideDashboardTheme.ink(0.35),
@@ -38,14 +38,14 @@ struct RouteGuidanceControlsView: View {
                action: routeGuidanceViewModel.toggleVoice
             )
 
-            circleButton(
-               icon: .endNavigationIcon,
-               tint: RideDashboardTheme.ink(0.55),
-               label: "End navigation",
-               hint: "Clears the route and stops turn calls. The ride keeps recording.",
-               identifier: "guidance.button.stop",
-               action: routeGuidanceViewModel.endNavigation
-            )
+            Button(diameter >= 38 ? "Stop Route" : "Stop", action: routeGuidanceViewModel.endNavigation)
+               .font(.caption.weight(.bold))
+               .buttonStyle(.bordered)
+               .tint(RideDashboardTheme.ink(0.7))
+               .controlSize(diameter >= 38 ? .regular : .mini)
+               .accessibilityLabel("Stop Route")
+               .accessibilityHint("Clears the route and stops turn calls. The ride keeps recording.")
+               .accessibilityIdentifier("guidance.button.stop")
          }
       }
    }
@@ -79,7 +79,6 @@ struct RouteGuidanceControlsView: View {
 private extension String {
    static let voiceOnIcon = "speaker.wave.2.fill"
    static let voiceOffIcon = "speaker.slash.fill"
-   static let endNavigationIcon = "xmark"
 }
 
 #Preview {

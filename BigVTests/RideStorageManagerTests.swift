@@ -210,6 +210,29 @@ struct RideStorageManagerTests {
       #expect(try context.fetch(FetchDescriptor<RideSample>()).count == 8)
    }
 
+   @Test func beginningANewRideAfterFinalizeKeepsThePreviousRide() throws {
+      let (storage, context) = try makeStorage()
+      let firstStart = Date(timeIntervalSince1970: 1_000_000)
+
+      storage.beginRide(startDate: firstStart)
+      for index in 0..<8 {
+         storage.append(draft(index: index, reference: firstStart), totals: RideState())
+      }
+
+      var firstState = populatedState(
+         startDate: firstStart,
+         endDate: firstStart.addingTimeInterval(90)
+      )
+      firstState.distance = RideRetentionPolicy.minimumMeaningfulDistance
+      #expect(storage.finalizeRide(with: firstState) != nil)
+
+      let secondStart = firstStart.addingTimeInterval(120)
+      storage.beginRide(startDate: secondStart)
+      storage.append(draft(index: 0, reference: secondStart), totals: RideState())
+
+      #expect(try context.fetch(FetchDescriptor<Ride>()).count == 2)
+   }
+
    @Test func discardingTheActiveRideRemovesItAndItsSamples() throws {
       let (storage, context) = try makeStorage()
       let reference = Date(timeIntervalSince1970: 1_000_000)

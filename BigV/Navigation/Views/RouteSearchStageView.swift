@@ -14,6 +14,8 @@ import UniformTypeIdentifiers
 struct RouteSearchStageView: View {
 
    @Bindable var routePlannerViewModel: RoutePlannerViewModel
+   let rideViewModel: RideViewModel
+   let onStopRoute: () -> Void
 
    @FocusState private var isFieldFocused: Bool
    @State private var isShowingGPXImporter = false
@@ -50,6 +52,15 @@ struct RouteSearchStageView: View {
    @ViewBuilder
    private var resultsColumn: some View {
       VStack(spacing: 12) {
+         if routePlannerViewModel.hasActiveRoute,
+            let destinationName = routePlannerViewModel.activeDestinationName {
+            ActiveRouteBannerView(
+               destinationName: destinationName,
+               isRideActive: rideViewModel.isRideActive,
+               onStopRoute: onStopRoute
+            )
+         }
+
          if routePlannerViewModel.hasFavorites {
             favoritesSection
          }
@@ -363,7 +374,11 @@ private extension String {
 #Preview {
    ZStack {
       Color.black.ignoresSafeArea()
-      RouteSearchStageView(routePlannerViewModel: RoutePlannerViewModel())
+      RouteSearchStageView(
+         routePlannerViewModel: RoutePlannerViewModel(),
+         rideViewModel: RideViewModel(),
+         onStopRoute: {}
+      )
    }
    .preferredColorScheme(.dark)
 }

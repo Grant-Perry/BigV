@@ -78,9 +78,12 @@ struct RideRootView: View {
          }
 
          Tab(RideTab.route.title, systemImage: RideTab.route.symbolName, value: .route) {
-            RoutePlannerView(routePlannerViewModel: routePlannerViewModel) {
-               selectedTab = .dashboard
-            }
+            RoutePlannerView(
+               routePlannerViewModel: routePlannerViewModel,
+               rideViewModel: rideViewModel,
+               onFollowRoute: { selectedTab = .dashboard },
+               onStopRoute: { routeGuidanceViewModel.endNavigation() }
+            )
          }
 
          Tab(RideTab.settings.title, systemImage: RideTab.settings.symbolName, value: .settings) {

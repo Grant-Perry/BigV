@@ -13,9 +13,13 @@ import SwiftUI
 struct RoutePlannerView: View {
 
    let routePlannerViewModel: RoutePlannerViewModel
+   let rideViewModel: RideViewModel
 
    /// Called once a route is being followed, so the tab bar can move on.
    let onFollowRoute: () -> Void
+
+   /// Drops the line and the turn calls. Never ends the ride.
+   let onStopRoute: () -> Void
 
    var body: some View {
       NavigationStack {
@@ -32,10 +36,15 @@ struct RoutePlannerView: View {
             .toolbar {
                ToolbarItem(placement: .topBarTrailing) {
                   if routePlannerViewModel.hasActiveRoute {
-                     Button("Clear Route", role: .destructive) {
-                        routePlannerViewModel.clearActiveRoute()
+                     Button("Stop Route") {
+                        onStopRoute()
                      }
-                     .accessibilityIdentifier("planner.button.clearRoute")
+                     .accessibilityHint(
+                        rideViewModel.isRideActive
+                           ? "Clears the route and stops turn calls. The ride keeps recording."
+                           : "Clears the planned route."
+                     )
+                     .accessibilityIdentifier("planner.button.stopRoute")
                   }
                }
             }
@@ -50,13 +59,21 @@ struct RoutePlannerView: View {
    private var stage: some View {
       switch routePlannerViewModel.stage {
          case .search:
-            RouteSearchStageView(routePlannerViewModel: routePlannerViewModel)
+            RouteSearchStageView(
+               routePlannerViewModel: routePlannerViewModel,
+               rideViewModel: rideViewModel,
+               onStopRoute: onStopRoute
+            )
 
          case .planning:
             planning
 
          case .preview:
-            RoutePreviewStageView(routePlannerViewModel: routePlannerViewModel, onConfirm: onFollowRoute)
+            RoutePreviewStageView(
+               routePlannerViewModel: routePlannerViewModel,
+               rideViewModel: rideViewModel,
+               onConfirm: onFollowRoute
+            )
       }
    }
 
@@ -84,6 +101,11 @@ struct RoutePlannerView: View {
 }
 
 #Preview {
-   RoutePlannerView(routePlannerViewModel: RoutePlannerViewModel(), onFollowRoute: {})
-      .preferredColorScheme(.dark)
+   RoutePlannerView(
+      routePlannerViewModel: RoutePlannerViewModel(),
+      rideViewModel: RideViewModel(),
+      onFollowRoute: {},
+      onStopRoute: {}
+   )
+   .preferredColorScheme(.dark)
 }
