@@ -16,7 +16,7 @@ struct RideDetailFullMapView: View {
    let route: RideRoute
    let radarPasses: [RideRadarPassAnnotation]
    let titleText: String
-   var highlight: RideRouteMapHighlight? = nil
+   var splitSegments: [RideSplitSegment] = []
    var laps: RideLapsReport? = nil
 
    @Binding private var highlightedSplit: RideSplitID?
@@ -30,7 +30,7 @@ struct RideDetailFullMapView: View {
       route: RideRoute,
       radarPasses: [RideRadarPassAnnotation],
       titleText: String,
-      highlight: RideRouteMapHighlight? = nil,
+      splitSegments: [RideSplitSegment] = [],
       laps: RideLapsReport? = nil,
       highlightedSplit: Binding<RideSplitID?> = .constant(nil),
       isScrubbing: Binding<Bool> = .constant(false)
@@ -38,7 +38,7 @@ struct RideDetailFullMapView: View {
       self.route = route
       self.radarPasses = radarPasses
       self.titleText = titleText
-      self.highlight = highlight
+      self.splitSegments = splitSegments
       self.laps = laps
       _highlightedSplit = highlightedSplit
       _isScrubbing = isScrubbing
@@ -124,6 +124,17 @@ struct RideDetailFullMapView: View {
       }
       .padding(.horizontal, 16)
       .padding(.top, 8)
+   }
+
+   // MARK: - Highlight
+
+   /// Resolved here, from the pinned split, rather than handed in: the laps
+   /// dock changes the split through the binding, and this view can update
+   /// on that binding before its parent has rebuilt the cover with a fresh
+   /// highlight. Deriving it locally keeps the lit slice and the camera in
+   /// step with whichever lap was just tapped.
+   private var highlight: RideRouteMapHighlight? {
+      RideRouteMapHighlight.highlight(for: highlightedSplit, in: splitSegments)
    }
 
    // MARK: - Camera

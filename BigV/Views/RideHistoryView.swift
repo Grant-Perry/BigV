@@ -3,25 +3,33 @@
 //  BigV
 //
 
+import MapKit
 import SwiftData
 import SwiftUI
 
-/// The Rides tab: latest ride as a cinematic card, then the rest.
+/// The Rides tab: one map stage that stays put, and every ride in one list
+/// beneath it.
+///
+/// A tap on a row puts that ride on the stage — its route, its date, its
+/// numbers. Tapping the stage, the row's chevron, or the selected row again
+/// opens the full report. No ride is "latest" or "earlier" here; the newest
+/// simply starts on the stage.
 struct RideHistoryView: View {
 
    let rideHistoryViewModel: RideHistoryViewModel
    let rideRouteViewModel: RideRouteViewModel
    let rideDetailViewModel: RideDetailViewModel
 
+   @State private var path = NavigationPath()
    @State private var pendingDeletion: [RideHistoryViewModel.Row] = []
 
    var body: some View {
-      NavigationStack {
+      NavigationStack(path: $path) {
          Group {
             if rideHistoryViewModel.isEmpty {
                RideHistoryEmptyState()
             } else {
-               rideList
+               logbook
             }
          }
          .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -34,62 +42,39 @@ struct RideHistoryView: View {
          }
          .rideAppFooter()
          .navigationTitle("Rides")
-         .navigationBarTitleDisplayMode(.large)
+         .navigationBarTitleDisplayMode(.inline)
          .navigationDestination(for: PersistentIdentifier.self) { rideID in
             RideRouteDetailView(rideDetailViewModel: rideDetailViewModel, rideID: rideID)
-               .onDisappear { loadHeroRoute() }
+               .onDisappear { loadStageRoute() }
          }
       }
       .onAppear {
          rideHistoryViewModel.load()
-         loadHeroRoute()
+         loadStageRoute()
       }
    }
 
-   // MARK: - List
+   // MARK: - Logbook
 
-   private var rideList: some View {
-      ScrollView {
-         LazyVStack(spacing: 12) {
-            if let summary = rideHistoryViewModel.summary {
-               RideHistorySummaryStrip(summary: summary)
-            }
-
-            if let latest = rideHistoryViewModel.latestRow {
-               NavigationLink(value: latest.id) {
-                  RideHistoryHeroCard(
-                     row: latest,
-                     distanceUnit: rideHistoryViewModel.distanceUnit,
-                     route: rideRouteViewModel.route,
-                     isRouteLoaded: rideRouteViewModel.isLoaded
-                  )
-               }
-               .buttonStyle(.plain)
-               .contextMenu { deleteButton(for: latest) }
-            }
-
-            if !rideHistoryViewModel.olderRows.isEmpty {
-               Text("EARLIER")
-                  .font(.caption2.weight(.bold))
-                  .kerning(1.4)
-                  .foregroundStyle(RideDashboardTheme.ink(0.4))
-                  .frame(maxWidth: .infinity, alignment: .leading)
-                  .padding(.top, 8)
-                  .padding(.leading, 4)
-            }
-
-            ForEach(rideHistoryViewModel.olderRows) { row in
-               NavigationLink(value: row.id) {
-                  RideHistoryRideCard(row: row, distanceUnit: rideHistoryViewModel.distanceUnit)
-               }
-               .buttonStyle(.plain)
-               .contextMenu { deleteButton(for: row) }
-            }
+   private var logbook: some View {
+      VStack(spacing: 0) {
+         if let selected = rideHistoryViewModel.selectedRow {
+            RideHistoryStage(
+               row: selected,
+               ordinal: rideHistoryViewModel.selectedOrdinal ?? 1,
+               rideCount: rideHistoryViewModel.rows.count,
+               distanceUnit: rideHistoryViewModel.distanceUnit,
+               route: rideRouteViewModel.route,
+               isRouteLoaded: rideRouteViewModel.isLoaded,
+               onOpen: { open(selected.id) }
+            )
+            .padding(.horizontal, 16)
+            .padding(.top, 6)
+            .contextMenu { deleteButton(for: selected) }
          }
-         .padding(.horizontal, 16)
-         .padding(.bottom, 24)
+
+         rideList
       }
-      .scrollIndicators(.hidden)
       .confirmationDialog(
          deletionTitle,
          isPresented: isConfirmingDeletion,
@@ -98,7 +83,7 @@ struct RideHistoryView: View {
          Button(deletionConfirmLabel, role: .destructive) {
             rideHistoryViewModel.delete(ids: Set(pendingDeletion.map(\.id)))
             pendingDeletion = []
-            loadHeroRoute()
+            loadStageRoute()
          }
 
          Button("Keep", role: .cancel) {
@@ -109,10 +94,61 @@ struct RideHistoryView: View {
       }
    }
 
-   // MARK: - Hero Route
+   // MARK: - List
 
-   private func loadHeroRoute() {
-      rideRouteViewModel.load(rideHistoryViewModel.latestRow?.id)
+   private var rideList: some View {
+      ScrollView {
+         LazyVStack(spacing: 8) {
+            if let summary = rideHistoryViewModel.summary {
+               RideHistoryListHeader(summary: summary)
+                  .padding(.top, 14)
+                  .padding(.bottom, 2)
+            }
+
+            ForEach(rideHistoryViewModel.rows) { row in
+               let isSelected = rideHistoryViewModel.isSelected(row)
+
+               RideHistoryRideCard(
+                  row: row,
+                  distanceUnit: rideHistoryViewModel.distanceUnit,
+                  isSelected: isSelected,
+                  onSelect: {
+                     if isSelected {
+                        open(row.id)
+                     } else {
+                        select(row.id)
+                     }
+                  },
+                  onOpen: { open(row.id) }
+               )
+               .contextMenu { deleteButton(for: row) }
+            }
+         }
+         .padding(.horizontal, 16)
+         .padding(.bottom, 24)
+      }
+      .scrollIndicators(.hidden)
+   }
+
+   // MARK: - Selection
+
+   /// Selection and route move in one transaction so the stage's headline
+   /// and map change together rather than a frame apart.
+   private func select(_ id: PersistentIdentifier) {
+      withAnimation(.smooth(duration: 0.28)) {
+         rideHistoryViewModel.select(id)
+         loadStageRoute()
+      }
+   }
+
+   private func open(_ id: PersistentIdentifier) {
+      path.append(id)
+   }
+
+   // MARK: - Stage Route
+
+   private func loadStageRoute() {
+      rideRouteViewModel.load(rideHistoryViewModel.selectedRow?.id)
    }
 
    // MARK: - Deletion

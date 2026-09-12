@@ -47,11 +47,26 @@ final class RideHistoryViewModel {
    private(set) var rows: [Row] = []
    private(set) var summary: Summary?
 
+   /// The ride the page's map and headline are showing. Newest by default;
+   /// a tap on any row moves it, and a deletion falls back to the newest.
+   private(set) var selectedID: PersistentIdentifier?
+
    var isEmpty: Bool { rows.isEmpty }
 
    var latestRow: Row? { rows.first }
 
-   var olderRows: [Row] { Array(rows.dropFirst()) }
+   var selectedRow: Row? {
+      rows.first { $0.id == selectedID } ?? latestRow
+   }
+
+   /// One-based place of the selected ride, newest first, for the headline.
+   var selectedOrdinal: Int? {
+      rows.firstIndex { $0.id == selectedRow?.id }.map { $0 + 1 }
+   }
+
+   func isSelected(_ row: Row) -> Bool {
+      selectedRow?.id == row.id
+   }
 
    var distanceUnit: String { RideUnitSystem.current.distanceUnit }
 
@@ -75,6 +90,17 @@ final class RideHistoryViewModel {
       rides = rideStorageManager.savedRides()
       rows = rides.map(Self.row)
       summary = Self.summary(of: rides)
+
+      // Keep the rider's pick across reloads; a deleted or missing pick lands
+      // on the newest ride so the stage is never empty while rows exist.
+      if !rows.contains(where: { $0.id == selectedID }) {
+         selectedID = rows.first?.id
+      }
+   }
+
+   func select(_ id: PersistentIdentifier) {
+      guard rows.contains(where: { $0.id == id }) else { return }
+      selectedID = id
    }
 
    /// Rows the rider swiped, awaiting explicit confirmation.

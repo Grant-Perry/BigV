@@ -104,19 +104,23 @@ nonisolated final class RideDashboardUITests: XCTestCase {
       // Into history, onto the newest ride.
       app.tabBars.buttons["Rides"].tap()
 
-      let heroCard = app.scrollViews.buttons.firstMatch
-      XCTAssertTrue(heroCard.waitForExistence(timeout: 10), "No ride card appeared in history.")
+      let openReport = app.buttons["history.button.openReport"]
+      XCTAssertTrue(openReport.waitForExistence(timeout: 10), "No ride stage appeared in history.")
 
-      // The landing page has to explain itself: an all-time summary, the
-      // hero's explicit report invitation, and a legend naming the map's dots.
-      XCTAssertTrue(app.staticTexts["LATEST RIDE"].exists, "Hero card label missing.")
+      // The landing page has to explain itself: the newest ride on the stage,
+      // its explicit report invitation, and the ride listed beneath it.
+      XCTAssertTrue(app.staticTexts["LATEST RIDE"].exists, "Stage label missing.")
       XCTAssertTrue(
          app.staticTexts["VIEW FULL REPORT"].exists,
-         "Hero card lost its report call to action."
+         "Stage lost its report call to action."
+      )
+      XCTAssertTrue(
+         app.descendants(matching: .any)["history.row.selected"].firstMatch.exists,
+         "The newest ride is not marked as selected in the list."
       )
       attachScreenshot(of: app, named: "Rides landing page")
 
-      heroCard.tap()
+      openReport.tap()
 
       // The report sections built from stored samples must all be present.
       XCTAssertTrue(

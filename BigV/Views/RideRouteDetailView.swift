@@ -29,7 +29,7 @@ struct RideRouteDetailView: View {
                radarPasses: rideDetailViewModel.radarPasses,
                header: rideDetailViewModel.header,
                laps: rideDetailViewModel.laps,
-               highlight: mapHighlight,
+               splitSegments: rideDetailViewModel.splitSegments,
                highlightedSplit: $highlightedSplit,
                isScrubbing: $isScrubbingLaps,
                onExpandMap: { isShowingFullMap = true }
@@ -93,7 +93,7 @@ struct RideRouteDetailView: View {
             route: rideDetailViewModel.route,
             radarPasses: rideDetailViewModel.radarPasses,
             titleText: rideDetailViewModel.titleText,
-            highlight: mapHighlight,
+            splitSegments: rideDetailViewModel.splitSegments,
             laps: rideDetailViewModel.laps,
             highlightedSplit: $highlightedSplit,
             isScrubbing: $isScrubbingLaps
@@ -108,15 +108,5 @@ struct RideRouteDetailView: View {
          highlightedSplit = nil
          rideDetailViewModel.clear()
       }
-   }
-
-   // MARK: - Highlight
-
-   private var mapHighlight: RideRouteMapHighlight? {
-      guard let id = highlightedSplit,
-            let segment = rideDetailViewModel.splitSegments.first(where: { $0.id == id })
-      else { return nil }
-      let built = RideRouteMapHighlight(segment: segment)
-      return built.route.isDrawable ? built : nil
    }
 }

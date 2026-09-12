@@ -19,7 +19,7 @@ struct RideDetailTrackSection: View {
    let radarPasses: [RideRadarPassAnnotation]
    let header: RideDetailHeader?
    let laps: RideLapsReport?
-   let highlight: RideRouteMapHighlight?
+   let splitSegments: [RideSplitSegment]
 
    @Binding var highlightedSplit: RideSplitID?
    @Binding var isScrubbing: Bool
@@ -142,6 +142,12 @@ struct RideDetailTrackSection: View {
    /// hero to collapse — the camera still has to be free.
    private var isInspecting: Bool {
       highlightedSplit != nil
+   }
+
+   /// Resolved from the pinned split in the same pass that reads it, so the
+   /// camera never frames a slice one tap behind the list.
+   private var highlight: RideRouteMapHighlight? {
+      RideRouteMapHighlight.highlight(for: highlightedSplit, in: splitSegments)
    }
 
    private var trailingHeroSpacing: CGFloat {
