@@ -29,6 +29,10 @@ struct RideRouteMapView: View {
    /// Live camera for inspect mode. `nil` keeps the original one-shot frame.
    var cameraPosition: Binding<MapCameraPosition>? = nil
 
+   /// Rounded corners and a hairline. Off for a map that bleeds into its own
+   /// stage and clips itself.
+   var isFramed: Bool = true
+
    var body: some View {
       Group {
          if let region = route.region, route.isDrawable {
@@ -38,21 +42,23 @@ struct RideRouteMapView: View {
          }
       }
       .frame(height: height)
-      .clipShape(.rect(cornerRadius: 16, style: .continuous))
+      .clipShape(.rect(cornerRadius: isFramed ? 16 : 0, style: .continuous))
       .overlay {
-         RoundedRectangle(cornerRadius: 16, style: .continuous)
-            .strokeBorder(
-               LinearGradient(
-                  colors: [
-                     RideDashboardTheme.ink(0.24),
-                     RideDashboardTheme.ice.opacity(0.14),
-                     RideDashboardTheme.ink(0.04)
-                  ],
-                  startPoint: .topLeading,
-                  endPoint: .bottomTrailing
-               ),
-               lineWidth: 1
-            )
+         if isFramed {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+               .strokeBorder(
+                  LinearGradient(
+                     colors: [
+                        RideDashboardTheme.ink(0.24),
+                        RideDashboardTheme.ice.opacity(0.14),
+                        RideDashboardTheme.ink(0.04)
+                     ],
+                     startPoint: .topLeading,
+                     endPoint: .bottomTrailing
+                  ),
+                  lineWidth: 1
+               )
+         }
       }
    }
 

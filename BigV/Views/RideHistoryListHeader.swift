@@ -35,7 +35,6 @@ struct RideHistoryListHeader: View {
          .font(.caption.weight(.semibold))
          .monospacedDigit()
       }
-      .padding(.horizontal, 4)
       .accessibilityElement(children: .combine)
       .accessibilityLabel(
          "\(summary.ridesText) rides, \(summary.distanceText) \(summary.distanceUnit) all time, \(summary.timeText) riding"

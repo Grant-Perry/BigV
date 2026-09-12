@@ -68,13 +68,12 @@ struct RideHistoryView: View {
                isRouteLoaded: rideRouteViewModel.isLoaded,
                onOpen: { open(selected.id) }
             )
-            .padding(.horizontal, 16)
-            .padding(.top, 6)
             .contextMenu { deleteButton(for: selected) }
          }
 
          rideList
       }
+      .sensoryFeedback(.selection, trigger: rideHistoryViewModel.selectedID)
       .confirmationDialog(
          deletionTitle,
          isPresented: isConfirmingDeletion,
@@ -96,20 +95,31 @@ struct RideHistoryView: View {
 
    // MARK: - List
 
+   /// One quiet container of hairline rows: an index, so it never competes
+   /// with the stage for the title of "the ride".
    private var rideList: some View {
       ScrollView {
-         LazyVStack(spacing: 8) {
+         LazyVStack(spacing: 0) {
             if let summary = rideHistoryViewModel.summary {
                RideHistoryListHeader(summary: summary)
-                  .padding(.top, 14)
-                  .padding(.bottom, 2)
+                  .padding(.horizontal, 12)
+                  .padding(.top, 12)
+                  .padding(.bottom, 6)
             }
 
-            ForEach(rideHistoryViewModel.rows) { row in
+            ForEach(Array(rideHistoryViewModel.rows.enumerated()), id: \.element.id) { index, row in
                let isSelected = rideHistoryViewModel.isSelected(row)
+
+               if index > 0 {
+                  Rectangle()
+                     .fill(RideDashboardTheme.ink(0.07))
+                     .frame(height: 1)
+                     .padding(.leading, 52)
+               }
 
                RideHistoryRideCard(
                   row: row,
+                  ordinal: index + 1,
                   distanceUnit: rideHistoryViewModel.distanceUnit,
                   isSelected: isSelected,
                   onSelect: {
@@ -121,10 +131,14 @@ struct RideHistoryView: View {
                   },
                   onOpen: { open(row.id) }
                )
+               .padding(.horizontal, 4)
                .contextMenu { deleteButton(for: row) }
             }
          }
+         .padding(.bottom, 6)
+         .rideGlassCard(density: .hud, cornerRadius: 20)
          .padding(.horizontal, 16)
+         .padding(.top, 12)
          .padding(.bottom, 24)
       }
       .scrollIndicators(.hidden)

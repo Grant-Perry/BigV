@@ -111,7 +111,7 @@ nonisolated final class RideDashboardUITests: XCTestCase {
       // its explicit report invitation, and the ride listed beneath it.
       XCTAssertTrue(app.staticTexts["LATEST RIDE"].exists, "Stage label missing.")
       XCTAssertTrue(
-         app.staticTexts["VIEW FULL REPORT"].exists,
+         app.staticTexts["FULL REPORT"].exists,
          "Stage lost its report call to action."
       )
       XCTAssertTrue(

@@ -15,7 +15,15 @@ final class RideHistoryViewModel {
 
    struct Row: Identifiable, Sendable, Equatable {
       let id: PersistentIdentifier
+
+      /// Full date, for the delete dialog and anywhere there is room.
       let dateText: String
+
+      /// "Sep 5 · 12:30 PM": one line in the list, year only when it differs.
+      let listDateText: String
+
+      /// "Saturday, Sep 5 · 12:30 PM": the stage headline.
+      let headlineDateText: String
       let distanceText: String
       let durationText: String
       let averageSpeedText: String
@@ -130,6 +138,8 @@ final class RideHistoryViewModel {
       return Row(
          id: ride.persistentModelID,
          dateText: ride.startDate.formatted(date: .abbreviated, time: .shortened),
+         listDateText: listDate(ride.startDate),
+         headlineDateText: headlineDate(ride.startDate),
          distanceText: RideFormatters.distance(ride.distance, system: system),
          durationText: RideFormatters.duration(ride.duration),
          averageSpeedText: RideFormatters.speed(ride.averageSpeed, system: system),
@@ -143,6 +153,26 @@ final class RideHistoryViewModel {
             RideFormatters.temperatureDegrees($0)
          }
       )
+   }
+
+   /// Rides from this year drop the year: "Sep 5 · 12:30 PM". Older ones keep
+   /// it so a ride from last season is never mistaken for one last week.
+   private static func listDate(_ date: Date) -> String {
+      let day = isThisYear(date)
+         ? date.formatted(.dateTime.month(.abbreviated).day())
+         : date.formatted(.dateTime.month(.abbreviated).day().year())
+      return "\(day) · \(date.formatted(date: .omitted, time: .shortened))"
+   }
+
+   private static func headlineDate(_ date: Date) -> String {
+      let day = isThisYear(date)
+         ? date.formatted(.dateTime.weekday(.wide).month(.abbreviated).day())
+         : date.formatted(.dateTime.weekday(.wide).month(.abbreviated).day().year())
+      return "\(day) · \(date.formatted(date: .omitted, time: .shortened))"
+   }
+
+   private static func isThisYear(_ date: Date) -> Bool {
+      Calendar.current.isDate(date, equalTo: .now, toGranularity: .year)
    }
 
    private static func summary(of rides: [Ride]) -> Summary? {
