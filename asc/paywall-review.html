@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=390, initial-scale=1">
+  <title>Keep BigVelo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --void: #040405;
+      --ink: #ffffff;
+      --ember: #ff7a1f;
+      --ice: #94d6f5;
+      --graphite: #13151a;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 390px;
+      min-height: 844px;
+      background: var(--void);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    body {
+      position: relative;
+      overflow: hidden;
+    }
+    .atmosphere {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 50% at 20% 0%, rgba(255, 122, 31, 0.16), transparent 55%),
+        radial-gradient(ellipse 70% 45% at 90% 30%, rgba(148, 214, 245, 0.10), transparent 50%),
+        linear-gradient(180deg, #040405 0%, #0c1016 42%, #040405 100%);
+    }
+    .phone {
+      position: relative;
+      width: 390px;
+      min-height: 844px;
+      padding: 12px 20px 28px;
+    }
+    .status {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      height: 24px;
+      padding: 0 6px 8px;
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+    .status-icons { letter-spacing: 0.08em; font-size: 13px; opacity: 0.92; }
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 44px;
+      margin-bottom: 8px;
+    }
+    .nav-close {
+      font-size: 17px;
+      font-weight: 400;
+      color: var(--ice);
+    }
+    .nav-title {
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+    .nav-gap { width: 48px; }
+    .wordmark {
+      font-family: "Outfit", "Avenir Next", sans-serif;
+      font-weight: 800;
+      font-size: 34px;
+      letter-spacing: -0.07em;
+      line-height: 1;
+      background: linear-gradient(180deg, #fff8e6 6%, #feeab5 36%, #d4a66a 68%, #e07a3a 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      margin: 12px 0 10px;
+    }
+    h2 {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      margin-bottom: 8px;
+    }
+    .detail {
+      font-size: 17px;
+      line-height: 1.35;
+      color: rgba(255,255,255,0.78);
+      margin-bottom: 18px;
+    }
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px;
+      border-radius: 14px;
+      margin-bottom: 10px;
+    }
+    .row.year {
+      background: rgba(255, 122, 31, 0.18);
+      border: 1px solid rgba(255, 122, 31, 0.55);
+    }
+    .row.plain {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+    }
+    .row h3 {
+      font-size: 15px;
+      font-weight: 600;
+    }
+    .row p {
+      font-size: 12px;
+      color: rgba(255,255,255,0.6);
+      margin-top: 2px;
+    }
+    .glyph {
+      font-size: 18px;
+      line-height: 1;
+    }
+    .glyph.ember { color: var(--ember); }
+    .glyph.ice { color: var(--ice); }
+    .legal {
+      font-size: 11px;
+      line-height: 1.35;
+      color: rgba(255,255,255,0.5);
+      margin: 6px 0 16px;
+    }
+    .links {
+      display: flex;
+      gap: 16px;
+      font-size: 12px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.7);
+      margin-bottom: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="atmosphere"></div>
+  <div class="phone">
+    <div class="status">
+      <span>9:41</span>
+      <span class="status-icons">●●● Wi‑Fi ▮▮▮▮</span>
+    </div>
+    <div class="nav">
+      <span class="nav-close">Close</span>
+      <span class="nav-title">Keep BigVelo</span>
+      <span class="nav-gap"></span>
+    </div>
+    <div class="wordmark">BigVelo</div>
+    <h2>Trial ended</h2>
+    <p class="detail">Recording, live radar and Watch start are off. Open past rides, saved routes and export. Keep BigVelo to ride again.</p>
+
+    <div class="row year">
+      <div>
+        <h3>Yearly</h3>
+        <p>$29.99/yr</p>
+      </div>
+      <span class="glyph ember">✦</span>
+    </div>
+    <div class="row plain">
+      <div>
+        <h3>Monthly</h3>
+        <p>$4.99/mo</p>
+      </div>
+      <span class="glyph ice">＋</span>
+    </div>
+    <div class="row plain">
+      <div>
+        <h3>Lifetime</h3>
+        <p>$79 once</p>
+      </div>
+      <span class="glyph ice">＋</span>
+    </div>
+
+    <p class="legal">BigVelo+ Monthly and Yearly auto-renew unless you cancel at least 24 hours before the period ends. Payment is charged to your Apple ID at confirmation. Manage or cancel in Settings or your Apple ID subscriptions. The 30-day device trial is separate and is not an App Store introductory offer. Lifetime is a one-time purchase.</p>
+
+    <div class="links">
+      <span>Restore</span>
+      <span>Redeem Code</span>
+      <span>Manage</span>
+    </div>
+    <div class="links">
+      <span>Privacy</span>
+      <span>Terms</span>
+      <span>Support</span>
+    </div>
+  </div>
+</body>
+</html>
