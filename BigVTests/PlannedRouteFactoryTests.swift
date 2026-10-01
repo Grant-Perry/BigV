@@ -155,13 +155,16 @@ struct PlannedRouteFactoryTests {
 
    // MARK: - Maneuvers
 
-   @Test func stepsBecomeManeuversWithCumulativeOffsets() throws {
+   /// A provider step is the road ridden up to its instruction, so the
+   /// instruction sits at the step's end. "Turn right onto Page Mill" carries
+   /// the 600 m of Foothill that ends at the Page Mill corner, 1,000 m in.
+   @Test func stepsBecomeManeuversAtTheEndOfEachStep() throws {
       let route = try #require(
          Self.route(
             Self.draft(
                maneuvers: [
                   .init(instruction: "Head north on Foothill", distance: 400, coordinates: [Self.start]),
-                  .init(instruction: "Turn right onto Page Mill", distance: 600, coordinates: [Self.middle]),
+                  .init(instruction: "Turn right onto Page Mill", distance: 600, coordinates: [Self.start, Self.middle]),
                   .init(instruction: "Arrive", distance: 0, coordinates: [Self.end])
                ]
             )
@@ -171,9 +174,34 @@ struct PlannedRouteFactoryTests {
       #expect(route.maneuvers.count == 3)
       #expect(route.maneuvers.map(\.id) == [0, 1, 2])
       #expect(route.maneuvers.map(\.distance) == [400, 600, 0])
-      #expect(route.maneuvers.map(\.distanceFromStart) == [0, 400, 1_000])
+      #expect(route.maneuvers.map(\.distanceFromStart) == [400, 1_000, 1_000])
       #expect(route.maneuvers[1].instruction == "Turn right onto Page Mill")
       #expect(route.maneuvers[1].coordinate.latitude == Self.middle.latitude)
+   }
+
+   /// The real-world shape of the bug this guards against: a long step whose
+   /// instruction names the turn at its far end. Anchored at the step's start,
+   /// that instruction is "passed" a few meters in and the rider is shown the
+   /// turn after it — a street parallel to the one they are on.
+   @Test func aLongStepKeepsItsInstructionUntilItsEnd() throws {
+      let route = try #require(
+         Self.route(
+            Self.draft(
+               maneuvers: [
+                  .init(instruction: "Turn right onto Baker St", distance: 1_196, coordinates: [Self.start, Self.middle]),
+                  .init(instruction: "Turn left onto Oak St", distance: 91, coordinates: [Self.middle, Self.end])
+               ]
+            )
+         )
+      )
+
+      let baker = try #require(route.maneuvers.first)
+      let oak = try #require(route.maneuvers.last)
+
+      #expect(baker.distanceFromStart == 1_196)
+      #expect(baker.coordinate.latitude == Self.middle.latitude)
+      #expect(oak.distanceFromStart == 1_287)
+      #expect(oak.coordinate.latitude == Self.end.latitude)
    }
 
    @Test func anInstructionlessStepIsDroppedButStillMovesTheOffset() throws {
@@ -190,7 +218,7 @@ struct PlannedRouteFactoryTests {
 
       #expect(route.maneuvers.count == 1)
       #expect(route.maneuvers[0].id == 0)
-      #expect(route.maneuvers[0].distanceFromStart == 250)
+      #expect(route.maneuvers[0].distanceFromStart == 1_050)
    }
 
    @Test func aStepWithNoUsableGeometryIsDroppedButStillMovesTheOffset() throws {
@@ -215,7 +243,7 @@ struct PlannedRouteFactoryTests {
       #expect(route.maneuvers[0].distanceFromStart == 800)
    }
 
-   @Test func aStepUsesItsFirstUsableCoordinateAsTheManeuverPoint() throws {
+   @Test func aStepUsesItsLastUsableCoordinateAsTheManeuverPoint() throws {
       let route = try #require(
          Self.route(
             Self.draft(
@@ -224,9 +252,9 @@ struct PlannedRouteFactoryTests {
                      instruction: "Turn right",
                      distance: 120,
                      coordinates: [
-                        CLLocationCoordinate2D(latitude: 0, longitude: 0),
+                        Self.start,
                         Self.middle,
-                        Self.end
+                        CLLocationCoordinate2D(latitude: 0, longitude: 0)
                      ]
                   )
                ]
@@ -272,7 +300,7 @@ struct PlannedRouteFactoryTests {
       )
 
       #expect(route.maneuvers.map(\.distance) == [0, 0, 100])
-      #expect(route.maneuvers.map(\.distanceFromStart) == [0, 0, 0])
+      #expect(route.maneuvers.map(\.distanceFromStart) == [0, 0, 100])
    }
 
    @Test func aRouteWithoutStepsIsStillRideable() throws {

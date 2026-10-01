@@ -14,6 +14,7 @@ struct RoutePlannerView: View {
 
    let routePlannerViewModel: RoutePlannerViewModel
    let rideViewModel: RideViewModel
+   let routeHomeAddressViewModel: RouteHomeAddressViewModel
 
    /// Called once a route is being followed, so the tab bar can move on.
    let onFollowRoute: () -> Void
@@ -62,6 +63,7 @@ struct RoutePlannerView: View {
             RouteSearchStageView(
                routePlannerViewModel: routePlannerViewModel,
                rideViewModel: rideViewModel,
+               routeHomeAddressViewModel: routeHomeAddressViewModel,
                onStopRoute: onStopRoute
             )
 
@@ -104,6 +106,7 @@ struct RoutePlannerView: View {
    RoutePlannerView(
       routePlannerViewModel: RoutePlannerViewModel(),
       rideViewModel: RideViewModel(),
+      routeHomeAddressViewModel: RouteHomeAddressViewModel(),
       onFollowRoute: {},
       onStopRoute: {}
    )

@@ -25,7 +25,12 @@ nonisolated enum PlannedRouteFactory {
 
       var instruction: String
       var notice: String?
+
+      /// Meters ridden from the previous instruction to this one.
       var distance: CLLocationDistance
+
+      /// The road leading up to the instruction. Its last point is where the
+      /// instruction applies.
       var coordinates: [CLLocationCoordinate2D]
 
       init(
@@ -167,6 +172,15 @@ nonisolated enum PlannedRouteFactory {
 
    /// Maps steps to instructions the rider can act on.
    ///
+   /// A step is the road ridden *up to* its instruction, not after it. Apple's
+   /// "Turn left onto Oak St" step carries the block of Baker St that ends at
+   /// the Oak St corner, and "Arrive at the destination" carries the final
+   /// approach. So a maneuver sits at the *end* of its step — the running
+   /// offset after the step's length is added — and its point is the step's
+   /// last coordinate. Anchoring it at the step's start instead shows every
+   /// instruction one turn early: the rider is told the street *after* the
+   /// one they must turn onto, with the distance to the wrong corner.
+   ///
    /// Steps with nothing to say are dropped from the list but still counted
    /// toward the running offset: Apple emits an instruction-less step for the
    /// leg that merely gets you onto the route, and skipping its length would
@@ -181,10 +195,10 @@ nonisolated enum PlannedRouteFactory {
          let stepLength = max(0, draft.distance.finiteOrZero)
          let instruction = draft.instruction.trimmed
 
-         defer { offset += stepLength }
+         offset += stepLength
 
          guard !instruction.isEmpty,
-               let coordinate = draft.coordinates.first(where: RideRouteDownsampler.isUsable)
+               let coordinate = draft.coordinates.last(where: RideRouteDownsampler.isUsable)
          else { continue }
 
          maneuvers.append(

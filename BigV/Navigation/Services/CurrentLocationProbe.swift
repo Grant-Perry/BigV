@@ -21,8 +21,10 @@ final class CurrentLocationProbe {
 
    // MARK: - Tuning
 
-   /// How long a resolved fix is reused. A rider planning a route has not moved
-   /// far in a minute, and re-probing per keystroke would be absurd.
+   /// How long a resolved fix is reused. A rider planning a route from the
+   /// sofa has not moved in a minute, and re-probing per keystroke would be
+   /// absurd. A rider planning *mid-ride* has — which is why the system's own
+   /// latest fix is consulted first and wins whenever it is newer.
    private static let freshness: TimeInterval = 60
 
    /// Ceiling on waiting for a live fix. Past this, planning fails honestly
@@ -34,6 +36,9 @@ final class CurrentLocationProbe {
    private let locationManager = CLLocationManager()
 
    private var cachedCoordinate: CLLocationCoordinate2D?
+
+   /// When the cached fix was *taken*, not when it was cached, so a system fix
+   /// that is newer than it can be told apart.
    private var cachedAt: Date?
 
    // MARK: - Authorization
@@ -53,7 +58,12 @@ final class CurrentLocationProbe {
    // MARK: - Probing
 
    /// The rider's coordinate, or `nil` when it cannot be established.
+   ///
+   /// Newest fix wins. While a ride is recording the system holds a fix a few
+   /// seconds old, and a route planned from a position a minute back would
+   /// begin behind the rider — every turn then reads against the wrong start.
    func coordinate() async -> CLLocationCoordinate2D? {
+      if let system = freshSystemFix { return remember(system) }
       if let fresh = freshCachedCoordinate { return fresh }
 
       guard isAuthorized else {
@@ -61,12 +71,11 @@ final class CurrentLocationProbe {
          return nil
       }
 
-      if let cached = locationManager.location?.coordinate,
-         RideRouteDownsampler.isUsable(cached) {
-         return remember(cached)
+      if let stale = locationManager.location, Self.isUsable(stale) {
+         return remember(stale)
       }
 
-      guard let live = await Self.liveCoordinate() else {
+      guard let live = await Self.liveFix() else {
          DebugPrint(mode: .navigation, "Location probe found no fix")
          return nil
       }
@@ -75,6 +84,20 @@ final class CurrentLocationProbe {
    }
 
    // MARK: - Cache
+
+   /// The system's last fix, when it is both recent and newer than anything
+   /// remembered here. Costs nothing: no session is started to read it.
+   private var freshSystemFix: CLLocation? {
+      guard isAuthorized,
+            let location = locationManager.location,
+            Self.isUsable(location),
+            Date.now.timeIntervalSince(location.timestamp) < Self.freshness
+      else { return nil }
+
+      if let cachedAt, location.timestamp <= cachedAt { return nil }
+
+      return location
+   }
 
    private var freshCachedCoordinate: CLLocationCoordinate2D? {
       guard let cachedCoordinate,
@@ -85,18 +108,22 @@ final class CurrentLocationProbe {
       return cachedCoordinate
    }
 
-   private func remember(_ coordinate: CLLocationCoordinate2D) -> CLLocationCoordinate2D {
-      cachedCoordinate = coordinate
-      cachedAt = .now
-      return coordinate
+   private func remember(_ location: CLLocation) -> CLLocationCoordinate2D {
+      cachedCoordinate = location.coordinate
+      cachedAt = location.timestamp
+      return location.coordinate
+   }
+
+   private static func isUsable(_ location: CLLocation) -> Bool {
+      RideRouteDownsampler.isUsable(location.coordinate)
    }
 
    // MARK: - Live Fix
 
    /// Races a single live update against the ceiling, so a device that never
    /// gets a fix cannot leave the caller suspended.
-   private static func liveCoordinate() async -> CLLocationCoordinate2D? {
-      await withTaskGroup(of: CLLocationCoordinate2D?.self) { group in
+   private static func liveFix() async -> CLLocation? {
+      await withTaskGroup(of: CLLocation?.self) { group in
          group.addTask { await firstFix() }
          group.addTask {
             try? await Task.sleep(for: ceiling)
@@ -110,17 +137,15 @@ final class CurrentLocationProbe {
       }
    }
 
-   private static func firstFix() async -> CLLocationCoordinate2D? {
+   private static func firstFix() async -> CLLocation? {
       do {
          for try await update in CLLocationUpdate.liveUpdates(.default) {
             if Task.isCancelled { return nil }
             if update.authorizationDenied || update.authorizationDeniedGlobally { return nil }
 
-            guard let coordinate = update.location?.coordinate,
-                  RideRouteDownsampler.isUsable(coordinate)
-            else { continue }
+            guard let location = update.location, isUsable(location) else { continue }
 
-            return coordinate
+            return location
          }
       } catch {
          DebugPrint(mode: .navigation, "Location probe failed: \(error.localizedDescription)")

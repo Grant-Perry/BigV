@@ -44,6 +44,8 @@ struct BigVApp: App {
    @State private var historyDetailViewModel: RideDetailViewModel
    @State private var routePlannerViewModel: RoutePlannerViewModel
    @State private var routeGuidanceViewModel: RouteGuidanceViewModel
+   @State private var routeHomeSettings: RouteHomeSettings
+   @State private var routeHomeAddressViewModel: RouteHomeAddressViewModel
 
    init() {
       let modelContainer = Self.makeModelContainer()
@@ -79,6 +81,11 @@ struct BigVApp: App {
       // surface and written by the long-press picker.
       let rideCockpitLayoutSettings = RideCockpitLayoutSettings()
       let routeFavoriteStore = RouteFavoriteStore()
+      let routeRecentStore = RouteRecentStore()
+
+      // Home is written from Settings and read by the planner's Home button,
+      // so both are handed the same store.
+      let routeHomeSettings = RouteHomeSettings()
 
       // Route planning and weather both need "where is the rider" while idle,
       // and neither may open a second `CLLocationManager` to get it.
@@ -181,11 +188,24 @@ struct BigVApp: App {
             plannedRouteProvider: MapKitCyclingRoutePlanner(),
             currentLocationProbe: currentLocationProbe,
             plannedRouteManager: plannedRouteManager,
-            routeFavoriteStore: routeFavoriteStore
+            routeFavoriteStore: routeFavoriteStore,
+            routeRecentStore: routeRecentStore,
+            routeHomeSettings: routeHomeSettings
          )
       )
       _routeGuidanceViewModel = State(
          initialValue: RouteGuidanceViewModel(routeGuidanceManager: routeGuidanceManager)
+      )
+      _routeHomeSettings = State(initialValue: routeHomeSettings)
+
+      // Its own completer: the planner's may be mid-query on the Ride To tab
+      // while the home sheet is open from Settings.
+      _routeHomeAddressViewModel = State(
+         initialValue: RouteHomeAddressViewModel(
+            routeSearchService: RouteSearchService(),
+            currentLocationProbe: currentLocationProbe,
+            routeHomeSettings: routeHomeSettings
+         )
       )
 
       let rideHistoryViewModel = RideHistoryViewModel(rideStorageManager: rideStorageManager)
@@ -256,7 +276,9 @@ struct BigVApp: App {
                rideClimbSettings: rideClimbSettings,
                rideLapSettings: rideLapSettings,
                rideAppearanceSettings: rideAppearanceSettings,
-               rideCockpitLayoutSettings: rideCockpitLayoutSettings
+               rideCockpitLayoutSettings: rideCockpitLayoutSettings,
+               routeHomeSettings: routeHomeSettings,
+               routeHomeAddressViewModel: routeHomeAddressViewModel
             )
          }
          .environment(rideAppearanceSettings)

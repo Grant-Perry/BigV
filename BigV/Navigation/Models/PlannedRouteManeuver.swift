@@ -30,12 +30,14 @@ nonisolated struct PlannedRouteManeuver: Identifiable, Sendable {
 
    // MARK: - Geometry
 
-   /// Length of this step in meters.
+   /// Meters ridden from the previous instruction to this one — the length of
+   /// the provider step that ends here.
    let distance: CLLocationDistance
 
-   /// Meters from the route start to the point this instruction applies to.
+   /// Meters from the route start to the point this instruction applies to:
+   /// the corner itself, which is the *end* of the provider's step.
    let distanceFromStart: CLLocationDistance
 
-   /// Where the instruction applies.
+   /// Where the instruction applies — the corner, not the road leading to it.
    let coordinate: CLLocationCoordinate2D
 }

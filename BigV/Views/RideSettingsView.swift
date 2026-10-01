@@ -26,6 +26,8 @@ struct RideSettingsView: View {
    @Bindable var lapSettings: RideLapSettings
    @Bindable var appearanceSettings: RideAppearanceSettings
    let cockpitLayoutSettings: RideCockpitLayoutSettings
+   let routeHomeSettings: RouteHomeSettings
+   let routeHomeAddressViewModel: RouteHomeAddressViewModel
    let onShowRadar: () -> Void
    let onFinishSetup: () -> Void
 
@@ -47,6 +49,11 @@ struct RideSettingsView: View {
                   lapSettings: lapSettings,
                   cockpitLayoutSettings: cockpitLayoutSettings,
                   onShowRadar: onShowRadar
+               )
+
+               RideSettingsRideToCard(
+                  routeHomeSettings: routeHomeSettings,
+                  routeHomeAddressViewModel: routeHomeAddressViewModel
                )
 
                RideSettingsPlusCard(plusStore: plusStore)
@@ -175,6 +182,8 @@ struct RideSettingsView: View {
       lapSettings: RideLapSettings(),
       appearanceSettings: RideAppearanceSettings(),
       cockpitLayoutSettings: RideCockpitLayoutSettings(),
+      routeHomeSettings: RouteHomeSettings(),
+      routeHomeAddressViewModel: RouteHomeAddressViewModel(),
       onShowRadar: {},
       onFinishSetup: {}
    )

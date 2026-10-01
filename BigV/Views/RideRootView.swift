@@ -29,6 +29,8 @@ struct RideRootView: View {
    let rideLapSettings: RideLapSettings
    let rideAppearanceSettings: RideAppearanceSettings
    let rideCockpitLayoutSettings: RideCockpitLayoutSettings
+   let routeHomeSettings: RouteHomeSettings
+   let routeHomeAddressViewModel: RouteHomeAddressViewModel
 
    @Environment(RideClimbModel.self) private var rideClimbModel
    @Environment(\.scenePhase) private var scenePhase
@@ -81,6 +83,7 @@ struct RideRootView: View {
             RoutePlannerView(
                routePlannerViewModel: routePlannerViewModel,
                rideViewModel: rideViewModel,
+               routeHomeAddressViewModel: routeHomeAddressViewModel,
                onFollowRoute: { selectedTab = .dashboard },
                onStopRoute: { routeGuidanceViewModel.endNavigation() }
             )
@@ -96,6 +99,8 @@ struct RideRootView: View {
                lapSettings: rideLapSettings,
                appearanceSettings: rideAppearanceSettings,
                cockpitLayoutSettings: rideCockpitLayoutSettings,
+               routeHomeSettings: routeHomeSettings,
+               routeHomeAddressViewModel: routeHomeAddressViewModel,
                onShowRadar: { isShowingRadarPairing = true },
                onFinishSetup: { selectedTab = .dashboard }
             )

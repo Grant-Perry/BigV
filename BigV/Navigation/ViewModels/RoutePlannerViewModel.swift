@@ -80,6 +80,8 @@ final class RoutePlannerViewModel {
    private let plannedRouteManager: PlannedRouteManager
    private let routeElevationEnricher: RouteElevationEnricher
    private let routeFavoriteStore: RouteFavoriteStore
+   private let routeRecentStore: RouteRecentStore
+   private let routeHomeSettings: RouteHomeSettings
 
    init(
       routeSearchService: RouteSearchService = RouteSearchService(),
@@ -87,7 +89,9 @@ final class RoutePlannerViewModel {
       currentLocationProbe: CurrentLocationProbe = CurrentLocationProbe(),
       plannedRouteManager: PlannedRouteManager = PlannedRouteManager(),
       routeElevationEnricher: RouteElevationEnricher = RouteElevationEnricher(),
-      routeFavoriteStore: RouteFavoriteStore = RouteFavoriteStore()
+      routeFavoriteStore: RouteFavoriteStore = RouteFavoriteStore(),
+      routeRecentStore: RouteRecentStore = RouteRecentStore(),
+      routeHomeSettings: RouteHomeSettings = RouteHomeSettings()
    ) {
       self.routeSearchService = routeSearchService
       self.plannedRouteProvider = plannedRouteProvider
@@ -95,6 +99,8 @@ final class RoutePlannerViewModel {
       self.plannedRouteManager = plannedRouteManager
       self.routeElevationEnricher = routeElevationEnricher
       self.routeFavoriteStore = routeFavoriteStore
+      self.routeRecentStore = routeRecentStore
+      self.routeHomeSettings = routeHomeSettings
    }
 
    // MARK: - Private State
@@ -272,6 +278,14 @@ final class RoutePlannerViewModel {
          course: prepared.course
       )
       enrichActiveRouteIfNeeded(prepared.route)
+
+      // A searched place is worth offering again. A course's endpoint is not:
+      // replanning to it would trade the trail for streets, and the trail
+      // itself is a favorite's job.
+      if prepared.route.source == .appleMaps {
+         routeRecentStore.record(destination)
+      }
+
       discardPlanning()
       queryText = ""
       suggestions = []
@@ -282,12 +296,19 @@ final class RoutePlannerViewModel {
    /// The trail as-is when the rider is already there; approach plus trail
    /// when they are not. Falls back to the trail alone if Apple has no bike
    /// route to the start, so Follow Route never leaves them stuck.
+   ///
+   /// Only a *course* — GPX, Trailforks, a retrace — can need a lead-in. An
+   /// Apple route was planned from the rider, so its start is wherever they
+   /// were when they searched; a rider who kept pedalling while they typed
+   /// must not be routed back to that spot. Guidance places them along the
+   /// line on its first sample instead.
    private func prepareForFollow(
       _ route: PlannedRoute,
       destination: RouteDestination,
       ticket: UInt64
    ) async -> (route: PlannedRoute, course: PlannedRoute?)? {
-      guard let origin = await currentLocationProbe.coordinate(),
+      guard route.source != .appleMaps,
+            let origin = await currentLocationProbe.coordinate(),
             let start = route.startCoordinate,
             RouteApproachPolicy.needsApproach(from: origin, to: start)
       else {
@@ -439,7 +460,60 @@ final class RoutePlannerViewModel {
       routeFavoriteStore.remove(id: id)
    }
 
+   // MARK: - Recents
+
+   var recents: [RouteRecentDestination] { routeRecentStore.recents }
+
+   var hasRecents: Bool { !routeRecentStore.isEmpty }
+
+   /// Plans a fresh route to a place the rider has been before.
+   func openRecent(_ recent: RouteRecentDestination) {
+      planRoute(to: recent.routeDestination)
+   }
+
+   func removeRecent(id: RouteRecentDestination.ID) {
+      routeRecentStore.remove(id: id)
+   }
+
+   func clearRecents() {
+      routeRecentStore.clear()
+   }
+
+   // MARK: - Home
+
+   var hasHome: Bool { routeHomeSettings.hasHome }
+
+   /// The address line for the Home button, or `nil` until home is set.
+   var homeLabel: String? { routeHomeSettings.homeLabel }
+
+   /// Plans the way home from here. Lands in preview like any search, so the
+   /// rider still chooses the line and, mid-ride, how it joins the ride.
+   func rideHome() {
+      guard let home = routeHomeSettings.home else { return }
+      planRoute(to: home)
+   }
+
    // MARK: - Planning
+
+   /// Plans straight to a known place, skipping search and resolution.
+   func planRoute(to destination: RouteDestination) {
+      searchTask?.cancel()
+      routeSearchService.cancel()
+      discardPlanning()
+
+      queryText = ""
+      suggestions = []
+      searchFailure = nil
+      gpxImportFailureMessage = nil
+
+      let ticket = generation.issue()
+      self.destination = destination
+      isPlanning = true
+
+      planTask = Task { [weak self] in
+         await self?.plan(to: destination, ticket: ticket)
+      }
+   }
 
    private func plan(_ suggestion: RouteSearchSuggestion, ticket: UInt64) async {
       let resolved: RouteDestination
@@ -454,6 +528,10 @@ final class RoutePlannerViewModel {
       guard generation.isCurrent(ticket) else { return }
       destination = resolved
 
+      await plan(to: resolved, ticket: ticket)
+   }
+
+   private func plan(to destination: RouteDestination, ticket: UInt64) async {
       guard let origin = await currentLocationProbe.coordinate() else {
          apply(planningFailure: .originUnavailable, ticket: ticket)
          return
@@ -462,7 +540,7 @@ final class RoutePlannerViewModel {
       guard generation.isCurrent(ticket) else { return }
 
       do {
-         let routes = try await plannedRouteProvider.routes(from: origin, to: resolved)
+         let routes = try await plannedRouteProvider.routes(from: origin, to: destination)
          guard generation.isCurrent(ticket) else { return }
 
          candidates = routes
@@ -566,53 +644,6 @@ final class RoutePlannerViewModel {
       isPlanning = false
       isPlanningApproach = false
       isEnrichingElevation = false
-   }
-}
-
-// MARK: - Presentation
-
-extension RoutePlannerViewModel {
-
-   func distanceText(for route: PlannedRoute) -> String {
-      PlannedRouteFormatters.distance(route.distance)
-   }
-
-   func travelTimeText(for route: PlannedRoute) -> String {
-      PlannedRouteFormatters.travelTime(route.expectedTravelTime)
-   }
-
-   /// Apple ranks its own routes, so the first is the one it recommends. The
-   /// provider's own label goes underneath when it has one.
-   func title(forCandidateAt index: Int) -> String {
-      index == 0 ? "Recommended" : "Alternate \(index)"
-   }
-
-   func detail(for route: PlannedRoute) -> String? {
-      route.name.isEmpty ? nil : "via \(route.name)"
-   }
-
-   func isSelected(_ route: PlannedRoute) -> Bool {
-      route.id == selectedCandidate?.id
-   }
-
-   /// "+853 FT · 2 climbs", once elevation has landed. `nil` says nothing is
-   /// known yet — the row shows the loading whisper off `isEnrichingElevation`.
-   func climbSummaryText(for route: PlannedRoute) -> String? {
-      guard route.hasElevationProfile, let ascent = route.totalAscent else { return nil }
-      return PlannedRouteFormatters.climbSummary(ascent: ascent, climbCount: route.climbs.count)
-   }
-
-   func favoriteSummaryText(for favorite: SavedRouteFavorite) -> String {
-      PlannedRouteFormatters.distance(favorite.plannedRoute.distance)
-   }
-
-   func favoriteSourceLabel(for favorite: SavedRouteFavorite) -> String {
-      switch favorite.plannedRoute.source {
-         case .appleMaps: "Apple Maps"
-         case .gpx: "GPX"
-         case .retrace: "Retrace"
-         case .trailforks: "Trailforks"
-      }
    }
 }
 
