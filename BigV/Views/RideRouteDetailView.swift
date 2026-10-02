@@ -16,9 +16,13 @@ struct RideRouteDetailView: View {
    let rideDetailViewModel: RideDetailViewModel
    let rideID: PersistentIdentifier
 
+   @Environment(\.accessibilityReduceMotion) private var reduceMotion
    @State private var isShowingFullMap = false
    @State private var highlightedSplit: RideSplitID?
    @State private var isScrubbingLaps = false
+   @State private var isLapsCollapsed = false
+   @State private var viewportHeight: CGFloat = 0
+   @State private var scrollPosition = ScrollPosition(edge: .top)
 
    var body: some View {
       ScrollView {
@@ -32,6 +36,8 @@ struct RideRouteDetailView: View {
                splitSegments: rideDetailViewModel.splitSegments,
                highlightedSplit: $highlightedSplit,
                isScrubbing: $isScrubbingLaps,
+               isLapsCollapsed: $isLapsCollapsed,
+               viewportHeight: viewportHeight,
                onExpandMap: { isShowingFullMap = true }
             )
 
@@ -65,7 +71,20 @@ struct RideRouteDetailView: View {
          .padding(.bottom, 24)
       }
       .scrollIndicators(.hidden)
-      .scrollDisabled(highlightedSplit != nil || isScrubbingLaps)
+      .scrollPosition($scrollPosition)
+      .scrollDisabled(highlightedSplit != nil || isScrubbingLaps || isLapsCollapsed)
+      .onScrollGeometryChange(for: CGFloat.self) { geometry in
+         geometry.containerSize.height - geometry.contentInsets.top - geometry.contentInsets.bottom
+      } action: { _, height in
+         viewportHeight = height
+      }
+      .onChange(of: isLapsCollapsed) { _, isCollapsed in
+         if isCollapsed {
+            withAnimation(reduceMotion ? nil : .smooth(duration: 0.32)) {
+               scrollPosition.scrollTo(edge: .top)
+            }
+         }
+      }
       .background {
          RideAtmosphereBackground(scene: .summary)
             .ignoresSafeArea()
@@ -96,7 +115,8 @@ struct RideRouteDetailView: View {
             splitSegments: rideDetailViewModel.splitSegments,
             laps: rideDetailViewModel.laps,
             highlightedSplit: $highlightedSplit,
-            isScrubbing: $isScrubbingLaps
+            isScrubbing: $isScrubbingLaps,
+            isLapsCollapsed: $isLapsCollapsed
          )
       }
       .task(id: rideID) {

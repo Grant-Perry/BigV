@@ -19,8 +19,18 @@ enum RideDetailHighlightLayout {
    /// Used until the hero has been measured on screen.
    static let fallbackHeroHeight: CGFloat = 168
 
+   /// What a folded stack keeps below and above the map: the report's top
+   /// inset, one gutter, the laps header bar, and a breath above the footer.
+   static let collapsedChromeHeight: CGFloat = 12 + stackSpacing + 52 + 12
+
    static func mapHeight(isHighlighting: Bool, heroHeight: CGFloat) -> CGFloat {
       guard isHighlighting else { return restingMapHeight }
       return restingMapHeight + heroHeight + stackSpacing
+   }
+
+   /// Folded: the map takes the visible scroll height. Never smaller than the
+   /// highlight stack, so an unmeasured viewport cannot shrink it.
+   static func collapsedMapHeight(viewportHeight: CGFloat, heroHeight: CGFloat) -> CGFloat {
+      max(viewportHeight - collapsedChromeHeight, mapHeight(isHighlighting: true, heroHeight: heroHeight))
    }
 }

@@ -57,6 +57,7 @@ struct RideBackToStartSheet: View {
       }
       .presentationDetents([.medium])
       .presentationDragIndicator(.visible)
+      .rideAppearance()
    }
 
    // MARK: - Header
@@ -123,5 +124,5 @@ struct RideBackToStartSheet: View {
 
 #Preview {
    RideBackToStartSheet(backToStartModel: RideBackToStartModel())
-      .preferredColorScheme(.dark)
+      .environment(RideAppearanceSettings())
 }

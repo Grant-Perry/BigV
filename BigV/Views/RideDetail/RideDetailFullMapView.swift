@@ -21,6 +21,7 @@ struct RideDetailFullMapView: View {
 
    @Binding private var highlightedSplit: RideSplitID?
    @Binding private var isScrubbing: Bool
+   @Binding private var isLapsCollapsed: Bool
 
    @Environment(\.dismiss) private var dismiss
    @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -33,7 +34,8 @@ struct RideDetailFullMapView: View {
       splitSegments: [RideSplitSegment] = [],
       laps: RideLapsReport? = nil,
       highlightedSplit: Binding<RideSplitID?> = .constant(nil),
-      isScrubbing: Binding<Bool> = .constant(false)
+      isScrubbing: Binding<Bool> = .constant(false),
+      isLapsCollapsed: Binding<Bool> = .constant(false)
    ) {
       self.route = route
       self.radarPasses = radarPasses
@@ -42,6 +44,7 @@ struct RideDetailFullMapView: View {
       self.laps = laps
       _highlightedSplit = highlightedSplit
       _isScrubbing = isScrubbing
+      _isLapsCollapsed = isLapsCollapsed
    }
 
    var body: some View {
@@ -50,9 +53,12 @@ struct RideDetailFullMapView: View {
          lapsDock
       }
       .background(RideDashboardTheme.void.ignoresSafeArea())
-      .preferredColorScheme(.dark)
+      .rideAppearance()
       .onAppear(perform: frameCamera)
       .onChange(of: highlightedSplit) { _, _ in
+         frameCamera()
+      }
+      .onChange(of: isLapsCollapsed) { _, _ in
          frameCamera()
       }
    }
@@ -92,7 +98,8 @@ struct RideDetailFullMapView: View {
          RideLapsCard(
             report: laps,
             highlightedSplit: $highlightedSplit,
-            isScrubbing: $isScrubbing
+            isScrubbing: $isScrubbing,
+            isCollapsed: $isLapsCollapsed
          )
          .padding(.horizontal, 16)
          .padding(.top, 10)
@@ -153,4 +160,5 @@ struct RideDetailFullMapView: View {
 
 #Preview {
    RideDetailFullMapView(route: .empty, radarPasses: [], titleText: "Aug 29 at 9:08 AM")
+      .environment(RideAppearanceSettings())
 }

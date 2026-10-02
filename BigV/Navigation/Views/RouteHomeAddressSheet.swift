@@ -52,6 +52,7 @@ struct RouteHomeAddressSheet: View {
          isFieldFocused = !routeHomeAddressViewModel.hasHome
       }
       .onDisappear { routeHomeAddressViewModel.end() }
+      .rideAppearance()
    }
 
    // MARK: - Current Home
@@ -189,5 +190,5 @@ private extension String {
 
 #Preview {
    RouteHomeAddressSheet(routeHomeAddressViewModel: RouteHomeAddressViewModel())
-      .preferredColorScheme(.dark)
+      .environment(RideAppearanceSettings())
 }

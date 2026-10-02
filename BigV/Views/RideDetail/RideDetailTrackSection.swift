@@ -10,8 +10,9 @@ import SwiftUI
 ///
 /// Resting, the hero sits between the preview and the list. While a split is
 /// highlighted the hero collapses, the map grows, and the camera is live —
-/// pinch, pan and rotate around the lit slice. The expand control still opens
-/// the full-screen map; a tap on the idle preview does the same.
+/// pinch, pan and rotate around the lit slice. Folding the laps header does
+/// the same for the whole ride and lets the map take the screen. The expand
+/// control still opens the full-screen map; a tap on the idle preview does too.
 struct RideDetailTrackSection: View {
 
    let route: RideRoute
@@ -23,6 +24,8 @@ struct RideDetailTrackSection: View {
 
    @Binding var highlightedSplit: RideSplitID?
    @Binding var isScrubbing: Bool
+   @Binding var isLapsCollapsed: Bool
+   let viewportHeight: CGFloat
    let onExpandMap: () -> Void
 
    @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -38,7 +41,11 @@ struct RideDetailTrackSection: View {
          lapsSection
       }
       .animation(highlightAnimation, value: isGrowingMap)
+      .animation(highlightAnimation, value: isFolded)
       .onChange(of: highlightedSplit) { _, _ in
+         frameCamera()
+      }
+      .onChange(of: isFolded) { _, _ in
          frameCamera()
       }
    }
@@ -49,10 +56,7 @@ struct RideDetailTrackSection: View {
       RideRouteMapView(
          route: route,
          isLoaded: isLoaded,
-         height: RideDetailHighlightLayout.mapHeight(
-            isHighlighting: isGrowingMap,
-            heroHeight: heroHeight
-         ),
+         height: mapHeight,
          radarPasses: radarPasses,
          highlight: highlight,
          interactionModes: isInspecting ? .all : [.pan, .zoom],
@@ -126,7 +130,8 @@ struct RideDetailTrackSection: View {
          RideLapsCard(
             report: laps,
             highlightedSplit: $highlightedSplit,
-            isScrubbing: $isScrubbing
+            isScrubbing: $isScrubbing,
+            isCollapsed: $isLapsCollapsed
          )
          .detailCardEntrance()
       }
@@ -134,14 +139,29 @@ struct RideDetailTrackSection: View {
 
    // MARK: - Layout
 
-   private var isGrowingMap: Bool {
-      highlightedSplit != nil && header != nil
+   /// The fold lives on the laps header, so a ride without laps never folds.
+   private var isFolded: Bool {
+      isLapsCollapsed && laps != nil
    }
 
-   /// A pinned split turns the preview into a live map, even when there is no
-   /// hero to collapse — the camera still has to be free.
+   private var isGrowingMap: Bool {
+      (highlightedSplit != nil || isFolded) && header != nil
+   }
+
+   /// A pinned split or a folded report turns the preview into a live map,
+   /// even when there is no hero to collapse — the camera still has to be free.
    private var isInspecting: Bool {
-      highlightedSplit != nil
+      highlightedSplit != nil || isFolded
+   }
+
+   private var mapHeight: CGFloat {
+      if isFolded {
+         return RideDetailHighlightLayout.collapsedMapHeight(
+            viewportHeight: viewportHeight,
+            heroHeight: heroHeight
+         )
+      }
+      return RideDetailHighlightLayout.mapHeight(isHighlighting: isGrowingMap, heroHeight: heroHeight)
    }
 
    /// Resolved from the pinned split in the same pass that reads it, so the

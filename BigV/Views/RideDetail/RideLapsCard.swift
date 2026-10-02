@@ -16,6 +16,11 @@ struct RideLapsCard: View {
    @Binding private var isScrubbing: Bool
    private let isInteractive: Bool
 
+   /// `nil` keeps the card always open; a binding lets the header fold the
+   /// rows away so the map above can have the screen.
+   private let isCollapsed: Binding<Bool>?
+
+   @Environment(\.accessibilityReduceMotion) private var reduceMotion
    @State private var rowFrames: [RideSplitID: CGRect] = [:]
 
    init(report: RideLapsReport) {
@@ -23,34 +28,79 @@ struct RideLapsCard: View {
       _highlightedSplit = .constant(nil)
       _isScrubbing = .constant(false)
       isInteractive = false
+      isCollapsed = nil
    }
 
    init(
       report: RideLapsReport,
       highlightedSplit: Binding<RideSplitID?>,
-      isScrubbing: Binding<Bool>
+      isScrubbing: Binding<Bool>,
+      isCollapsed: Binding<Bool>? = nil
    ) {
       self.report = report
       _highlightedSplit = highlightedSplit
       _isScrubbing = isScrubbing
       isInteractive = true
+      self.isCollapsed = isCollapsed
    }
 
    var body: some View {
       VStack(alignment: .leading, spacing: 12) {
-         RideDetailCardHeader(
-            icon: "flag.fill",
-            tint: RideDashboardTheme.ember,
-            title: "LAPS & CLIMBS",
-            detail: report.summaryText
-         )
+         header
 
-         scrubbableRows
+         if !isFolded {
+            scrubbableRows
+               .transition(.opacity.combined(with: .move(edge: .bottom)))
+         }
       }
       .padding(14)
       .rideGlassCard(density: .standard)
       .sensoryFeedback(.selection, trigger: highlightedSplit)
+      .sensoryFeedback(.impact(weight: .light), trigger: isFolded)
       .accessibilityIdentifier("detail.card.laps")
+   }
+
+   // MARK: - Header
+
+   private var cardHeader: some View {
+      RideDetailCardHeader(
+         icon: "flag.fill",
+         tint: RideDashboardTheme.ember,
+         title: "LAPS & CLIMBS",
+         detail: report.summaryText
+      )
+   }
+
+   @ViewBuilder
+   private var header: some View {
+      if isCollapsed != nil {
+         Button(action: toggleFold) {
+            HStack(spacing: 10) {
+               cardHeader
+
+               Image(systemName: "chevron.down")
+                  .font(.caption.weight(.bold))
+                  .foregroundStyle(RideDashboardTheme.ink(0.55))
+                  .rotationEffect(.degrees(isFolded ? 180 : 0))
+                  .frame(width: 26, height: 26)
+                  .background(RideDashboardTheme.ink(0.08), in: .circle)
+            }
+            .contentShape(.rect)
+         }
+         .buttonStyle(.plain)
+         .accessibilityElement(children: .ignore)
+         .accessibilityLabel("Laps and climbs, \(report.summaryText)")
+         .accessibilityValue(isFolded ? "Collapsed" : "Expanded")
+         .accessibilityHint(isFolded ? "Shows the list" : "Hides the list to show more map")
+         .accessibilityAddTraits(.isButton)
+         .accessibilityIdentifier("detail.button.toggleLaps")
+      } else {
+         cardHeader
+      }
+   }
+
+   private var isFolded: Bool {
+      isCollapsed?.wrappedValue ?? false
    }
 
    // MARK: - Rows
@@ -145,6 +195,14 @@ struct RideLapsCard: View {
    }
 
    // MARK: - Intent
+
+   private func toggleFold() {
+      guard let isCollapsed else { return }
+      isScrubbing = false
+      withAnimation(reduceMotion ? nil : .smooth(duration: 0.32)) {
+         isCollapsed.wrappedValue.toggle()
+      }
+   }
 
    private func toggle(_ id: RideSplitID) {
       highlightedSplit = highlightedSplit == id ? nil : id
