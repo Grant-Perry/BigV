@@ -70,6 +70,11 @@ final class RideSessionManager {
 
    private var lastSampleAt: Date?
 
+   /// Whether the scene is in front, reported by the root view. Core Location
+   /// only lets a background activity session begin from the foreground, so the
+   /// location manager has to be told which side of that line a call is on.
+   private var isSceneActive = false
+
    /// The last accepted fix, kept so a radar pass can be stamped with where the
    /// rider was. Lives here rather than on `RideState`: no view needs it.
    private var lastRiderCoordinate: CLLocationCoordinate2D?
@@ -563,7 +568,7 @@ final class RideSessionManager {
    // MARK: - Streams
 
    private func startLocationStream() {
-      let stream = locationManager.startUpdates()
+      let stream = locationManager.startUpdates(isInForeground: isSceneActive)
 
       locationTask = Task { [weak self] in
          for await event in stream {
@@ -860,6 +865,43 @@ final class RideSessionManager {
 
          case .command(let request, let acknowledgement):
             apply(request, acknowledgement: acknowledgement)
+
+         case .linkStateChanged:
+            refreshRemoteStartReadiness()
+      }
+   }
+
+   // MARK: - Scene Activity
+
+   /// Called by the root view on every foreground entry.
+   ///
+   /// This is the one moment a background activity session can be opened, so
+   /// the location manager is armed here whenever a Watch is paired: a START
+   /// from the wrist later, with the phone locked in a pocket, then rejoins a
+   /// session that is already running instead of trying to open one from the
+   /// background, which Core Location silently refuses. Without this the ride
+   /// gets one fix in the wake window and then nothing — speed and distance
+   /// stay at 0.00 while elevation shows that single fix.
+   func sceneDidBecomeActive() {
+      isSceneActive = true
+      refreshRemoteStartReadiness()
+   }
+
+   func sceneDidResignActive() {
+      isSceneActive = false
+   }
+
+   /// Arms or releases the standing background session to match the wrist link.
+   ///
+   /// Runs from the background too: that is harmless, and after a background
+   /// relaunch it is what rejoins a session the previous process held.
+   private func refreshRemoteStartReadiness() {
+      guard let rideWatchManager else { return }
+
+      if rideWatchManager.linkState.allowsQueuedUpdates {
+         locationManager.armForRemoteStart(isInForeground: isSceneActive)
+      } else {
+         locationManager.disarmRemoteStart()
       }
    }
 
@@ -889,7 +931,7 @@ final class RideSessionManager {
       _ request: RideRemoteCommandRequest,
       acknowledgement: RideRemoteCommandAcknowledgement
    ) {
-      let outcome = RideRemoteCommandValidator.evaluate(request, phase: state.phase)
+      var outcome = RideRemoteCommandValidator.evaluate(request, phase: state.phase)
 
       if outcome == .accepted {
          switch request.command {
@@ -897,6 +939,12 @@ final class RideSessionManager {
             case .pause: pause()
             case .resume: resume()
             case .end: end()
+         }
+
+         // The validator judges phase, not entitlement. A START the access gate
+         // refused must say so, or the wrist shows idle with no explanation.
+         if request.command == .start, !state.phase.isActive {
+            outcome = .accessLocked
          }
       }
 

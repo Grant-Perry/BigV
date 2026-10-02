@@ -90,10 +90,18 @@ final class BigVeloPlusStore: RideRecordingAccessing {
 
    private enum Key {
       static let trialBeganAt = "ride.access.trialBeganAt"
+      static let isPlus = "ride.access.isPlus"
    }
 
    // MARK: - Lifecycle
 
+   /// The entitlement is answered synchronously from the last verified result
+   /// and then re-verified against StoreKit's local receipt straight away.
+   ///
+   /// Neither waits on the product catalog. A START from the wrist can arrive
+   /// in the first second of a background launch, with no signal, long before
+   /// `Product.products(for:)` returns — and a rider whose trial has lapsed but
+   /// who owns Plus must not be refused while the catalog loads.
    init(defaults: UserDefaults = .standard) {
       self.defaults = defaults
       if let stored = defaults.object(forKey: Key.trialBeganAt) as? Date {
@@ -103,7 +111,11 @@ final class BigVeloPlusStore: RideRecordingAccessing {
          defaults.set(trialBeganAt, forKey: Key.trialBeganAt)
       }
 
+      isPlus = defaults.bool(forKey: Key.isPlus)
+
       updatesTask = Task { [weak self] in
+         await self?.refreshEntitlement()
+
          for await update in Transaction.updates {
             await self?.handle(update)
          }
@@ -116,6 +128,9 @@ final class BigVeloPlusStore: RideRecordingAccessing {
 
    // MARK: - Catalog
 
+   /// Fetches the catalog, then re-checks the entitlement either way: the
+   /// catalog needs the network, the receipt does not, and a failed fetch must
+   /// never leave a paying rider locked out.
    func loadProducts() async {
       guard !isLoadingProducts else { return }
       isLoadingProducts = true
@@ -130,11 +145,12 @@ final class BigVeloPlusStore: RideRecordingAccessing {
          yearlyProduct = loaded.first { $0.id == BigVeloPlusProductID.yearly.rawValue }
          lifetimeProduct = loaded.first { $0.id == BigVeloPlusProductID.lifetime.rawValue }
          DebugPrint(mode: .persistence, "StoreKit loaded \(loaded.count) Plus products")
-         await refreshEntitlement()
       } catch {
          lastErrorMessage = error.localizedDescription
          DebugPrint(mode: .persistence, "StoreKit product load failed: \(error.localizedDescription)")
       }
+
+      await refreshEntitlement()
    }
 
    // MARK: - Purchase
@@ -200,6 +216,9 @@ final class BigVeloPlusStore: RideRecordingAccessing {
          owned = true
          break
       }
+
+      // Remembered so the next launch answers correctly before this runs.
+      defaults.set(owned, forKey: Key.isPlus)
 
       #if DEBUG
       isPlus = owned || forcePlusInDebug

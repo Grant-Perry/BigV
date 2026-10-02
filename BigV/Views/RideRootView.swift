@@ -128,9 +128,8 @@ struct RideRootView: View {
       .sheet(isPresented: $isShowingRadarPairing) {
          RideRadarPairingView(pairingViewModel: rideRadarPairingViewModel)
       }
-      .onChange(of: scenePhase) { _, newPhase in
-         guard newPhase != .active else { return }
-         rideViewModel.flushPendingWork()
+      .onChange(of: scenePhase, initial: true) { _, newPhase in
+         rideViewModel.sceneDidChange(to: newPhase)
       }
       // A ride can start or end from the wrist while the rider is reading
       // history, so the cockpit comes to them rather than waiting to be found.

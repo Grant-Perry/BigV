@@ -17,6 +17,11 @@ nonisolated enum RideRemoteCommandOutcome: String, Sendable, CaseIterable {
    /// The command sat in a queue too long to still represent rider intent.
    case expired
 
+   /// The phone understood START but recording is locked: the free month is
+   /// over and no Plus entitlement is owned. Without this the wrist was told
+   /// "accepted" and quietly fell back to idle while the rider pedalled off.
+   case accessLocked
+
    /// The phone never heard it. Produced on the Watch when the transport fails,
    /// never sent over the wire.
    case undelivered
@@ -30,6 +35,7 @@ nonisolated enum RideRemoteCommandOutcome: String, Sendable, CaseIterable {
          case .accepted: nil
          case .ignoredForPhase: "Phone ignored that"
          case .expired: "Too late — try again"
+         case .accessLocked: "Unlock BigVelo on iPhone"
          case .undelivered: "Phone unreachable"
       }
    }

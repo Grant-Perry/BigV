@@ -39,6 +39,10 @@ final class RideWatchManager {
       case heartRate(Double?)
 
       case command(RideRemoteCommandRequest, RideRemoteCommandAcknowledgement)
+
+      /// Pairing or reachability moved. Lets the session decide whether a
+      /// START can still arrive from the wrist while the phone is pocketed.
+      case linkStateChanged(RideWatchLinkState)
    }
 
    // MARK: - Published State
@@ -279,6 +283,7 @@ final class RideWatchManager {
       // A link that just went quiet leaves the mirror stale, so the next publish
       // has to refresh the context rather than wait out the heartbeat.
       lastContextPublishedAt = nil
+      eventContinuation?.yield(.linkStateChanged(resolved))
 
       DebugPrint(mode: .sensors, "Watch link: \(resolved.rawValue)")
    }

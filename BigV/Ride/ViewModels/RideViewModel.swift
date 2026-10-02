@@ -379,6 +379,17 @@ final class RideViewModel {
 
    func flushPendingWork() { rideSessionManager.flushPendingWork() }
 
+   /// Scene phase, forwarded so the session can arm background location while
+   /// the app is still in front — the only time Core Location allows it.
+   func sceneDidChange(to phase: ScenePhase) {
+      if phase == .active {
+         rideSessionManager.sceneDidBecomeActive()
+      } else {
+         rideSessionManager.sceneDidResignActive()
+         flushPendingWork()
+      }
+   }
+
    // MARK: - Live Charts
 
    private(set) var selectedMetric: RideLiveMetric?
