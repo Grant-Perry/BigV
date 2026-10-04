@@ -71,8 +71,11 @@ final class CurrentLocationProbe {
          return nil
       }
 
-      if let stale = locationManager.location, Self.isUsable(stale) {
-         return remember(stale)
+      if let cached = locationManager.location,
+         Self.isUsable(cached),
+         cached.horizontalAccuracy >= 0,
+         Date.now.timeIntervalSince(cached.timestamp) < 120 {
+         return remember(cached)
       }
 
       guard let live = await Self.liveFix() else {

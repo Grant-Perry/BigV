@@ -109,6 +109,7 @@ struct RideTelemetryEngine {
    private var lastAcceptedLocation: CLLocation?
    private var distanceAnchor: CLLocation?
    private var elevationReference: Double?
+   private var needsReseed = false
    private var gradeWindow: [GradePoint] = []
    private var verticalWindow: [VerticalPoint] = []
 
@@ -150,6 +151,7 @@ struct RideTelemetryEngine {
       lastAcceptedLocation = nil
       distanceAnchor = nil
       elevationReference = nil
+      needsReseed = false
       gradeWindow.removeAll()
       verticalWindow.removeAll()
    }
@@ -187,6 +189,14 @@ struct RideTelemetryEngine {
       acceptedSampleCount = totals.acceptedSampleCount
    }
 
+   /// Forces the next fix to re-seed instead of integrating from the last
+   /// accepted one. A pause, however short, must not bill the rider's movement
+   /// during it (or the gap's moving time) as ride distance.
+   mutating func invalidateAnchor() {
+      guard hasFix else { return }
+      needsReseed = true
+   }
+
    /// Zeroes the displayed speed without disturbing totals.
    ///
    /// Used when samples stop arriving, so a stopped rider never sees a stale number.
@@ -220,6 +230,16 @@ struct RideTelemetryEngine {
       guard location.horizontalAccuracy <= configuration.maxHorizontalAccuracy else {
          rejectedSampleCount += 1
          return .rejected(.poorAccuracy)
+      }
+
+      if needsReseed {
+         guard location.horizontalAccuracy <= configuration.maxHorizontalAccuracy else {
+            rejectedSampleCount += 1
+            return .rejected(.poorAccuracy)
+         }
+         needsReseed = false
+         seed(with: location)
+         return .reseeded
       }
 
       let interval = location.timestamp.timeIntervalSince(previous.timestamp)

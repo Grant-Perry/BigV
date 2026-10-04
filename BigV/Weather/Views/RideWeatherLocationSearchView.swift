@@ -13,7 +13,7 @@ import SwiftUI
 /// follows it until the rider taps back to the GPS.
 struct RideWeatherLocationSearchView: View {
 
-   let onSelect: (CLLocationCoordinate2D, String) -> Void
+   let onSelect: (CLLocationCoordinate2D, String, TimeZone?) -> Void
 
    @Environment(\.dismiss) private var dismiss
    @State private var searchText = ""
@@ -152,7 +152,7 @@ struct RideWeatherLocationSearchView: View {
       let coordinate = item.location.coordinate
       guard CLLocationCoordinate2DIsValid(coordinate) else { return }
 
-      onSelect(coordinate, label(for: item))
+      onSelect(coordinate, label(for: item), item.timeZone)
       dismiss()
    }
 

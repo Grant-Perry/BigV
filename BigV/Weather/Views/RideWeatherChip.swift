@@ -22,7 +22,7 @@ struct RideWeatherChip: View {
       Button {
          isShowingForecast = true
       } label: {
-         if let snapshot = rideWeatherModel.snapshot {
+         if let snapshot = rideWeatherModel.displayedSnapshot {
             reading(snapshot)
          } else {
             placeholder
@@ -77,7 +77,7 @@ struct RideWeatherChip: View {
    // MARK: - Accessibility
 
    private var accessibilityValue: String {
-      guard let snapshot = rideWeatherModel.snapshot else {
+      guard let snapshot = rideWeatherModel.displayedSnapshot else {
          return rideWeatherModel.isLoading ? "Loading" : "Unavailable"
       }
 

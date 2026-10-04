@@ -106,13 +106,16 @@ actor RideWeatherClient {
 
    // MARK: - Daily
 
-   func dailyForecast(for location: CLLocation) async -> [RideWeatherDay] {
+   func dailyForecast(
+      for location: CLLocation,
+      timeZone: TimeZone = .current
+   ) async -> [RideWeatherDay] {
       let key = Self.cacheKey(for: location.coordinate)
 
       if let cached = dailyCache[key], cached.expires > .now { return cached.days }
       if let existing = dailyInFlight[key] { return await existing.value }
 
-      let task = Task { await fetchDaily(for: location, cacheKey: key) }
+      let task = Task { await fetchDaily(for: location, timeZone: timeZone, cacheKey: key) }
       dailyInFlight[key] = task
       let days = await task.value
       dailyInFlight[key] = nil
@@ -120,10 +123,17 @@ actor RideWeatherClient {
       return days
    }
 
-   private func fetchDaily(for location: CLLocation, cacheKey: String) async -> [RideWeatherDay] {
+   private func fetchDaily(
+      for location: CLLocation,
+      timeZone: TimeZone,
+      cacheKey: String
+   ) async -> [RideWeatherDay] {
       do {
          let forecast = try await weatherService.weather(for: location, including: .daily)
-         let calendar = Calendar.current
+         // The place's calendar, not the device's: a day boundary in Tokyo is not
+         // one in Denver.
+         var calendar = Calendar.current
+         calendar.timeZone = timeZone
 
          let days = forecast.forecast.map { day in
             RideWeatherDay(
@@ -332,8 +342,11 @@ final class RideWeatherService {
       return snapshot
    }
 
-   func dailyForecast(for location: CLLocation) async -> [RideWeatherDay] {
-      let days = await client.dailyForecast(for: location)
+   func dailyForecast(
+      for location: CLLocation,
+      timeZone: TimeZone = .current
+   ) async -> [RideWeatherDay] {
+      let days = await client.dailyForecast(for: location, timeZone: timeZone)
       await syncMetadata()
       return days
    }

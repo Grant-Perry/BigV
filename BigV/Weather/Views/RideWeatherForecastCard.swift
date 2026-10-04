@@ -17,6 +17,7 @@ struct RideWeatherForecastCard: View {
    let hours: [RideWeatherHour]
    let daily: [RideWeatherDay]
    let unit: RideTemperatureUnit
+   var timeZone: TimeZone = .current
 
    @State private var mode: Mode = .hourly
 
@@ -96,7 +97,9 @@ struct RideWeatherForecastCard: View {
 
    private func hourPill(_ hour: RideWeatherHour) -> some View {
       VStack(spacing: 6) {
-         Text(hour.date.formatted(.dateTime.hour(.defaultDigits(amPM: .abbreviated))))
+         Text(hour.date.formatted(
+            Date.FormatStyle(timeZone: timeZone).hour(.defaultDigits(amPM: .abbreviated))
+         ))
             .font(.system(size: 11, weight: .medium))
             .foregroundStyle(RideDashboardTheme.ink(0.5))
             .lineLimit(1)
@@ -126,7 +129,7 @@ struct RideWeatherForecastCard: View {
    }
 
    private func visibleHours(at now: Date) -> [RideWeatherHour] {
-      let currentHour = Calendar.current.dateInterval(of: .hour, for: now)?.start ?? now
+      let currentHour = calendar.dateInterval(of: .hour, for: now)?.start ?? now
       return Array(hours.lazy.filter { $0.date >= currentHour }.prefix(24))
    }
 
@@ -180,10 +183,16 @@ struct RideWeatherForecastCard: View {
    }
 
    private func dayLabel(for date: Date) -> String {
-      let calendar = Calendar.current
       if calendar.isDateInToday(date) { return "Today" }
       if calendar.isDateInTomorrow(date) { return "Tomorrow" }
-      return date.formatted(.dateTime.weekday(.abbreviated))
+      return date.formatted(Date.FormatStyle(timeZone: timeZone).weekday(.abbreviated))
+   }
+
+   /// The place's own calendar, so "Today" means today there, not on the wrist.
+   private var calendar: Calendar {
+      var calendar = Calendar.current
+      calendar.timeZone = timeZone
+      return calendar
    }
 
    // MARK: - Pieces

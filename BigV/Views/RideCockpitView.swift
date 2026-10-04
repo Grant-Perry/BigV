@@ -30,6 +30,7 @@ struct RideCockpitView: View {
    @State private var isShowingLapNotice = false
    @State private var acknowledgedLapPulse = 0
    @State private var lapNoticeDismissTask: Task<Void, Never>?
+   @State private var recoveryNoticeDismissTask: Task<Void, Never>?
 
    var body: some View {
       Group {
@@ -139,10 +140,12 @@ struct RideCockpitView: View {
       guard pulse > 0, pulse != acknowledgedRecoveryPulse else { return }
 
       acknowledgedRecoveryPulse = pulse
+      recoveryNoticeDismissTask?.cancel()
       withAnimation { isShowingRecoveryNotice = true }
 
-      Task {
+      recoveryNoticeDismissTask = Task {
          try? await Task.sleep(for: .seconds(6))
+         guard !Task.isCancelled else { return }
          withAnimation { isShowingRecoveryNotice = false }
       }
    }

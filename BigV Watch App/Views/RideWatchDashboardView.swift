@@ -38,7 +38,11 @@ struct RideWatchDashboardView: View {
                      .frame(maxWidth: .infinity, alignment: .leading)
                }
 
-               glance
+               // Freshness reads the clock, so the glance re-evaluates every
+               // second or a dead link would keep showing live numbers.
+               TimelineView(.periodic(from: .now, by: 1)) { _ in
+                  glance
+               }
             }
             .padding(.horizontal, 6)
          }

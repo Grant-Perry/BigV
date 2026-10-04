@@ -27,6 +27,9 @@ final class RideWeatherModel {
    private static let firstRetryInterval: TimeInterval = 30
    private static let maximumRetryInterval: TimeInterval = 10 * 60
 
+   /// Degrees; matches the client's roughly one-kilometre cache cell.
+   private static let matchTolerance = 0.02
+
    // MARK: - Published State
 
    private(set) var place: RideWeatherPlace?
@@ -79,7 +82,23 @@ final class RideWeatherModel {
    var canUseCurrentLocation: Bool { place?.source == .pinned }
 
    /// The chip has something worth a pill; otherwise it degrades to a glyph.
-   var hasReading: Bool { snapshot != nil }
+   var hasReading: Bool { displayedSnapshot != nil }
+
+   /// The snapshot, only while it still describes the place on screen and is
+   /// recent enough to trust. A failed refresh must not leave the last city's
+   /// temperature under a new city's name, or an hours-old one on the chip.
+   var displayedSnapshot: RideWeatherSnapshot? {
+      guard let snapshot else { return nil }
+      guard Date.now.timeIntervalSince(snapshot.fetchedAt) <= Self.refreshInterval * 2 else {
+         return nil
+      }
+      if let place {
+         guard abs(snapshot.latitude - place.latitude) < Self.matchTolerance,
+               abs(snapshot.longitude - place.longitude) < Self.matchTolerance
+         else { return nil }
+      }
+      return snapshot
+   }
 
    // MARK: - Refresh Loop
 
@@ -97,23 +116,25 @@ final class RideWeatherModel {
    /// still fresh, so the caller never has to reason about cadence.
    func refreshIfStale() async {
       let elapsed = Date.now.timeIntervalSince(lastAttemptAt ?? .distantPast)
-      guard elapsed >= (snapshot == nil ? retryInterval : Self.refreshInterval) else { return }
+      guard elapsed >= (isRetrying ? retryInterval : Self.refreshInterval) else { return }
 
       await refresh()
    }
 
    // MARK: - Location Control
 
-   func pin(coordinate: CLLocationCoordinate2D, label: String) async {
-      let pinned = RideWeatherPlace.pinned(coordinate: coordinate, label: label)
+   func pin(coordinate: CLLocationCoordinate2D, label: String, timeZone: TimeZone? = nil) async {
+      let pinned = RideWeatherPlace.pinned(coordinate: coordinate, label: label, timeZone: timeZone)
       RideWeatherPlaceStore.save(pinned)
       place = pinned
+      resetReading()
       await refresh()
    }
 
    func useCurrentLocation() async {
       RideWeatherPlaceStore.clear()
       place = nil
+      resetReading()
       await refresh()
    }
 
@@ -130,6 +151,13 @@ final class RideWeatherModel {
 
       guard let resolved = await resolvePlace() else {
          guard generation == loadGeneration else { return }
+
+         // A cancelled probe says nothing about the permission, so it must not
+         // be booked as a failure or push the backoff out.
+         guard !Task.isCancelled else {
+            abandonLoad()
+            return
+         }
          finish(generation: generation, snapshot: nil, message: Self.locationMessage)
          return
       }
@@ -139,6 +167,11 @@ final class RideWeatherModel {
 
       let reading = await weatherService.currentWeather(for: resolved.location)
       guard generation == loadGeneration else { return }
+
+      if reading == nil, Task.isCancelled {
+         abandonLoad()
+         return
+      }
 
       finish(
          generation: generation,
@@ -155,8 +188,21 @@ final class RideWeatherModel {
    private func beginLoad() -> Int {
       loadGeneration += 1
       lastAttemptAt = .now
-      isLoading = snapshot == nil
+      isLoading = displayedSnapshot == nil
       return loadGeneration
+   }
+
+   /// A different place invalidates everything known about the last one.
+   private func resetReading() {
+      snapshot = nil
+      failureMessage = nil
+      consecutiveFailures = 0
+      lastAttemptAt = nil
+   }
+
+   private func abandonLoad() {
+      isLoading = false
+      lastAttemptAt = nil
    }
 
    private func finish(generation: Int, snapshot reading: RideWeatherSnapshot?, message: String?) {
@@ -190,13 +236,17 @@ final class RideWeatherModel {
 
    // MARK: - Backoff
 
+   /// Backing off applies whenever the last attempt failed, even with an old
+   /// snapshot on hand, and before the first reading has ever landed.
+   private var isRetrying: Bool { consecutiveFailures > 0 || displayedSnapshot == nil }
+
    private var retryInterval: TimeInterval {
       let scaled = Self.firstRetryInterval * pow(2, Double(max(0, consecutiveFailures - 1)))
       return min(scaled, Self.maximumRetryInterval)
    }
 
    private var nextDelay: TimeInterval {
-      snapshot == nil ? retryInterval : Self.refreshInterval
+      isRetrying ? retryInterval : Self.refreshInterval
    }
 
    private static let locationMessage = "Location unavailable — allow location to see local weather."

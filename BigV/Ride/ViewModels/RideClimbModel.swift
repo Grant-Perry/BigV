@@ -67,6 +67,7 @@ final class RideClimbModel {
       let climb: PlannedClimb
       let startedAt: Date
       let startDistance: Double
+      let startElapsed: TimeInterval
    }
 
    // MARK: - Initialization
@@ -214,7 +215,8 @@ final class RideClimbModel {
       plannedClimbAnchor = ClimbAnchor(
          climb: climb,
          startedAt: .now,
-         startDistance: rideState.distance
+         startDistance: rideState.distance,
+         startElapsed: rideState.elapsedTime
       )
 
       if climb.category != .uncategorized, rideState.phase == .recording {
@@ -248,7 +250,8 @@ final class RideClimbModel {
          endDistance: rideState.distance,
          elevationGain: anchor.climb.ascent,
          averageGrade: anchor.climb.averageGrade,
-         category: anchor.climb.category
+         category: anchor.climb.category,
+         elapsed: rideState.elapsedTime - anchor.startElapsed
       )
       lastCompletedSplit = draft
       rideSessionManager?.record(climbSplit: draft)

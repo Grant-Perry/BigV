@@ -266,6 +266,13 @@ final class RideWatchLinkManager {
             case .metrics(let snapshot) = message
       else { return }
 
+      // The context outlives the ride by design. An old recording/paused
+      // snapshot must never open a workout on the wrist.
+      if snapshot.phase.isActive, !snapshot.isFresh(within: 60) {
+         DebugPrint(mode: .sessionLifecycle, "Ignored stale phone context: \(snapshot.phase.rawValue)")
+         return
+      }
+
       eventContinuation?.yield(.metrics(snapshot))
       DebugPrint(mode: .sessionLifecycle, "Seeded from phone context: \(snapshot.phase.rawValue)")
    }

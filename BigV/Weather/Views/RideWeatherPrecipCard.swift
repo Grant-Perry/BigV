@@ -16,6 +16,7 @@ struct RideWeatherPrecipCard: View {
    }
 
    let outlook: RidePrecipOutlook
+   var timeZone: TimeZone = .current
 
    @State private var mode: Mode = .next12Hours
 
@@ -89,7 +90,11 @@ struct RideWeatherPrecipCard: View {
    private func bars(at now: Date) -> [RidePrecipBar] {
       switch mode {
          case .next12Hours:
-            RidePrecipForecast.hourlyBars(hours: outlook.hours, anchor: now)
+            RidePrecipForecast.hourlyBars(
+               hours: outlook.hours,
+               anchor: now,
+               timeZone: timeZone
+            )
 
          case .nextHour:
             RidePrecipForecast.minuteBars(
@@ -102,7 +107,7 @@ struct RideWeatherPrecipCard: View {
 
    private func axisMarkers(for bars: [RidePrecipBar]) -> [RidePrecipAxisMarker] {
       switch mode {
-         case .next12Hours: RidePrecipForecast.hourlyAxisMarkers(for: bars)
+         case .next12Hours: RidePrecipForecast.hourlyAxisMarkers(for: bars, timeZone: timeZone)
          case .nextHour: RidePrecipForecast.minuteAxisMarkers
       }
    }
@@ -116,7 +121,7 @@ struct RideWeatherPrecipCard: View {
 
    private func summary(for bars: [RidePrecipBar], at now: Date) -> String {
       switch mode {
-         case .next12Hours: RidePrecipForecast.hourlySummary(bars: bars, now: now)
+         case .next12Hours: RidePrecipForecast.hourlySummary(bars: bars, now: now, timeZone: timeZone)
          case .nextHour: RidePrecipForecast.nextHourSummary(minuteBars: bars, now: now)
       }
    }

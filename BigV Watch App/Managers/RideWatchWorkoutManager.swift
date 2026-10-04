@@ -185,12 +185,14 @@ final class RideWatchWorkoutManager {
       // The rider can hit CANCEL inside the warm-up window. Starting the
       // activity anyway would leave a workout running behind an idle glance.
       guard !Task.isCancelled else {
+         endLiveSession(session)
          discardEndedSession()
          return closedStream(failing: nil)
       }
 
       guard session.state == .prepared else {
          DebugPrint(mode: .healthKit, "Sensors never warmed — stalled at \(session.state.label)")
+         endLiveSession(session)
          discardEndedSession()
          return closedStream(failing: "Heart rate sensor did not start")
       }
@@ -379,6 +381,17 @@ final class RideWatchWorkoutManager {
             failure = reason
             DebugPrint(mode: .healthKit, "Sensor session failed: \(reason)")
             discardEndedSession()
+      }
+   }
+
+   /// A cancelled or stalled start still owns a live HealthKit session. Dropping
+   /// the reference without ending it leaks a workout that watchOS keeps showing.
+   private func endLiveSession(_ session: HKWorkoutSession) {
+      switch session.state {
+         case .prepared, .running, .paused:
+            session.end()
+         default:
+            break
       }
    }
 

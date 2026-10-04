@@ -12,6 +12,7 @@ enum RideLocationIssue: String, Sendable, Equatable {
    case servicesDisabled
    case temporarilyUnavailable
    case failed
+   case reducedAccuracy
 
    var message: String {
       switch self {
@@ -19,6 +20,7 @@ enum RideLocationIssue: String, Sendable, Equatable {
          case .servicesDisabled: "Location Services are off for this device."
          case .temporarilyUnavailable: "No GPS signal."
          case .failed: "Location updates stopped unexpectedly."
+         case .reducedAccuracy: "Turn on Precise Location in Settings."
       }
    }
 
@@ -29,13 +31,14 @@ enum RideLocationIssue: String, Sendable, Equatable {
          case .servicesDisabled: "Turn on Location Services"
          case .temporarilyUnavailable: "No phone GPS yet"
          case .failed: "Phone GPS stopped"
+         case .reducedAccuracy: "Turn on Precise Location"
       }
    }
 
    /// Whether the rider must change something before recording can work.
    var requiresRiderAction: Bool {
       switch self {
-         case .authorizationDenied, .servicesDisabled: true
+         case .authorizationDenied, .servicesDisabled, .reducedAccuracy: true
          case .temporarilyUnavailable, .failed: false
       }
    }

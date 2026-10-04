@@ -29,11 +29,15 @@ nonisolated struct RideClimbSplitDraft: Sendable, Equatable {
    /// `nil` when the effort never earned a category.
    let category: ClimbCategory?
 
+   /// Ride-clock seconds the climb took, paused time excluded. `nil` falls back
+   /// to the wall-clock span of the dates.
+   var elapsed: TimeInterval?
+
    // MARK: - Derived
 
    var distance: Double { max(0, endDistance - startDistance) }
 
-   var duration: TimeInterval { max(0, endDate.timeIntervalSince(startDate)) }
+   var duration: TimeInterval { max(0, elapsed ?? endDate.timeIntervalSince(startDate)) }
 
    var averageSpeed: Double {
       duration > 0 ? distance / duration : 0

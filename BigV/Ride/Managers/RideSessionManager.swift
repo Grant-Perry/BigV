@@ -67,6 +67,7 @@ final class RideSessionManager {
    private var radarTask: Task<Void, Never>?
    private var radarHousekeepingTask: Task<Void, Never>?
    private var weatherStampTask: Task<Void, Never>?
+   private var endWeatherStampTask: Task<Void, Never>?
 
    private var lastSampleAt: Date?
 
@@ -90,6 +91,10 @@ final class RideSessionManager {
    /// on top of the live tracker's count so a recovered ride's traffic total
    /// picks up rather than restarting at zero.
    private var restoredRadarPassCount = 0
+
+   /// Passes persisted this ride. Only these count toward the summary, so the
+   /// figure always matches what the stored ride holds.
+   private var persistedRadarPassCount = 0
 
    /// Throttles checkpoint writes on the tick. The checkpoint only has to be
    /// fresh enough to prove the app was mid-ride, not accurate to the second.
@@ -169,6 +174,7 @@ final class RideSessionManager {
       state.radar = radar
       radarPassCountAtRideStart = radarTracker.vehiclePassCount
       restoredRadarPassCount = 0
+      persistedRadarPassCount = 0
       state.radar.vehiclePassCount = 0
       state.radar.closestPassDistanceMeters = nil
       state.radar.maximumPassClosingSpeedMetersPerSecond = nil
@@ -208,6 +214,10 @@ final class RideSessionManager {
 
       rideClock.endPause()
       lastSampleAt = nil
+
+      // However short the pause, the rider may have moved; the first fix after
+      // it re-seeds instead of integrating across the gap.
+      telemetryEngine.invalidateAnchor()
       state.phase = .recording
       writeCheckpoint(force: true)
       mirrorToWatch()
@@ -265,8 +275,9 @@ final class RideSessionManager {
       // and commit must file the ride that just ended, not the empty one
       // `start()` is about to publish.
       let finishedState = state
+      let endCoordinate = lastRiderCoordinate
       finalizeTask = Task { [weak self] in
-         await self?.finalizeRide(snapshot: finishedState)
+         await self?.finalizeRide(snapshot: finishedState, endCoordinate: endCoordinate)
       }
    }
 
@@ -296,6 +307,7 @@ final class RideSessionManager {
       lastSampleAt = nil
       lastRiderCoordinate = nil
       restoredRadarPassCount = 0
+      persistedRadarPassCount = 0
       heartRateRingBuffer.clear()
       mirrorToWatch()
    }
@@ -413,6 +425,7 @@ final class RideSessionManager {
 
       radarPassCountAtRideStart = radarTracker.vehiclePassCount
       restoredRadarPassCount = ride.vehicleCount
+      persistedRadarPassCount = 0
       state.radar.vehiclePassCount = ride.vehicleCount
       state.radar.closestPassDistanceMeters = ride.closestPassDistance
       state.radar.maximumPassClosingSpeedMetersPerSecond = ride.maximumClosingSpeed
@@ -462,7 +475,8 @@ final class RideSessionManager {
          completedLapCount: lastLap.index,
          anchorDate: lastLap.endDate,
          anchorDistance: lastLap.endDistance,
-         anchorElevationGain: ride.laps.reduce(0) { $0 + $1.elevationGain }
+         anchorElevationGain: ride.laps.reduce(0) { $0 + $1.elevationGain },
+         anchorElapsed: ride.laps.reduce(0) { $0 + $1.duration }
       )
    }
 
@@ -525,7 +539,7 @@ final class RideSessionManager {
 
    // MARK: - Finalization
 
-   private func finalizeRide(snapshot: RideState) async {
+   private func finalizeRide(snapshot: RideState, endCoordinate: CLLocationCoordinate2D?) async {
       guard let commit = rideFinalizer.commit(snapshot) else { return }
 
       // Follow Route can start the next ride before this task runs. Commit
@@ -538,7 +552,7 @@ final class RideSessionManager {
       }
 
       if let committedRide = commit.ride {
-         stampEndWeather(on: committedRide)
+         stampEndWeather(on: committedRide, at: endCoordinate)
       }
 
       guard let finishedRide = commit.ride, rideFinalizer.exportsToHealth else { return }
@@ -616,8 +630,8 @@ final class RideSessionManager {
             mirrorToWatch()
             DebugPrint(mode: .locationFiltering, "Location issue: \(issue.rawValue)")
 
-         case .location(let location):
-            state.locationIssue = nil
+         case .location(let location, let accuracyLimited):
+            state.locationIssue = accuracyLimited ? .reducedAccuracy : nil
             ingest(location)
       }
    }
@@ -688,12 +702,13 @@ final class RideSessionManager {
       }
    }
 
-   private func stampEndWeather(on ride: Ride) {
+   private func stampEndWeather(on ride: Ride, at coordinate: CLLocationCoordinate2D?) {
       guard let rideWeatherStamper else { return }
-      let coordinate = lastRiderCoordinate
 
-      weatherStampTask?.cancel()
-      weatherStampTask = Task {
+      // Its own task: a Follow Route restart stamps the next ride's start
+      // weather on `weatherStampTask`, which must not cancel this one.
+      endWeatherStampTask?.cancel()
+      endWeatherStampTask = Task {
          await rideWeatherStamper.stampEnd(
             on: ride,
             latitude: coordinate?.latitude,
@@ -731,6 +746,7 @@ final class RideSessionManager {
          distance: state.distance,
          elevationGain: state.elevationGain,
          at: .now,
+         elapsed: currentRideElapsed,
          trigger: .manual
       ) else { return }
 
@@ -751,11 +767,18 @@ final class RideSessionManager {
       DebugPrint(mode: .sessionLifecycle, "Climb split recorded: \(Int(draft.elevationGain)) m gained")
    }
 
+   /// Ride-clock seconds so far, pauses excluded; what laps are timed against.
+   private var currentRideElapsed: TimeInterval? {
+      guard let startDate = state.startDate else { return nil }
+      return rideClock.elapsed(since: startDate)
+   }
+
    private func cutAutoLapsIfNeeded() {
       let laps = lapTracker.autoLaps(
          distance: state.distance,
          elevationGain: state.elevationGain,
          at: .now,
+         elapsed: currentRideElapsed,
          every: rideLapSettings?.autoLapDistanceMeters
       )
 
@@ -772,6 +795,7 @@ final class RideSessionManager {
                distance: state.distance,
                elevationGain: state.elevationGain,
                at: state.endDate ?? .now,
+               elapsed: state.elapsedTime,
                trigger: .rideEnd
             )
       else { return }
@@ -884,6 +908,7 @@ final class RideSessionManager {
    /// stay at 0.00 while elevation shows that single fix.
    func sceneDidBecomeActive() {
       isSceneActive = true
+      locationManager.restartIfStalled(isInForeground: true)
       refreshRemoteStartReadiness()
    }
 
@@ -1153,6 +1178,8 @@ final class RideSessionManager {
          latitude: lastRiderCoordinate?.latitude,
          longitude: lastRiderCoordinate?.longitude
       )
+      persistedRadarPassCount += 1
+      state.radar.vehiclePassCount = restoredRadarPassCount + persistedRadarPassCount
       state.hasStorageFailure = rideStorageManager.hasFailure
 
       // Mirrored into the snapshot so the post-ride summary reads its radar
@@ -1191,9 +1218,7 @@ final class RideSessionManager {
       state.radar.nearestDistanceMeters = radarTracker.nearestTrack?.distanceMeters
       state.radar.nearestClosingSpeedMetersPerSecond =
          radarTracker.nearestTrack?.closingSpeedMetersPerSecond
-      state.radar.vehiclePassCount = restoredRadarPassCount + max(
-         0, radarTracker.vehiclePassCount - radarPassCountAtRideStart
-      )
+      state.radar.vehiclePassCount = restoredRadarPassCount + persistedRadarPassCount
    }
 
    /// Clears phantom vehicles when the radar stops reporting. Runs from both

@@ -47,7 +47,10 @@ final class RideWeatherDetailModel {
       weatherModel.place?.coordinate ?? Self.fallbackCoordinate
    }
 
-   var current: RideWeatherSnapshot? { weatherModel.snapshot }
+   var current: RideWeatherSnapshot? { weatherModel.displayedSnapshot }
+
+   /// The place's own zone; the device's for the GPS, which is where it is.
+   var timeZone: TimeZone { weatherModel.place?.timeZone ?? .current }
 
    var temperatureUnit: RideTemperatureUnit { weatherModel.temperatureUnit }
 
@@ -64,7 +67,8 @@ final class RideWeatherDetailModel {
    /// Today's row, which carries the sun times and the high/low the hero shows
    /// when the current conditions do not.
    var today: RideWeatherDay? {
-      let calendar = Calendar.current
+      var calendar = Calendar.current
+      calendar.timeZone = timeZone
       return daily.first { calendar.isDateInToday($0.calendarDayStart) } ?? daily.first
    }
 
@@ -76,12 +80,13 @@ final class RideWeatherDetailModel {
       isLoading = daily.isEmpty && precipOutlook.isEmpty
 
       await weatherModel.refreshIfStale()
-      guard generation == loadGeneration, let place = weatherModel.place else {
+      guard generation == loadGeneration else { return }
+      guard let place = weatherModel.place else {
          isLoading = false
          return
       }
 
-      async let forecast = weatherService.dailyForecast(for: place.location)
+      async let forecast = weatherService.dailyForecast(for: place.location, timeZone: place.timeZone)
       async let outlook = weatherService.precipOutlook(for: place.location)
 
       let days = await forecast
@@ -100,9 +105,13 @@ final class RideWeatherDetailModel {
 
    // MARK: - Location
 
-   func selectPlace(coordinate: CLLocationCoordinate2D, label: String) async {
+   func selectPlace(
+      coordinate: CLLocationCoordinate2D,
+      label: String,
+      timeZone: TimeZone? = nil
+   ) async {
       clearForecast()
-      await weatherModel.pin(coordinate: coordinate, label: label)
+      await weatherModel.pin(coordinate: coordinate, label: label, timeZone: timeZone)
       await load()
    }
 

@@ -76,6 +76,12 @@ final class RideHealthManager {
       let distance = ride.distance
       let activeEnergy = ride.activeEnergy
       let route = Self.routeLocations(from: ride.samples, within: start...end)
+      let pauses = Self.pauseIntervals(
+         from: ride.samples.map(\.timestamp),
+         start: start,
+         end: end,
+         rideDuration: ride.duration
+      )
 
       await requestAuthorizationIfNeeded()
 
@@ -89,7 +95,8 @@ final class RideHealthManager {
             from: start,
             to: end,
             distance: distance,
-            activeEnergy: activeEnergy
+            activeEnergy: activeEnergy,
+            pauses: pauses
          )
 
          await insertRoute(route, for: workout)
@@ -113,14 +120,16 @@ final class RideHealthManager {
       from start: Date,
       to end: Date,
       distance: Double,
-      activeEnergy: Double?
+      activeEnergy: Double?,
+      pauses: [DateInterval] = []
    ) async throws -> HKWorkout {
       do {
          return try await writeWorkoutUsingBuilder(
             from: start,
             to: end,
             distance: distance,
-            activeEnergy: activeEnergy
+            activeEnergy: activeEnergy,
+            pauses: pauses
          )
       } catch {
          DebugPrint(
@@ -131,7 +140,8 @@ final class RideHealthManager {
             from: start,
             to: end,
             distance: distance,
-            activeEnergy: activeEnergy
+            activeEnergy: activeEnergy,
+            pauses: pauses
          )
       }
    }
@@ -140,7 +150,8 @@ final class RideHealthManager {
       from start: Date,
       to end: Date,
       distance: Double,
-      activeEnergy: Double?
+      activeEnergy: Double?,
+      pauses: [DateInterval]
    ) async throws -> HKWorkout {
       let configuration = HKWorkoutConfiguration()
       configuration.activityType = .cycling
@@ -170,6 +181,20 @@ final class RideHealthManager {
          }
       }
 
+      if !pauses.isEmpty {
+         let events = pauses.flatMap { pause in
+            [
+               HKWorkoutEvent(type: .pause, dateInterval: DateInterval(start: pause.start, duration: 0), metadata: nil),
+               HKWorkoutEvent(type: .resume, dateInterval: DateInterval(start: pause.end, duration: 0), metadata: nil)
+            ]
+         }
+         do {
+            try await Self.add(events, to: workoutBuilder)
+         } catch {
+            DebugPrint(mode: .healthKit, "Pause events skipped: \(error.localizedDescription)")
+         }
+      }
+
       try await workoutBuilder.endCollection(at: end)
 
       guard let workout = try await workoutBuilder.finishWorkout() else {
@@ -191,6 +216,54 @@ final class RideHealthManager {
             }
          }
       }
+   }
+
+   private static func add(_ events: [HKWorkoutEvent], to workoutBuilder: HKWorkoutBuilder) async throws {
+      try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+         workoutBuilder.addWorkoutEvents(events) { _, error in
+            if let error {
+               continuation.resume(throwing: error)
+            } else {
+               continuation.resume()
+            }
+         }
+      }
+   }
+
+   /// Reconstructs where the ride was paused so Health's active duration matches
+   /// `ride.duration`. Pauses are not stored, but no samples are written while
+   /// paused, so the largest gaps between samples are where they were; the total
+   /// is exactly the wall time the ride clock excluded.
+   static func pauseIntervals(
+      from timestamps: [Date],
+      start: Date,
+      end: Date,
+      rideDuration: TimeInterval
+   ) -> [DateInterval] {
+      var remaining = (end.timeIntervalSince(start) - rideDuration)
+      guard remaining > 1 else { return [] }
+
+      let sorted = timestamps.filter { $0 >= start && $0 <= end }.sorted()
+      let gaps = zip(sorted, sorted.dropFirst())
+         .map { DateInterval(start: $0, end: $1) }
+         .filter { $0.duration > 5 }
+         .sorted { $0.duration > $1.duration }
+
+      var pauses: [DateInterval] = []
+
+      for gap in gaps where remaining > 1 {
+         let length = min(gap.duration, remaining)
+         pauses.append(DateInterval(start: gap.start, duration: length))
+         remaining -= length
+      }
+
+      // Anything unaccounted for is charged as one closing pause, so the
+      // workout's active time still matches the ride.
+      if remaining > 1 {
+         pauses.append(DateInterval(start: end.addingTimeInterval(-remaining), duration: remaining))
+      }
+
+      return pauses.sorted { $0.start < $1.start }
    }
 
    private func shareableSamples(_ samples: [HKQuantitySample]) -> [HKSample] {

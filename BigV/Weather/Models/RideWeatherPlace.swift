@@ -26,17 +26,23 @@ nonisolated struct RideWeatherPlace: Identifiable, Hashable, Sendable {
    let label: String
    let source: Source
 
+   /// IANA identifier of the place's own zone. `nil` means the device's, which
+   /// is right for the GPS and the fallback for an older saved pin.
+   let timeZoneIdentifier: String?
+
    init(
       id: UUID = UUID(),
       coordinate: CLLocationCoordinate2D,
       label: String,
-      source: Source
+      source: Source,
+      timeZone: TimeZone? = nil
    ) {
       self.id = id
       self.latitude = coordinate.latitude
       self.longitude = coordinate.longitude
       self.label = label
       self.source = source
+      self.timeZoneIdentifier = timeZone?.identifier
    }
 
    // MARK: - Geometry
@@ -51,13 +57,22 @@ nonisolated struct RideWeatherPlace: Identifiable, Hashable, Sendable {
 
    var isFollowingDevice: Bool { source == .device }
 
+   /// The zone every sun time and hour label for this place must be read in.
+   var timeZone: TimeZone {
+      timeZoneIdentifier.flatMap(TimeZone.init(identifier:)) ?? .current
+   }
+
    // MARK: - Factories
 
    static func device(coordinate: CLLocationCoordinate2D, label: String) -> RideWeatherPlace {
       RideWeatherPlace(coordinate: coordinate, label: label, source: .device)
    }
 
-   static func pinned(coordinate: CLLocationCoordinate2D, label: String) -> RideWeatherPlace {
-      RideWeatherPlace(coordinate: coordinate, label: label, source: .pinned)
+   static func pinned(
+      coordinate: CLLocationCoordinate2D,
+      label: String,
+      timeZone: TimeZone? = nil
+   ) -> RideWeatherPlace {
+      RideWeatherPlace(coordinate: coordinate, label: label, source: .pinned, timeZone: timeZone)
    }
 }

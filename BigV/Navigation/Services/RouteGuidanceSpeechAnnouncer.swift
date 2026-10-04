@@ -44,6 +44,11 @@ final class RouteGuidanceSpeechAnnouncer {
    private var utteranceToken = 0
    private var isUtterancePending = false
 
+   /// Phrases requested since the last utterance began. Cues landing in the same
+   /// tick ("Off route." then "Rerouting.") are spoken together rather than the
+   /// later one silently cancelling the earlier.
+   private var pendingPhrases: [String] = []
+
    /// The claim in flight, so two cues arriving together share one activation
    /// rather than racing to speak before the route is up.
    private var claimTask: Task<Bool, Never>?
@@ -71,12 +76,20 @@ final class RouteGuidanceSpeechAnnouncer {
 
    /// Says one phrase, abandoning anything still being said.
    ///
-   /// Guidance never queues: if a second cue arrives while the first is still
-   /// playing, the rider is closer to the turn than they were, so the newer
-   /// phrase is the only one that still helps.
+   /// Guidance never queues behind speech already playing: if a second cue
+   /// arrives while the first is being spoken, the rider is closer to the turn
+   /// than they were, so the newer phrase is the only one that still helps. The
+   /// exception is phrases requested before speech has begun, which are joined
+   /// so none is lost to a same-tick cancel.
    func speak(_ phrase: String) {
       let trimmed = phrase.trimmingCharacters(in: .whitespacesAndNewlines)
       guard isEnabled, !trimmed.isEmpty else { return }
+
+      if isUtterancePending {
+         pendingPhrases.append(trimmed)
+      } else {
+         pendingPhrases = [trimmed]
+      }
 
       utteranceTask?.cancel()
       utteranceToken += 1
@@ -102,8 +115,11 @@ final class RouteGuidanceSpeechAnnouncer {
          }
          isUtterancePending = false
 
+         let phrase = pendingPhrases.joined(separator: " ")
+         pendingPhrases = []
+
          guard claimed else { return }
-         utter(trimmed)
+         utter(phrase)
       }
    }
 
@@ -113,6 +129,7 @@ final class RouteGuidanceSpeechAnnouncer {
       utteranceTask = nil
       utteranceToken += 1
       isUtterancePending = false
+      pendingPhrases = []
 
       if synthesizer.isSpeaking {
          synthesizer.stopSpeaking(at: .immediate)

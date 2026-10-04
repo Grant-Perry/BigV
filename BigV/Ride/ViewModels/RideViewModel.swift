@@ -349,6 +349,7 @@ final class RideViewModel {
    }
    func reset() {
       clearSelectedMetric()
+      cancelMetricSwap()
       clearLiveRadarTimeline()
       selectedCockpitPage = .dashboard
       rideSessionManager.reset()
@@ -358,6 +359,7 @@ final class RideViewModel {
       presentAccessPaywallIfLocked()
       guard canBeginRide else { return }
       clearSelectedMetric()
+      cancelMetricSwap()
       clearLiveRadarTimeline()
       selectedCockpitPage = .dashboard
       rideSessionManager.reset()

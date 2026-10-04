@@ -9,6 +9,10 @@ import Foundation
 ///
 /// Versioned JSON so a future schema can migrate without breaking old files.
 /// HealthKit workout links are omitted — they are device-local identifiers.
+///
+/// Laps and climb splits ride along as optional arrays: files written before
+/// they were backed up decode with `nil` and restore without them, so the
+/// format version stays at 1. Restore counts a ride only once it has saved.
 nonisolated struct RideBackupPayload: Codable, Sendable {
 
    static let currentFormatVersion = 1
@@ -68,6 +72,37 @@ nonisolated struct RideBackupPayload: Codable, Sendable {
       var endTemperatureCelsius: Double?
       var samples: [SampleRecord]
       var radarEvents: [RadarEventRecord]
+
+      /// Optional: backups from before laps and climbs were included have none.
+      var laps: [LapRecord]?
+      var climbSplits: [ClimbSplitRecord]?
+   }
+
+   struct LapRecord: Codable, Sendable {
+      var index: Int
+      var startDate: Date
+      var endDate: Date
+      var startDistance: Double
+      var endDistance: Double
+      var distance: Double
+      var duration: TimeInterval
+      var elevationGain: Double
+      var averageSpeed: Double
+      var triggerRawValue: String
+   }
+
+   struct ClimbSplitRecord: Codable, Sendable {
+      var index: Int
+      var startDate: Date
+      var endDate: Date
+      var startDistance: Double
+      var endDistance: Double
+      var distance: Double
+      var duration: TimeInterval
+      var elevationGain: Double
+      var averageSpeed: Double
+      var averageGrade: Double
+      var categoryRawValue: Int?
    }
 
    struct SampleRecord: Codable, Sendable {

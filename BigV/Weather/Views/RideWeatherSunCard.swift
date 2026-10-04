@@ -9,6 +9,7 @@ import SwiftUI
 struct RideWeatherSunCard: View {
 
    let today: RideWeatherDay?
+   var timeZone: TimeZone = .current
 
    var body: some View {
       HStack(spacing: 0) {
@@ -71,7 +72,7 @@ struct RideWeatherSunCard: View {
 
    private func label(_ date: Date?) -> String {
       guard let date else { return RideFormatters.placeholder }
-      return date.formatted(date: .omitted, time: .shortened)
+      return date.formatted(Date.FormatStyle(date: .omitted, time: .shortened, timeZone: timeZone))
    }
 }
 

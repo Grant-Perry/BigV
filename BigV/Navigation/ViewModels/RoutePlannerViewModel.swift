@@ -171,6 +171,12 @@ final class RoutePlannerViewModel {
          guard let coordinate = await self?.currentLocationProbe.coordinate() else { return }
          self?.routeSearchService.biasResults(toward: coordinate)
       }
+
+      // Leaving the tab cancels enrichment mid-flight; pick it back up for any
+      // candidate still missing its profile.
+      if candidates.contains(where: { !$0.hasElevationProfile }) {
+         enrichCandidates(ticket: generation.issue())
+      }
    }
 
    func end() {
@@ -192,6 +198,15 @@ final class RoutePlannerViewModel {
       generation.retireAll()
       routeSearchService.stopUpdates()
       plannedRouteProvider.cancel()
+
+      // Cancelled work never reports back, so the flags it owned would spin
+      // forever. Suggestions go with the service's own cleared completions.
+      isPlanning = false
+      isPlanningApproach = false
+      isEnrichingElevation = false
+      queryText = ""
+      suggestions = []
+      searchFailure = nil
    }
 
    // MARK: - Search Intent

@@ -88,9 +88,11 @@ nonisolated enum RidePrecipForecast {
    static func hourlyBars(
       hours: [RideWeatherHour],
       anchor: Date,
-      limit: Int = hourCount
+      limit: Int = hourCount,
+      timeZone: TimeZone = .current
    ) -> [RidePrecipBar] {
-      let calendar = Calendar.current
+      var calendar = Calendar.current
+      calendar.timeZone = timeZone
       let startOfHour = calendar.date(
          from: calendar.dateComponents([.year, .month, .day, .hour], from: anchor)
       ) ?? anchor
@@ -123,17 +125,23 @@ nonisolated enum RidePrecipForecast {
 
    static var hourlyTitle: String { "Next \(hourCount) Hours" }
 
-   static func hourlySummary(bars: [RidePrecipBar], now: Date = .now) -> String {
+   static func hourlySummary(
+      bars: [RidePrecipBar],
+      now: Date = .now,
+      timeZone: TimeZone = .current
+   ) -> String {
       guard let firstWet = bars.first(where: \.isWet) else {
          return dryHourlySummary(bars: bars)
       }
 
       let start = bars.first?.date ?? now
-      if Calendar.current.isDate(firstWet.date, equalTo: start, toGranularity: .hour) {
+      var calendar = Calendar.current
+      calendar.timeZone = timeZone
+      if calendar.isDate(firstWet.date, equalTo: start, toGranularity: .hour) {
          return "Rain now"
       }
 
-      return "Rain starting around \(hourLabel(for: firstWet.date))"
+      return "Rain starting around \(hourLabel(for: firstWet.date, timeZone: timeZone))"
    }
 
    /// Naming the peak explains the short bars instead of leaving a rider to
@@ -146,14 +154,17 @@ nonisolated enum RidePrecipForecast {
    }
 
    /// Label every other bar plus the last, so twelve columns stay readable.
-   static func hourlyAxisMarkers(for bars: [RidePrecipBar]) -> [RidePrecipAxisMarker] {
+   static func hourlyAxisMarkers(
+      for bars: [RidePrecipBar],
+      timeZone: TimeZone = .current
+   ) -> [RidePrecipAxisMarker] {
       guard !bars.isEmpty else { return [] }
 
       let count = Double(bars.count)
       return bars.enumerated().compactMap { index, bar in
          guard index.isMultiple(of: 2) || index == bars.count - 1 else { return nil }
          return RidePrecipAxisMarker(
-            label: hourLabel(for: bar.date),
+            label: hourLabel(for: bar.date, timeZone: timeZone),
             fraction: (Double(index) + 0.5) / count
          )
       }
@@ -253,8 +264,8 @@ nonisolated enum RidePrecipForecast {
       "\(Int((min(1, max(0, fraction)) * 100).rounded()))%"
    }
 
-   static func hourLabel(for date: Date) -> String {
-      date.formatted(.dateTime.hour(.defaultDigits(amPM: .abbreviated)))
+   static func hourLabel(for date: Date, timeZone: TimeZone = .current) -> String {
+      date.formatted(Date.FormatStyle(timeZone: timeZone).hour(.defaultDigits(amPM: .abbreviated)))
          .lowercased()
          .replacingOccurrences(of: "m", with: "")
          .replacingOccurrences(of: " ", with: "")

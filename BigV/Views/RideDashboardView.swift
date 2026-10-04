@@ -24,7 +24,6 @@ struct RideDashboardView: View {
    var onSwipeForward: () -> Void = {}
 
    @Environment(\.verticalSizeClass) private var verticalSizeClass
-   @Environment(\.scenePhase) private var scenePhase
    @State private var isDrawerOpen = true
 
    /// Natural height of the tile grid, measured inside its scroll view.
@@ -55,18 +54,8 @@ struct RideDashboardView: View {
          }
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
-      // The magnetometer only matters while this screen is up: it is what
-      // gives the ribbon a heading at a standstill, and it costs battery, so
-      // it runs exactly as long as the cockpit is on screen and in front.
-      .onAppear { rideViewModel.startCompassHeading() }
-      .onDisappear { rideViewModel.stopCompassHeading() }
-      .onChange(of: scenePhase) { _, phase in
-         if phase == .active {
-            rideViewModel.startCompassHeading()
-         } else {
-            rideViewModel.stopCompassHeading()
-         }
-      }
+      // The magnetometer is driven by RideLivePagerView, which knows whether
+      // the dashboard or Traffic page is in front.
    }
 
    // MARK: - Portrait

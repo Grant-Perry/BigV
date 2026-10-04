@@ -132,6 +132,7 @@ final class RideBackupManager {
 
       var added = 0
       var skipped = 0
+      var failed = 0
 
       for record in payload.rides {
          let key = Self.identityKey(
@@ -144,13 +145,16 @@ final class RideBackupManager {
             continue
          }
 
-         rideStorageManager.importFinishedRide(record)
+         guard rideStorageManager.importFinishedRide(record) else {
+            failed += 1
+            continue
+         }
          added += 1
       }
 
       DebugPrint(
          mode: .persistence,
-         "Backup restored +\(added) rides, skipped \(skipped), prefs applied"
+         "Backup restored +\(added) rides, skipped \(skipped), failed \(failed), prefs applied"
       )
       return ImportResult(addedRideCount: added, skippedRideCount: skipped)
    }
@@ -237,7 +241,44 @@ final class RideBackupManager {
             .map(encode(sample:)),
          radarEvents: ride.radarEvents
             .sorted { $0.timestamp < $1.timestamp }
-            .map(encode(event:))
+            .map(encode(event:)),
+         laps: ride.laps
+            .sorted { $0.index < $1.index }
+            .map(encode(lap:)),
+         climbSplits: ride.climbSplits
+            .sorted { $0.index < $1.index }
+            .map(encode(split:))
+      )
+   }
+
+   private static func encode(lap: RideLap) -> RideBackupPayload.LapRecord {
+      RideBackupPayload.LapRecord(
+         index: lap.index,
+         startDate: lap.startDate,
+         endDate: lap.endDate,
+         startDistance: lap.startDistance,
+         endDistance: lap.endDistance,
+         distance: lap.distance,
+         duration: lap.duration,
+         elevationGain: lap.elevationGain,
+         averageSpeed: lap.averageSpeed,
+         triggerRawValue: lap.triggerRawValue
+      )
+   }
+
+   private static func encode(split: RideClimbSplit) -> RideBackupPayload.ClimbSplitRecord {
+      RideBackupPayload.ClimbSplitRecord(
+         index: split.index,
+         startDate: split.startDate,
+         endDate: split.endDate,
+         startDistance: split.startDistance,
+         endDistance: split.endDistance,
+         distance: split.distance,
+         duration: split.duration,
+         elevationGain: split.elevationGain,
+         averageSpeed: split.averageSpeed,
+         averageGrade: split.averageGrade,
+         categoryRawValue: split.categoryRawValue
       )
    }
 

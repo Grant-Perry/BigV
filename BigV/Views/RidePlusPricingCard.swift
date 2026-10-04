@@ -12,6 +12,8 @@ struct RidePlusPricingCard: View {
    @Bindable var plusStore: BigVeloPlusStore
    var accessibilityPrefix: String = "plus"
 
+   @Environment(\.scenePhase) private var scenePhase
+
    var body: some View {
       VStack(alignment: .leading, spacing: 10) {
          if plusStore.isPlus {
@@ -41,6 +43,18 @@ struct RidePlusPricingCard: View {
             emphasized: false
          )
 
+         if !plusStore.hasProducts && !plusStore.isLoadingProducts {
+            Button {
+               Task { await plusStore.loadProducts() }
+            } label: {
+               Label("Retry", systemImage: "arrow.clockwise")
+                  .font(.subheadline.weight(.semibold))
+            }
+            .buttonStyle(.bordered)
+            .tint(RideDashboardTheme.ice)
+            .accessibilityIdentifier("\(accessibilityPrefix).plus.retry")
+         }
+
          Text(Self.autoRenewCopy)
             .font(.caption2)
             .foregroundStyle(RideDashboardTheme.ink(0.5))
@@ -51,6 +65,12 @@ struct RidePlusPricingCard: View {
             Text(message)
                .font(.caption2)
                .foregroundStyle(RideDashboardTheme.halt)
+         }
+      }
+      // Catalog fetch can fail offline; try again when the rider comes back.
+      .onChange(of: scenePhase) { _, phase in
+         if phase == .active, !plusStore.hasProducts {
+            Task { await plusStore.loadProducts() }
          }
       }
    }

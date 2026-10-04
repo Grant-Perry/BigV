@@ -19,6 +19,7 @@ nonisolated enum RideWeatherPlaceStore {
       static let latitude = "ride.weather.pin.latitude"
       static let longitude = "ride.weather.pin.longitude"
       static let label = "ride.weather.pin.label"
+      static let timeZone = "ride.weather.pin.timeZone"
    }
 
    // MARK: - Access
@@ -35,18 +36,25 @@ nonisolated enum RideWeatherPlaceStore {
       guard CLLocationCoordinate2DIsValid(coordinate) else { return nil }
 
       let label = defaults.string(forKey: Key.label) ?? ""
-      return .pinned(coordinate: coordinate, label: label.isEmpty ? "Pinned" : label)
+      let timeZone = defaults.string(forKey: Key.timeZone).flatMap(TimeZone.init(identifier:))
+      return .pinned(
+         coordinate: coordinate,
+         label: label.isEmpty ? "Pinned" : label,
+         timeZone: timeZone
+      )
    }
 
    static func save(_ place: RideWeatherPlace, in defaults: UserDefaults = .standard) {
       defaults.set(place.latitude, forKey: Key.latitude)
       defaults.set(place.longitude, forKey: Key.longitude)
       defaults.set(place.label, forKey: Key.label)
+      defaults.set(place.timeZoneIdentifier, forKey: Key.timeZone)
    }
 
    static func clear(in defaults: UserDefaults = .standard) {
       defaults.removeObject(forKey: Key.latitude)
       defaults.removeObject(forKey: Key.longitude)
       defaults.removeObject(forKey: Key.label)
+      defaults.removeObject(forKey: Key.timeZone)
    }
 }

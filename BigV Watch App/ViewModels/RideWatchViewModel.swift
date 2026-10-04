@@ -62,6 +62,9 @@ final class RideWatchViewModel {
    private var activationTask: Task<Void, Never>?
    private var linkTask: Task<Void, Never>?
    private var sensorTask: Task<Void, Never>?
+   /// A cancelled task that may still be unwinding. The next start awaits it so a
+   /// stale task never discards the session the new one is using.
+   private var retiringSensorTask: Task<Void, Never>?
    private var noticeTask: Task<Void, Never>?
 
    // MARK: - Lifecycle
@@ -111,7 +114,7 @@ final class RideWatchViewModel {
       // sits in Health as an in-progress ride and is the first thing that
       // makes the phone's end-of-ride write fail. Mid-ride recovery still
       // starts: a reclaimed session, or the first active phase from the phone.
-      wantsSensing = rideWatchWorkoutManager.isSensing || phase.isActive
+      wantsSensing = wantsSensing || rideWatchWorkoutManager.isSensing || phase.isActive
       startSensingIfFrontmost()
    }
 
@@ -177,10 +180,12 @@ final class RideWatchViewModel {
 
    var isSensingHeartRate: Bool { rideWatchWorkoutManager.isSensing }
 
-   /// Whether the newest snapshot is recent enough to read as live. Event-driven:
-   /// it turns false when an old payload lands, not on a timer.
+   /// Whether the newest snapshot is recent enough to read as live. Re-read each
+   /// second by the dashboard's timeline, and false at once when the phone drops.
    var hasLiveMetrics: Bool {
-      guard phase.isActive, let snapshot else { return true }
+      guard phase.isActive else { return true }
+      if linkState == .unreachable { return false }
+      guard let snapshot else { return true }
       return snapshot.isFresh()
    }
 
@@ -283,6 +288,13 @@ final class RideWatchViewModel {
    private func apply(_ incoming: RideWatchMetricsSnapshot) {
       if let snapshot, incoming.capturedAt < snapshot.capturedAt { return }
 
+      // An active phase from an old payload (a queued context) must not start
+      // sensing; keep it only as dimmed data.
+      if incoming.phase.isActive, !incoming.isFresh(within: 60) {
+         snapshot = incoming
+         return
+      }
+
       playRadarHapticIfNeeded(for: incoming)
       snapshot = incoming
       adopt(incoming.phase)
@@ -347,9 +359,16 @@ final class RideWatchViewModel {
    private func startSensing() {
       sensorGeneration += 1
       let generation = sensorGeneration
+      let previous = retiringSensorTask
 
       sensorTask = Task { [weak self] in
          guard let self else { return }
+
+         await previous?.value
+         guard !Task.isCancelled else {
+            self.releaseSensorTask(generation)
+            return
+         }
 
          // One more recover before minting a session. A leftover system
          // session plus a new `startActivity()` is a guaranteed trip to the clock.
@@ -374,6 +393,7 @@ final class RideWatchViewModel {
 
    private func parkSensing() {
       sensorTask?.cancel()
+      if let sensorTask { retiringSensorTask = sensorTask }
       sensorTask = nil
 
       rideWatchWorkoutManager.parkSensing()

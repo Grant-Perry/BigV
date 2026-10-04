@@ -39,8 +39,14 @@ struct RideWeatherDetailSheet: View {
       .rideAppearance()
       .task { await weatherDetailModel.load() }
       .sheet(isPresented: $isShowingLocationSearch) {
-         RideWeatherLocationSearchView { coordinate, label in
-            Task { await weatherDetailModel.selectPlace(coordinate: coordinate, label: label) }
+         RideWeatherLocationSearchView { coordinate, label, timeZone in
+            Task {
+               await weatherDetailModel.selectPlace(
+                  coordinate: coordinate,
+                  label: label,
+                  timeZone: timeZone
+               )
+            }
          }
       }
    }
@@ -57,14 +63,18 @@ struct RideWeatherDetailSheet: View {
             RideWeatherForecastCard(
                hours: weatherDetailModel.precipOutlook.hours,
                daily: weatherDetailModel.daily,
-               unit: weatherDetailModel.temperatureUnit
+               unit: weatherDetailModel.temperatureUnit,
+               timeZone: weatherDetailModel.timeZone
             )
 
             if !weatherDetailModel.precipOutlook.isEmpty {
-               RideWeatherPrecipCard(outlook: weatherDetailModel.precipOutlook)
+               RideWeatherPrecipCard(
+                  outlook: weatherDetailModel.precipOutlook,
+                  timeZone: weatherDetailModel.timeZone
+               )
             }
 
-            RideWeatherSunCard(today: weatherDetailModel.today)
+            RideWeatherSunCard(today: weatherDetailModel.today, timeZone: weatherDetailModel.timeZone)
 
             RideWeatherAttributionLabel(url: weatherDetailModel.attributionURL)
                .frame(maxWidth: .infinity, alignment: .center)

@@ -93,6 +93,11 @@ final class BigVeloPlusStore: RideRecordingAccessing {
       static let isPlus = "ride.access.isPlus"
    }
 
+   /// Back-off between launch re-checks when StoreKit answered with nothing.
+   /// A cold `storekitd` or a sandbox session that needs re-auth usually
+   /// settles within the first pass or two.
+   private static let silentRetryDelays: [Duration] = [.seconds(3), .seconds(10), .seconds(30)]
+
    // MARK: - Lifecycle
 
    /// The entitlement is answered synchronously from the last verified result
@@ -114,7 +119,7 @@ final class BigVeloPlusStore: RideRecordingAccessing {
       isPlus = defaults.bool(forKey: Key.isPlus)
 
       updatesTask = Task { [weak self] in
-         await self?.refreshEntitlement()
+         await self?.refreshEntitlementAtLaunch()
 
          for await update in Transaction.updates {
             await self?.handle(update)
@@ -168,6 +173,10 @@ final class BigVeloPlusStore: RideRecordingAccessing {
             case .success(let verification):
                let transaction = try checkVerified(verification)
                await transaction.finish()
+               // The signed transaction in hand is the proof. Apply it before the
+               // receipt re-read so a slow or silent StoreKit can never leave a
+               // rider who just paid staring at the paywall.
+               apply(PlusEntitlementResolver.verdict(evidence: [evidence(from: transaction)]), authoritative: false)
                await refreshEntitlement()
                DebugPrint(mode: .persistence, "StoreKit purchase ok: \(product.id)")
                return true
@@ -193,7 +202,9 @@ final class BigVeloPlusStore: RideRecordingAccessing {
       lastErrorMessage = nil
       do {
          try await AppStore.sync()
-         await refreshEntitlement()
+         // Apple just re-sent the receipt on request, so this pass is allowed
+         // to say "nothing owned" — the only pass that is.
+         await refreshEntitlement(authoritative: true)
          DebugPrint(mode: .persistence, "StoreKit restore finished, isPlus=\(isPlus)")
       } catch {
          lastErrorMessage = error.localizedDescription
@@ -203,19 +214,52 @@ final class BigVeloPlusStore: RideRecordingAccessing {
 
    // MARK: - Entitlements
 
-   func refreshEntitlement() async {
-      var owned = false
+   /// Re-reads the local receipt and applies the verdict.
+   ///
+   /// Reads two views of the same receipt: `currentEntitlements` for what is
+   /// active now, and `latest(for:)` per product so a subscription that has
+   /// run out still counts as evidence. Without the second read a lapsed
+   /// yearly and an empty daemon look the same, and the store would either
+   /// lock out a paying rider or wave through a lapsed one.
+   ///
+   /// - Parameter authoritative: Pass `true` only after `AppStore.sync()`. On
+   ///   every other pass an empty answer leaves the remembered value alone.
+   @discardableResult
+   func refreshEntitlement(authoritative: Bool = false) async -> PlusEntitlementResolver.Verdict {
+      var evidence: [PlusEntitlementResolver.Evidence] = []
 
       for await result in Transaction.currentEntitlements {
          guard let transaction = try? checkVerified(result) else { continue }
-         guard BigVeloPlusProductID(rawValue: transaction.productID) != nil else { continue }
-
-         if transaction.revocationDate != nil { continue }
-         if let expiration = transaction.expirationDate, expiration < Date() { continue }
-
-         owned = true
-         break
+         evidence.append(self.evidence(from: transaction))
       }
+
+      for productID in BigVeloPlusProductID.allCases {
+         guard let result = await Transaction.latest(for: productID.rawValue),
+               let transaction = try? checkVerified(result) else { continue }
+         evidence.append(self.evidence(from: transaction))
+      }
+
+      let verdict = PlusEntitlementResolver.verdict(evidence: evidence)
+      apply(verdict, authoritative: authoritative)
+      DebugPrint(mode: .persistence, "StoreKit entitlement verdict=\(verdict) isPlus=\(isPlus)")
+      return verdict
+   }
+
+   /// First pass after launch, with a short back-off while StoreKit is silent.
+   /// Stops on the first real answer, or after the last retry, whichever comes
+   /// first; a rider with nothing to restore costs three cheap receipt reads.
+   private func refreshEntitlementAtLaunch() async {
+      var verdict = await refreshEntitlement()
+      for delay in Self.silentRetryDelays where verdict == .noEvidence {
+         try? await Task.sleep(for: delay)
+         guard !Task.isCancelled else { return }
+         verdict = await refreshEntitlement()
+      }
+   }
+
+   private func apply(_ verdict: PlusEntitlementResolver.Verdict, authoritative: Bool) {
+      let cached = defaults.bool(forKey: Key.isPlus)
+      let owned = PlusEntitlementResolver.isPlus(after: verdict, cached: cached, authoritative: authoritative)
 
       // Remembered so the next launch answers correctly before this runs.
       defaults.set(owned, forKey: Key.isPlus)
@@ -227,33 +271,52 @@ final class BigVeloPlusStore: RideRecordingAccessing {
       #endif
    }
 
+   private func evidence(from transaction: Transaction) -> PlusEntitlementResolver.Evidence {
+      PlusEntitlementResolver.Evidence(
+         productID: transaction.productID,
+         expirationDate: transaction.expirationDate,
+         revocationDate: transaction.revocationDate
+      )
+   }
+
    private func refreshEntitlement() {
       Task { await refreshEntitlement() }
    }
 
    // MARK: - Display Helpers
 
+   /// Shown instead of a made-up price when the catalog failed to load.
+   static let priceUnavailable = "Price unavailable"
+
+   /// True once the catalog has loaded; false after a failed or empty fetch.
+   var hasProducts: Bool {
+      monthlyProduct != nil || yearlyProduct != nil || lifetimeProduct != nil
+   }
+
    func displayPrice(for productID: BigVeloPlusProductID) -> String {
       switch productID {
          case .monthly:
-            return monthlyProduct?.displayPrice ?? "$4.99"
+            return monthlyProduct?.displayPrice ?? Self.priceUnavailable
          case .yearly:
-            return yearlyProduct?.displayPrice ?? "$29.99"
+            return yearlyProduct?.displayPrice ?? Self.priceUnavailable
          case .lifetime:
-            return lifetimeProduct?.displayPrice ?? "$79"
+            return lifetimeProduct?.displayPrice ?? Self.priceUnavailable
       }
    }
 
    var yearlyDetail: String {
-      "\(displayPrice(for: .yearly))/yr"
+      guard yearlyProduct != nil else { return Self.priceUnavailable }
+      return "\(displayPrice(for: .yearly))/yr"
    }
 
    var monthlyDetail: String {
-      "\(displayPrice(for: .monthly))/mo"
+      guard monthlyProduct != nil else { return Self.priceUnavailable }
+      return "\(displayPrice(for: .monthly))/mo"
    }
 
    var lifetimeDetail: String {
-      "\(displayPrice(for: .lifetime)) once"
+      guard lifetimeProduct != nil else { return Self.priceUnavailable }
+      return "\(displayPrice(for: .lifetime)) once"
    }
 
    // MARK: - Private
@@ -262,6 +325,12 @@ final class BigVeloPlusStore: RideRecordingAccessing {
       do {
          let transaction = try checkVerified(result)
          await transaction.finish()
+         // A renewal or Ask-to-Buy approval is proof on its own. A refund of
+         // one product is not proof the rider owns nothing else, so a lapse
+         // waits for the full read below.
+         if PlusEntitlementResolver.verdict(evidence: [evidence(from: transaction)]) == .owned {
+            apply(.owned, authoritative: false)
+         }
          await refreshEntitlement()
       } catch {
          DebugPrint(mode: .persistence, "StoreKit update verify failed: \(error.localizedDescription)")

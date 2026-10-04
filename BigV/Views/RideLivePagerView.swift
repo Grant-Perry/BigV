@@ -17,6 +17,7 @@ struct RideLivePagerView: View {
 
    @Environment(RideClimbModel.self) private var rideClimbModel
    @State private var isMapPageMounted = false
+   @Environment(\.scenePhase) private var scenePhase
 
    /// The radar page exists only when a radar does — no rider without one
    /// should ever swipe onto an empty road. The climb page is always present:
@@ -56,7 +57,20 @@ struct RideLivePagerView: View {
       .sensoryFeedback(.impact(weight: .medium), trigger: rideViewModel.metricSwapRequest) { _, request in
          request != nil
       }
+      // The magnetometer gives the ribbon a heading at a standstill and costs
+      // battery, so it runs only while a page showing it is in front.
+      .onAppear { updateCompass() }
+      .onDisappear {
+         rideViewModel.stopCompassHeading()
+         rideViewModel.cancelMetricSwap()
+      }
+      .onChange(of: scenePhase) { _, _ in updateCompass() }
+      .onChange(of: rideViewModel.isFinished) { _, finished in
+         if finished { rideViewModel.cancelMetricSwap() }
+         updateCompass()
+      }
       .onChange(of: rideViewModel.selectedCockpitPage) { _, page in
+         updateCompass()
          if page == .map { isMapPageMounted = true }
          routeGuidanceViewModel.collapseTurnList()
          // A card held on one page is not a card held on the next.
@@ -75,6 +89,18 @@ struct RideLivePagerView: View {
                rideViewModel.selectedCockpitPage == .dashboard
          else { return }
          withAnimation { rideViewModel.selectedCockpitPage = .climb }
+      }
+   }
+
+   private func updateCompass() {
+      let page = rideViewModel.selectedCockpitPage
+      let wantsCompass = (page == .dashboard || page == .traffic)
+         && scenePhase == .active
+         && !rideViewModel.isFinished
+      if wantsCompass {
+         rideViewModel.startCompassHeading()
+      } else {
+         rideViewModel.stopCompassHeading()
       }
    }
 

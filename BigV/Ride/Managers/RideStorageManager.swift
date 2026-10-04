@@ -352,8 +352,10 @@ final class RideStorageManager {
    // MARK: - Backup Import
 
    /// Inserts a finished ride from a Settings backup. Caller is responsible for
-   /// duplicate checks; this path always inserts.
-   func importFinishedRide(_ record: RideBackupPayload.RideRecord) {
+   /// duplicate checks; this path always inserts. Returns `false` — with the
+   /// context rolled back so nothing half-imported lingers — when the save fails.
+   @discardableResult
+   func importFinishedRide(_ record: RideBackupPayload.RideRecord) -> Bool {
       let ride = Ride(startDate: record.startDate, name: record.name)
       ride.endDate = record.endDate
       ride.duration = record.duration
@@ -412,7 +414,52 @@ final class RideStorageManager {
          modelContext.insert(event)
       }
 
-      save(reason: "backup import")
+      for lapRecord in record.laps ?? [] {
+         let trigger = RideLapTracker.Trigger(rawValue: lapRecord.triggerRawValue) ?? .manual
+         let lap = RideLap(lap: RideLapTracker.Lap(
+            index: lapRecord.index,
+            startDate: lapRecord.startDate,
+            endDate: lapRecord.endDate,
+            startDistance: lapRecord.startDistance,
+            endDistance: lapRecord.endDistance,
+            elevationGain: lapRecord.elevationGain,
+            trigger: trigger,
+            duration: lapRecord.duration
+         ))
+         // Lap derives these from its ends; keep what was stored at the cut.
+         lap.distance = lapRecord.distance
+         lap.duration = lapRecord.duration
+         lap.averageSpeed = lapRecord.averageSpeed
+         lap.ride = ride
+         modelContext.insert(lap)
+         ride.lapCount += 1
+      }
+
+      for splitRecord in record.climbSplits ?? [] {
+         let draft = RideClimbSplitDraft(
+            startDate: splitRecord.startDate,
+            endDate: splitRecord.endDate,
+            startDistance: splitRecord.startDistance,
+            endDistance: splitRecord.endDistance,
+            elevationGain: splitRecord.elevationGain,
+            averageGrade: splitRecord.averageGrade,
+            category: splitRecord.categoryRawValue.flatMap(ClimbCategory.init(rawValue:))
+         )
+         let split = RideClimbSplit(index: splitRecord.index, draft: draft)
+         split.distance = splitRecord.distance
+         split.duration = splitRecord.duration
+         split.averageSpeed = splitRecord.averageSpeed
+         split.categoryRawValue = splitRecord.categoryRawValue
+         split.ride = ride
+         modelContext.insert(split)
+         ride.climbSplitCount += 1
+      }
+
+      guard saveReportingSuccess(reason: "backup import") else {
+         modelContext.rollback()
+         return false
+      }
+      return true
    }
 
    // MARK: - Export Links
@@ -477,10 +524,16 @@ final class RideStorageManager {
    }
 
    private func save(reason: String) {
+      saveReportingSuccess(reason: reason)
+   }
+
+   /// Saves, reporting whether it stuck.
+   @discardableResult
+   private func saveReportingSuccess(reason: String) -> Bool {
       guard modelContext.hasChanges else {
          unsavedSampleCount = 0
          lastSaveDate = .now
-         return
+         return true
       }
 
       do {
@@ -490,8 +543,10 @@ final class RideStorageManager {
          lastFailure = nil
 
          DebugPrint(mode: .persistence, "Saved: \(reason)")
+         return true
       } catch {
          record(error, reason: reason)
+         return false
       }
    }
 

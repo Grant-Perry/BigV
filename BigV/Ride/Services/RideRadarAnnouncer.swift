@@ -92,7 +92,11 @@ final class RideRadarAnnouncer {
          guard let self else { return }
 
          let claimed = await self.claimSession()
-         guard claimed, token == self.toneToken else { return }
+         guard token == self.toneToken else { return }
+         guard claimed else {
+            self.settleWhenIdle(after: token)
+            return
+         }
          self.schedule(tone, token: token)
       }
    }

@@ -40,9 +40,10 @@ nonisolated struct RideLapTracker {
       let elevationGain: Double
       let trigger: Trigger
 
-      var distance: Double { max(0, endDistance - startDistance) }
+      /// Ride-clock seconds the lap covered, paused time excluded.
+      let duration: TimeInterval
 
-      var duration: TimeInterval { max(0, endDate.timeIntervalSince(startDate)) }
+      var distance: Double { max(0, endDistance - startDistance) }
 
       var averageSpeed: Double {
          duration > 0 ? distance / duration : 0
@@ -60,6 +61,7 @@ nonisolated struct RideLapTracker {
    private var anchorDate: Date?
    private var anchorDistance: Double = 0
    private var anchorElevationGain: Double = 0
+   private var anchorElapsed: TimeInterval = 0
 
    // MARK: - Lifecycle
 
@@ -68,6 +70,7 @@ nonisolated struct RideLapTracker {
       anchorDate = date
       anchorDistance = 0
       anchorElevationGain = 0
+      anchorElapsed = 0
       completedLapCount = 0
    }
 
@@ -75,6 +78,7 @@ nonisolated struct RideLapTracker {
       anchorDate = nil
       anchorDistance = 0
       anchorElevationGain = 0
+      anchorElapsed = 0
       completedLapCount = 0
    }
 
@@ -87,24 +91,33 @@ nonisolated struct RideLapTracker {
       completedLapCount: Int,
       anchorDate: Date,
       anchorDistance: Double,
-      anchorElevationGain: Double
+      anchorElevationGain: Double,
+      anchorElapsed: TimeInterval? = nil
    ) {
       self.completedLapCount = max(0, completedLapCount)
       self.anchorDate = anchorDate
       self.anchorDistance = max(0, anchorDistance)
       self.anchorElevationGain = max(0, anchorElevationGain)
+      self.anchorElapsed = max(0, anchorElapsed ?? 0)
    }
 
    // MARK: - Manual
 
    /// Cuts a lap here, wherever here is. `nil` before recording has begun.
+   ///
+   /// `elapsed` is the ride clock's total at this moment (pauses excluded). When
+   /// omitted the lap falls back to wall-clock time between the two dates.
    mutating func cut(
       distance: Double,
       elevationGain: Double,
       at date: Date,
+      elapsed: TimeInterval? = nil,
       trigger: Trigger = .manual
    ) -> Lap? {
       guard let startedAt = anchorDate else { return nil }
+
+      let lapDuration = elapsed.map { max(0, $0 - anchorElapsed) }
+         ?? max(0, date.timeIntervalSince(startedAt))
 
       let lap = Lap(
          index: completedLapCount + 1,
@@ -113,13 +126,15 @@ nonisolated struct RideLapTracker {
          startDistance: anchorDistance,
          endDistance: distance,
          elevationGain: max(0, elevationGain - anchorElevationGain),
-         trigger: trigger
+         trigger: trigger,
+         duration: lapDuration
       )
 
       completedLapCount += 1
       anchorDate = date
       anchorDistance = distance
       anchorElevationGain = elevationGain
+      anchorElapsed = elapsed ?? (anchorElapsed + lapDuration)
 
       return lap
    }
@@ -136,6 +151,7 @@ nonisolated struct RideLapTracker {
       distance: Double,
       elevationGain: Double,
       at date: Date,
+      elapsed: TimeInterval? = nil,
       every threshold: Double?
    ) -> [Lap] {
       guard anchorDate != nil, let threshold, threshold > 0 else { return [] }
@@ -147,6 +163,7 @@ nonisolated struct RideLapTracker {
             distance: anchorDistance + threshold,
             elevationGain: elevationGain,
             at: date,
+            elapsed: elapsed,
             trigger: .auto
          ) else { break }
 
