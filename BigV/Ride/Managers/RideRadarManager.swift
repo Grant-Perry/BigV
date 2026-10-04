@@ -80,6 +80,23 @@ final class RideRadarManager {
    /// and start its connect only after that callback lands.
    @ObservationIgnored private var pendingConnect: CBPeripheral?
 
+   /// Set once any GATT value arrives on the current link. A `didConnect`
+   /// alone proves nothing: a radar rejecting the pairing accepts the link
+   /// and drops it a few hundred milliseconds later, before a single read.
+   @ObservationIgnored private var isLinkProven = false
+
+   /// Consecutive connects that died before being proven. Resets with data.
+   @ObservationIgnored private var flapCount = 0
+
+   /// Flaps in a row before we stop blaming the radio and tell the rider to
+   /// put the radar in pairing mode. Two sub-second deaths back to back is
+   /// already unambiguous; a third just makes the rider watch it strobe.
+   @ObservationIgnored private let flapLimit = 2
+
+   /// Set when a connect to the remembered identifier timed out. The next
+   /// reconnect scans by service instead of retrying a UUID that may be dead.
+   @ObservationIgnored private var shouldScanOnReconnect = false
+
    /// 1 / 2 / 4 / 8 / 16 / 30 seconds, then hold at 30.
    @ObservationIgnored private let backoffLadder: [TimeInterval] = [1, 2, 4, 8, 16, 30]
 
@@ -146,6 +163,9 @@ final class RideRadarManager {
       reconnectTask?.cancel()
       reconnectTask = nil
       reconnectAttempt = 0
+      flapCount = 0
+      isLinkProven = false
+      shouldScanOnReconnect = false
 
       if let peripheral, let central {
          central.cancelPeripheralConnection(peripheral)
@@ -251,6 +271,7 @@ final class RideRadarManager {
       cancelConnectTimeout()
       reconnectTask?.cancel()
       reconnectTask = nil
+      flapCount = 0
 
       // The disconnect callback owns the cleanup, so the delegate path stays
       // the single place connection state changes.
@@ -292,7 +313,11 @@ final class RideRadarManager {
    }
 
    private func connectRememberedOrScan(with central: CBCentralManager) {
-      if let identifierString = UserDefaults.standard.string(forKey: PreferenceKey.peripheralIdentifier),
+      let scanInstead = shouldScanOnReconnect
+      shouldScanOnReconnect = false
+
+      if !scanInstead,
+         let identifierString = UserDefaults.standard.string(forKey: PreferenceKey.peripheralIdentifier),
          let identifier = UUID(uuidString: identifierString),
          let remembered = central.retrievePeripherals(withIdentifiers: [identifier]).first {
          connect(remembered, with: central)
@@ -368,6 +393,7 @@ final class RideRadarManager {
       pendingConnect = nil
       peripheral = target
       target.delegate = bridge
+      isLinkProven = false
 
       publishConnection(.connecting)
       // Skip EnableAutoReconnect on the handshake itself — it has been observed
@@ -383,8 +409,13 @@ final class RideRadarManager {
 
       cancelConnectTimeout()
       pendingConnect = nil
-      reconnectAttempt = 0
-      lastIssue = nil
+
+      // Backoff resets only once data flows (`markLinkProven`). Resetting here
+      // turned a radar that rejects pairing into a 1 s connect/drop hammer.
+      // Keep a pairing hint on screen until the link actually proves itself.
+      if lastIssue != .pairingRejected {
+         lastIssue = nil
+      }
 
       UserDefaults.standard.set(
          connected.identifier.uuidString,
@@ -410,7 +441,7 @@ final class RideRadarManager {
 
    fileprivate func centralDidFailToConnect(_ failed: CBPeripheral, error: Error?) {
       cancelConnectTimeout()
-      DebugPrint(mode: .radar, "Radar connect failed: \(error?.localizedDescription ?? "unknown")")
+      DebugPrint(mode: .radar, "Radar connect failed: \(describe(error))")
 
       if let pending = pendingConnect, let central {
          peripheral = nil
@@ -422,10 +453,7 @@ final class RideRadarManager {
 
       peripheral = nil
       publishConnection(.disconnected)
-
-      // Most common: the Garmin Varia app (or another bike app) still holds the
-      // single BLE slot. Surface the actionable copy.
-      publishIssue(.radarBusy)
+      publishIssue(.connectionFailed)
 
       if !isDiscovering {
          scheduleReconnect()
@@ -443,11 +471,26 @@ final class RideRadarManager {
 
       guard disconnected.identifier == peripheral?.identifier else { return }
 
+      let wasConnected = connection == .connected
+      let flapped = wasConnected && !isLinkProven
+      flapCount = flapped ? flapCount + 1 : 0
+      isLinkProven = false
+
+      DebugPrint(
+         mode: .radar,
+         "Radar disconnected: \(describe(error)) · proven=\(!flapped) · flaps=\(flapCount)"
+      )
+
       publishConnection(.disconnected)
       batteryPercent = nil
       peripheral = nil
 
-      if error != nil {
+      // iOS still holds a bond the radar has thrown away (radar reset, or
+      // re-paired to a Garmin). Every connect will die until the rider forgets
+      // the radar in Settings › Bluetooth. Say so on the first hit.
+      if isStaleBond(error) || flapCount >= flapLimit {
+         publishIssue(.pairingRejected)
+      } else if error != nil {
          publishIssue(.connectionLost)
       }
 
@@ -455,6 +498,31 @@ final class RideRadarManager {
       guard hasRememberedRadar, !isDiscovering else { return }
 
       scheduleReconnect()
+   }
+
+   /// First GATT value on this link: the radar is actually serving us. Only
+   /// now is it safe to forget prior failures and reset the backoff ladder.
+   private func markLinkProven() {
+      guard !isLinkProven else { return }
+      isLinkProven = true
+      flapCount = 0
+      reconnectAttempt = 0
+
+      if lastIssue == .pairingRejected || lastIssue == .connectionLost {
+         lastIssue = nil
+      }
+      DebugPrint(mode: .radar, "Radar link proven")
+   }
+
+   private func isStaleBond(_ error: Error?) -> Bool {
+      guard let cbError = error as? CBError else { return false }
+      return cbError.code == .peerRemovedPairingInformation
+   }
+
+   private func describe(_ error: Error?) -> String {
+      guard let error else { return "no error" }
+      let nsError = error as NSError
+      return "\(nsError.domain)#\(nsError.code) \(nsError.localizedDescription)"
    }
 
    private func scheduleReconnect() {
@@ -489,7 +557,12 @@ final class RideRadarManager {
          else { return }
 
          DebugPrint(mode: .radar, "Radar connect timed out")
-         self.cancelPendingConnection(reason: .radarBusy)
+         // A remembered identifier can stop resolving (the rider forgot the
+         // radar in Settings › Bluetooth, so iOS lost the key that resolved
+         // its private address). Retrying that UUID never ends; the next
+         // attempt scans by service and re-remembers whatever answers.
+         self.shouldScanOnReconnect = true
+         self.cancelPendingConnection(reason: .radarUnreachable)
          self.publishConnection(.disconnected)
 
          if !self.isDiscovering {
@@ -534,7 +607,10 @@ final class RideRadarManager {
 
    // MARK: - GATT
 
-   fileprivate func peripheralDidDiscoverServices(_ discovered: CBPeripheral) {
+   fileprivate func peripheralDidDiscoverServices(_ discovered: CBPeripheral, error: Error?) {
+      if let error {
+         DebugPrint(mode: .radar, "Service discovery failed: \(describe(error))")
+      }
       for service in discovered.services ?? [] {
          switch service.uuid {
             case radarService:
@@ -550,7 +626,14 @@ final class RideRadarManager {
       }
    }
 
-   fileprivate func peripheralDidDiscoverCharacteristics(of service: CBService, on discovered: CBPeripheral) {
+   fileprivate func peripheralDidDiscoverCharacteristics(
+      of service: CBService,
+      on discovered: CBPeripheral,
+      error: Error?
+   ) {
+      if let error {
+         DebugPrint(mode: .radar, "Characteristic discovery failed on \(service.uuid): \(describe(error))")
+      }
       for characteristic in service.characteristics ?? [] {
          switch characteristic.uuid {
             case threatCharacteristic:
@@ -572,8 +655,28 @@ final class RideRadarManager {
       }
    }
 
-   fileprivate func peripheralDidUpdateValue(for characteristic: CBCharacteristic) {
+   /// Subscription results. An ATT "insufficient authentication / encryption"
+   /// here is iPhone being told to pair before the radar will talk — the
+   /// tell-tale that precedes a rejected-pairing disconnect.
+   fileprivate func peripheralDidUpdateNotificationState(
+      for characteristic: CBCharacteristic,
+      error: Error?
+   ) {
+      if let error {
+         DebugPrint(mode: .radar, "Notify on \(characteristic.uuid) refused: \(describe(error))")
+      } else {
+         DebugPrint(mode: .radar, "Notify on \(characteristic.uuid): \(characteristic.isNotifying ? "on" : "off")")
+      }
+   }
+
+   fileprivate func peripheralDidUpdateValue(for characteristic: CBCharacteristic, error: Error?) {
+      if let error {
+         DebugPrint(mode: .radar, "Read of \(characteristic.uuid) failed: \(describe(error))")
+         return
+      }
       guard let data = characteristic.value else { return }
+
+      markLinkProven()
 
       switch characteristic.uuid {
          case threatCharacteristic:
@@ -675,7 +778,7 @@ private final class RideRadarDelegateBridge: NSObject,
    // MARK: - CBPeripheralDelegate
 
    func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
-      manager?.peripheralDidDiscoverServices(peripheral)
+      manager?.peripheralDidDiscoverServices(peripheral, error: error)
    }
 
    func peripheral(
@@ -683,7 +786,15 @@ private final class RideRadarDelegateBridge: NSObject,
       didDiscoverCharacteristicsFor service: CBService,
       error: Error?
    ) {
-      manager?.peripheralDidDiscoverCharacteristics(of: service, on: peripheral)
+      manager?.peripheralDidDiscoverCharacteristics(of: service, on: peripheral, error: error)
+   }
+
+   func peripheral(
+      _ peripheral: CBPeripheral,
+      didUpdateNotificationStateFor characteristic: CBCharacteristic,
+      error: Error?
+   ) {
+      manager?.peripheralDidUpdateNotificationState(for: characteristic, error: error)
    }
 
    func peripheral(
@@ -691,6 +802,6 @@ private final class RideRadarDelegateBridge: NSObject,
       didUpdateValueFor characteristic: CBCharacteristic,
       error: Error?
    ) {
-      manager?.peripheralDidUpdateValue(for: characteristic)
+      manager?.peripheralDidUpdateValue(for: characteristic, error: error)
    }
 }

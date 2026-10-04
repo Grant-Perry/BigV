@@ -18,7 +18,7 @@ nonisolated enum DebugConfig {
    /// - `.ride` — the live ride engine
    /// - `[.locationFiltering, .telemetry]` — specific areas
    #if DEBUG
-      static let activeMode: DebugMode = [.healthKit, .sessionLifecycle, .sensors]
+      static let activeMode: DebugMode = [.healthKit, .sessionLifecycle, .sensors, .radar]
    #else
       static let activeMode: DebugMode = .none
    #endif

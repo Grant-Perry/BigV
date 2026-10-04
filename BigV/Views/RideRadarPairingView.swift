@@ -181,6 +181,11 @@ struct RideRadarPairingView: View {
                   .tint(RideDashboardTheme.ice)
             }
 
+            // Nothing answering yet is the moment the rider needs the steps.
+            if pairingViewModel.discoveries.isEmpty {
+               RideRadarPairingStepsView()
+            }
+
             ForEach(pairingViewModel.discoveries) { discovery in
                Button {
                   pairingViewModel.connect(to: discovery.id)
@@ -203,6 +208,13 @@ struct RideRadarPairingView: View {
             }
          }
       } else if !pairingViewModel.isSimulated {
+         // First pairing: the steps lead, the button follows. With a radar
+         // already remembered the button is enough; the steps reappear once
+         // the rider starts a scan.
+         if !pairingViewModel.hasRememberedRadar {
+            RideRadarPairingStepsView()
+         }
+
          Button {
             pairingViewModel.beginScan()
          } label: {
