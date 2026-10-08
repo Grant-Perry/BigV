@@ -10,7 +10,9 @@ import Foundation
 ///
 /// Owns authorization, the live update sequence and the background activity
 /// session that keeps GPS alive while the phone is mounted and the screen is
-/// off. It performs no ride math; filtering lives in `RideTelemetryEngine`.
+/// off. The session exists exactly as long as a ride's stream does, so the
+/// system's location indicator means one thing: a ride is recording. It
+/// performs no ride math; filtering lives in `RideTelemetryEngine`.
 @MainActor
 final class RideLocationManager {
 
@@ -29,23 +31,9 @@ final class RideLocationManager {
    private var updatesTask: Task<Void, Never>?
    private var continuation: AsyncStream<Event>.Continuation?
 
-   /// Whether the held session should outlive the ride stream so a START from
-   /// the wrist can bring GPS up with the phone still in a pocket.
-   private var isArmedForRemoteStart = false
-
-   /// Whether the held session was opened while the app was in the foreground.
-   /// One opened from the background may be a dead object, so it is replaced
-   /// the next time the app is in front.
-   private var sessionBeganInForeground = false
-
    /// Whether the live stream ended on a problem only the rider can fix, with
    /// the consumer stream still open waiting for `restartIfStalled`.
    private var isStalled = false
-
-   /// Releases the standing session when no ride or Watch START has needed it
-   /// for a while, so an idle phone does not hold a location indicator forever.
-   private var idleDisarmTask: Task<Void, Never>?
-   private static let idleDisarmInterval: Duration = .seconds(600)
 
    /// Pause before re-opening a stream that failed, so a persistent error
    /// cannot spin.
@@ -67,34 +55,49 @@ final class RideLocationManager {
       }
    }
 
+   /// Whether a ride can bring GPS up with the app in the background.
+   ///
+   /// When In Use only delivers to an app that is in front, or that carried a
+   /// stream out of the foreground. A START from the wrist with the phone
+   /// locked in a pocket is neither, so it needs Always.
+   var canBeginFromBackground: Bool {
+      authorizationManager.authorizationStatus == .authorizedAlways
+   }
+
    func requestAuthorizationIfNeeded() {
       guard authorizationManager.authorizationStatus == .notDetermined else { return }
       authorizationManager.requestWhenInUseAuthorization()
+   }
+
+   /// Asks to step up from When In Use to Always. Foreground only; the system
+   /// shows the upgrade once per install, so this is called when a paired
+   /// Watch gives the rider a reason to say yes.
+   func requestAlwaysAuthorizationIfNeeded() {
+      guard authorizationManager.authorizationStatus == .authorizedWhenInUse else { return }
+      authorizationManager.requestAlwaysAuthorization()
    }
 
    // MARK: - Updates
 
    /// Starts location delivery. Any previous stream is torn down first.
    ///
-   /// The background session is reused, never recycled, here: a START that
-   /// arrives from the wrist with the phone locked is running in the
-   /// background, and the only session that can keep GPS alive from there is
-   /// one that was already open. See `armForRemoteStart(isInForeground:)`.
-   func startUpdates(isInForeground: Bool) -> AsyncStream<Event> {
+   /// The background activity session lives exactly as long as a ride's
+   /// stream. Nothing holds one between rides: the system keeps a session's
+   /// indicator up after the rider force quits the app and does not relaunch
+   /// the app to end it, so a session with no ride behind it would sit in the
+   /// Dynamic Island until the next launch.
+   func startUpdates() -> AsyncStream<Event> {
       stopStream()
       requestAuthorizationIfNeeded()
 
       if isAuthorized {
-         beginBackgroundSessionIfNeeded(isInForeground: isInForeground)
+         beginBackgroundSessionIfNeeded()
       }
 
       let (stream, continuation) = AsyncStream<Event>.makeStream(
          bufferingPolicy: .bufferingNewest(16)
       )
       self.continuation = continuation
-
-      idleDisarmTask?.cancel()
-      idleDisarmTask = nil
       launchConsumer(yielding: continuation)
 
       DebugPrint(mode: .sessionLifecycle, "Location updates started")
@@ -103,25 +106,19 @@ final class RideLocationManager {
 
    func stopUpdates() {
       stopStream()
-
-      if isArmedForRemoteStart {
-         scheduleIdleDisarm()
-      } else {
-         endBackgroundSession()
-      }
-
+      endBackgroundSession()
       DebugPrint(mode: .sessionLifecycle, "Location updates stopped")
    }
 
    /// Re-opens a stream that ended because the rider had to change something.
    /// Called when the scene comes forward and when authorization changes. A
    /// no-op unless a ride's stream is open and stalled.
-   func restartIfStalled(isInForeground: Bool) {
+   func restartIfStalled() {
       guard isStalled, let continuation, isAuthorized,
             CLLocationManager.locationServicesEnabled()
       else { return }
 
-      beginBackgroundSessionIfNeeded(isInForeground: isInForeground)
+      beginBackgroundSessionIfNeeded()
       launchConsumer(yielding: continuation)
       DebugPrint(mode: .sessionLifecycle, "Location updates restarted after rider action")
    }
@@ -135,7 +132,7 @@ final class RideLocationManager {
    }
 
    private func authorizationDidChange() {
-      restartIfStalled(isInForeground: false)
+      restartIfStalled()
    }
 
    private func stopStream() {
@@ -145,66 +142,6 @@ final class RideLocationManager {
 
       continuation?.finish()
       continuation = nil
-   }
-
-   // MARK: - Remote Start
-
-   /// Holds a background session open between rides so START from the wrist
-   /// works with the phone in a pocket.
-   ///
-   /// Core Location only lets a background activity session *begin* while the
-   /// app is in the foreground; from the background an app can rejoin a
-   /// session it already holds, never open a new one. A session first created
-   /// inside a Watch command therefore does nothing when the phone is locked:
-   /// one fix may land in the wake window, then the stream goes quiet and the
-   /// cockpit sits at 0.00 with the elevation of that single fix. Arming while
-   /// the rider still has the app in front is what makes the wrist START work.
-   ///
-   /// Calling this from the background is safe: it either rejoins a session
-   /// this app held before being terminated or quietly does nothing.
-   func armForRemoteStart(isInForeground: Bool) {
-      isArmedForRemoteStart = true
-      guard isAuthorized else { return }
-
-      if updatesTask == nil {
-         scheduleIdleDisarm()
-      }
-
-      // A session opened from the background is replaced as soon as the app
-      // is in front, where a fresh one is guaranteed to take.
-      if isInForeground, backgroundSession != nil, !sessionBeganInForeground {
-         endBackgroundSession()
-      }
-
-      beginBackgroundSessionIfNeeded(isInForeground: isInForeground)
-   }
-
-   /// Releases the held session once no ride needs it. No Watch, no reason
-   /// to show the rider a location indicator between rides.
-   func disarmRemoteStart() {
-      isArmedForRemoteStart = false
-      idleDisarmTask?.cancel()
-      idleDisarmTask = nil
-      guard updatesTask == nil else { return }
-      endBackgroundSession()
-   }
-
-   /// Starts the inactivity countdown. Re-arming (the app coming forward, a
-   /// Watch link change) restarts it, so a rider who opens the app is covered
-   /// again for another window.
-   private func scheduleIdleDisarm() {
-      idleDisarmTask?.cancel()
-      idleDisarmTask = Task { [weak self] in
-         do {
-            try await Task.sleep(for: Self.idleDisarmInterval)
-         } catch {
-            return
-         }
-
-         guard let self, self.updatesTask == nil else { return }
-         DebugPrint(mode: .sessionLifecycle, "Remote start disarmed after idle timeout")
-         self.disarmRemoteStart()
-      }
    }
 
    // MARK: - Consumption
@@ -232,7 +169,7 @@ final class RideLocationManager {
 
                if update.locationUnavailable {
                   if isAuthorized {
-                     beginBackgroundSessionIfNeeded(isInForeground: false)
+                     beginBackgroundSessionIfNeeded()
                   }
                   continuation.yield(.issue(.temporarilyUnavailable))
                   continue
@@ -240,7 +177,7 @@ final class RideLocationManager {
 
                guard let location = update.location else { continue }
 
-               beginBackgroundSessionIfNeeded(isInForeground: false)
+               beginBackgroundSessionIfNeeded()
                continuation.yield(.location(location, accuracyLimited: update.accuracyLimited))
             }
          } catch {
@@ -266,15 +203,11 @@ final class RideLocationManager {
    /// the phone is locked. Create it as soon as we already have when-in-use;
    /// a first-launch prompt still waits for `isAuthorized` so we do not
    /// race the grant.
-   private func beginBackgroundSessionIfNeeded(isInForeground: Bool) {
+   private func beginBackgroundSessionIfNeeded() {
       guard backgroundSession == nil else { return }
 
       backgroundSession = CLBackgroundActivitySession()
-      sessionBeganInForeground = isInForeground
-      DebugPrint(
-         mode: .sessionLifecycle,
-         "Background activity session started (\(isInForeground ? "foreground" : "background"))"
-      )
+      DebugPrint(mode: .sessionLifecycle, "Background activity session started")
    }
 
    private func endBackgroundSession() {
@@ -282,7 +215,6 @@ final class RideLocationManager {
 
       backgroundSession.invalidate()
       self.backgroundSession = nil
-      sessionBeganInForeground = false
       DebugPrint(mode: .sessionLifecycle, "Background activity session ended")
    }
 }

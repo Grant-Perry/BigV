@@ -78,10 +78,11 @@ final class CurrentLocationProbe {
          return remember(cached)
       }
 
-      guard let live = await Self.liveFix() else {
-         DebugPrint(mode: .navigation, "Location probe found no fix")
-         return nil
-      }
+      DebugPrint(mode: .sessionLifecycle, "Location probe live fix started")
+      let live = await Self.liveFix()
+      DebugPrint(mode: .sessionLifecycle, "Location probe live fix ended (\(live == nil ? "no fix" : "fix"))")
+
+      guard let live else { return nil }
 
       return remember(live)
    }

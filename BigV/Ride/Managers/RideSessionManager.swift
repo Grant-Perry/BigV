@@ -71,9 +71,9 @@ final class RideSessionManager {
 
    private var lastSampleAt: Date?
 
-   /// Whether the scene is in front, reported by the root view. Core Location
-   /// only lets a background activity session begin from the foreground, so the
-   /// location manager has to be told which side of that line a call is on.
+   /// Whether the scene is in front, reported by the root view. A START from
+   /// the wrist is judged against it: with only When In Use location, a ride
+   /// begun from the background would record nothing.
    private var isSceneActive = false
 
    /// The last accepted fix, kept so a radar pass can be stamped with where the
@@ -372,6 +372,10 @@ final class RideSessionManager {
          }
       }
 
+      // No ride to resume means no background activity session is recreated.
+      // A session the previous process left with the system is dropped by the
+      // system once the app launches without rejoining it; creating one here
+      // "to end it" would register a fresh session instead.
       if !hasResumed {
          checkpointStore.clear()
       }
@@ -582,7 +586,7 @@ final class RideSessionManager {
    // MARK: - Streams
 
    private func startLocationStream() {
-      let stream = locationManager.startUpdates(isInForeground: isSceneActive)
+      let stream = locationManager.startUpdates()
 
       locationTask = Task { [weak self] in
          for await event in stream {
@@ -891,43 +895,39 @@ final class RideSessionManager {
             apply(request, acknowledgement: acknowledgement)
 
          case .linkStateChanged:
-            refreshRemoteStartReadiness()
+            prepareRemoteStartIfNeeded()
       }
    }
 
    // MARK: - Scene Activity
 
    /// Called by the root view on every foreground entry.
-   ///
-   /// This is the one moment a background activity session can be opened, so
-   /// the location manager is armed here whenever a Watch is paired: a START
-   /// from the wrist later, with the phone locked in a pocket, then rejoins a
-   /// session that is already running instead of trying to open one from the
-   /// background, which Core Location silently refuses. Without this the ride
-   /// gets one fix in the wake window and then nothing — speed and distance
-   /// stay at 0.00 while elevation shows that single fix.
    func sceneDidBecomeActive() {
       isSceneActive = true
-      locationManager.restartIfStalled(isInForeground: true)
-      refreshRemoteStartReadiness()
+      locationManager.restartIfStalled()
+      prepareRemoteStartIfNeeded()
    }
 
    func sceneDidResignActive() {
       isSceneActive = false
    }
 
-   /// Arms or releases the standing background session to match the wrist link.
+   /// Asks for Always location once a Watch is paired and the app is in front.
    ///
-   /// Runs from the background too: that is harmless, and after a background
-   /// relaunch it is what rejoins a session the previous process held.
-   private func refreshRemoteStartReadiness() {
-      guard let rideWatchManager else { return }
+   /// A START from the wrist with the phone locked in a pocket runs in the
+   /// background, where When In Use delivers nothing: the ride would get one
+   /// fix in the wake window and then sit at 0.00. Always is what lets that
+   /// START bring GPS up, and the system only shows the upgrade from the
+   /// foreground. No standing session is held between rides to work around
+   /// this — one would survive a force quit as a location indicator with no
+   /// ride behind it.
+   private func prepareRemoteStartIfNeeded() {
+      guard isSceneActive,
+            let rideWatchManager,
+            rideWatchManager.linkState.allowsQueuedUpdates
+      else { return }
 
-      if rideWatchManager.linkState.allowsQueuedUpdates {
-         locationManager.armForRemoteStart(isInForeground: isSceneActive)
-      } else {
-         locationManager.disarmRemoteStart()
-      }
+      locationManager.requestAlwaysAuthorizationIfNeeded()
    }
 
    /// Drops a pulse the wrist stopped sending.
@@ -957,6 +957,15 @@ final class RideSessionManager {
       acknowledgement: RideRemoteCommandAcknowledgement
    ) {
       var outcome = RideRemoteCommandValidator.evaluate(request, phase: state.phase)
+
+      // A START with the app in the background and only When In Use would
+      // record a ride with no GPS behind it. Refuse it with the reason instead.
+      if outcome == .accepted,
+         request.command == .start,
+         !isSceneActive,
+         !locationManager.canBeginFromBackground {
+         outcome = .needsPhoneInUse
+      }
 
       if outcome == .accepted {
          switch request.command {

@@ -22,6 +22,11 @@ nonisolated enum RideRemoteCommandOutcome: String, Sendable, CaseIterable {
    /// "accepted" and quietly fell back to idle while the rider pedalled off.
    case accessLocked
 
+   /// START arrived with the app in the background and only When In Use
+   /// location, which delivers nothing there. Opening BigVelo on the phone, or
+   /// allowing Always location, lifts it.
+   case needsPhoneInUse
+
    /// The phone never heard it. Produced on the Watch when the transport fails,
    /// never sent over the wire.
    case undelivered
@@ -36,6 +41,7 @@ nonisolated enum RideRemoteCommandOutcome: String, Sendable, CaseIterable {
          case .ignoredForPhase: "Phone ignored that"
          case .expired: "Too late — try again"
          case .accessLocked: "Unlock BigVelo on iPhone"
+         case .needsPhoneInUse: "Open BigVelo on iPhone"
          case .undelivered: "Phone unreachable"
       }
    }
