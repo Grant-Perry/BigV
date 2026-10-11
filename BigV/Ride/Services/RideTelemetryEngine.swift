@@ -14,68 +14,6 @@ import Foundation
 /// before it is allowed to move a number the rider sees.
 struct RideTelemetryEngine {
 
-   // MARK: - Configuration
-
-   struct Configuration: Sendable {
-
-      /// Accuracy required to declare an initial fix. Loose on purpose: the
-      /// first lock just has to start the ride. Recording still uses
-      /// `maxHorizontalAccuracy`.
-      var fixAcquisitionAccuracy: Double = 65
-
-      /// Accuracy required for a sample to contribute once recording.
-      var maxHorizontalAccuracy: Double = 20
-
-      /// Vertical accuracy required before altitude is trusted.
-      var maxVerticalAccuracy: Double = 12
-
-      /// Anything faster is a GPS jump, not a bicycle. 26.8 m/s is 60 mph.
-      var maxPlausibleSpeed: Double = 26.8
-
-      /// Speed at or above which the rider counts as moving. 0.9 m/s is 2 mph.
-      var movingSpeedThreshold: Double = 0.9
-
-      var speedSmoothingFactor: Double = 0.35
-      var altitudeSmoothingFactor: Double = 0.2
-
-      /// Altitude must change by this much before it counts as gain or loss.
-      var elevationHysteresis: Double = 1.5
-
-      /// Minimum run required before grade is meaningful.
-      var gradeWindowDistance: Double = 40
-      var maxGradeMagnitude: Double = 25
-
-      /// Seconds of altitude history behind the VAM figure. Thirty seconds is
-      /// the convention the number is defined by — long enough to ride out GPS
-      /// altitude wobble, short enough to answer "how fast am I climbing now".
-      var verticalSpeedWindow: TimeInterval = 30
-
-      /// A larger gap between samples is treated as a signal dropout.
-      var maxSampleGap: TimeInterval = 10
-
-      static let `default` = Configuration()
-   }
-
-   // MARK: - Sample Outcomes
-
-   enum Rejection: String, Sendable, Equatable {
-      case invalidAccuracy
-      case poorAccuracy
-      case staleTimestamp
-      case implausibleJump
-   }
-
-   enum Outcome: Sendable, Equatable {
-      /// First usable fix of the ride.
-      case acquiredFix
-
-      /// Signal returned after a dropout; accumulators re-anchored.
-      case reseeded
-
-      case accepted
-      case rejected(Rejection)
-   }
-
    // MARK: - Published Telemetry
 
    private(set) var speed: Double = 0
@@ -105,9 +43,24 @@ struct RideTelemetryEngine {
 
    // MARK: - Private State
 
-   private let configuration: Configuration
+   /// Read by the coarse-fix extension; the engine's own file is the only
+   /// place that mutates state.
+   let configuration: Configuration
    private var lastAcceptedLocation: CLLocation?
-   private var distanceAnchor: CLLocation?
+   private(set) var distanceAnchor: CLLocation?
+
+   /// Whether the anchor was placed by a coarse sample. The first precise
+   /// sample after one re-anchors instead of measuring against a position
+   /// that could be tens of metres off.
+   private(set) var anchorIsCoarse = false
+
+   /// Speed from position alone while loose fixes carry no satellite speed.
+   private var coarseGeometry = CoarseGeometry()
+
+   /// Whether geometry has overruled a reported standstill and is still
+   /// carrying speed sample to sample. Released the moment the reported speed
+   /// comes back or the position itself stops advancing.
+   private var isOverridingStandstill = false
    private var elevationReference: Double?
    private var needsReseed = false
    private var gradeWindow: [GradePoint] = []
@@ -150,6 +103,9 @@ struct RideTelemetryEngine {
       rejectedSampleCount = 0
       lastAcceptedLocation = nil
       distanceAnchor = nil
+      anchorIsCoarse = false
+      isOverridingStandstill = false
+      coarseGeometry.reset()
       elevationReference = nil
       needsReseed = false
       gradeWindow.removeAll()
@@ -157,18 +113,6 @@ struct RideTelemetryEngine {
    }
 
    // MARK: - Restore
-
-   /// Totals carried over from a ride the app was killed in the middle of.
-   struct RestoredTotals: Sendable, Equatable {
-
-      var distance: Double = 0
-      var movingTime: TimeInterval = 0
-      var maximumSpeed: Double = 0
-      var elevationGain: Double = 0
-      var elevationLoss: Double = 0
-      var altitude: Double?
-      var acceptedSampleCount: Int = 0
-   }
 
    /// Reloads a ride's accumulated totals without a position anchor.
    ///
@@ -203,6 +147,7 @@ struct RideTelemetryEngine {
    mutating func markSpeedStale() {
       speed = 0
       isMoving = false
+      isOverridingStandstill = false
       grade = 0
       verticalSpeed = 0
       verticalWindow.removeAll()
@@ -223,17 +168,24 @@ struct RideTelemetryEngine {
             rejectedSampleCount += 1
             return .rejected(.poorAccuracy)
          }
-         seed(with: location)
+         // A Wi-Fi fix is good enough to start the clock, not to measure from.
+         seed(
+            with: location,
+            isCoarse: location.horizontalAccuracy > configuration.maxHorizontalAccuracy
+         )
          return .acquiredFix
       }
 
-      guard location.horizontalAccuracy <= configuration.maxHorizontalAccuracy else {
+      let isPrecise = location.horizontalAccuracy <= configuration.maxHorizontalAccuracy
+
+      guard isPrecise || isUsableCoarseSample(location) else {
          rejectedSampleCount += 1
          return .rejected(.poorAccuracy)
       }
 
+      // Re-anchoring needs a position worth anchoring to.
       if needsReseed {
-         guard location.horizontalAccuracy <= configuration.maxHorizontalAccuracy else {
+         guard isPrecise else {
             rejectedSampleCount += 1
             return .rejected(.poorAccuracy)
          }
@@ -251,35 +203,56 @@ struct RideTelemetryEngine {
 
       // A dropout must not become phantom distance or phantom moving time.
       guard interval <= configuration.maxSampleGap else {
-         seed(with: location)
+         seed(with: location, isCoarse: !isPrecise)
          return .reseeded
       }
 
       let travelled = location.distance(from: previous)
 
-      guard travelled / interval <= configuration.maxPlausibleSpeed else {
+      guard isPlausibleMove(travelled, over: interval, from: previous, to: location) else {
          rejectedSampleCount += 1
          return .rejected(.implausibleJump)
       }
 
-      updateSpeed(with: location, travelled: travelled, interval: interval)
-      updateTime(interval: interval)
-      updateElevation(with: location)
-      updateDistance(with: location)
+      if isPrecise {
+         coarseGeometry.reset()
+         updateSpeed(with: location, travelled: travelled, interval: interval, isPrecise: true)
+         updateTime(interval: interval)
+         updateElevation(with: location)
+         updateDistance(with: location)
+      } else if hasReportedSpeed(location) {
+         coarseGeometry.reset()
+         updateSpeed(with: location, travelled: travelled, interval: interval, isPrecise: false)
+         updateTime(interval: interval)
+         integrateDistance(over: interval, at: location)
+      } else {
+         updateGeometricSpeed(with: location)
+         updateTime(interval: interval)
+      }
+
       updateGrade()
       updateCourse(with: location)
 
       lastAcceptedLocation = location
       acceptedSampleCount += 1
-      return .accepted
+      return isPrecise ? .accepted : .acceptedCoarse
    }
 
    // MARK: - Seeding
 
-   private mutating func seed(with location: CLLocation) {
+   private mutating func seed(with location: CLLocation, isCoarse: Bool = false) {
       hasFix = true
       lastAcceptedLocation = location
       distanceAnchor = location
+      anchorIsCoarse = isCoarse
+      isOverridingStandstill = false
+
+      // A loose seed is the first point geometry can measure from.
+      if isCoarse {
+         coarseGeometry.anchor(at: location)
+      } else {
+         coarseGeometry.reset()
+      }
 
       guard location.verticalAccuracy > 0,
             location.verticalAccuracy <= configuration.maxVerticalAccuracy else { return }
@@ -294,10 +267,34 @@ struct RideTelemetryEngine {
 
    // MARK: - Speed
 
-   private mutating func updateSpeed(with location: CLLocation, travelled: Double, interval: TimeInterval) {
-      let reported = location.speedAccuracy >= 0 && location.speed >= 0
+   private mutating func updateSpeed(
+      with location: CLLocation,
+      travelled: Double,
+      interval: TimeInterval,
+      isPrecise: Bool
+   ) {
+      var reported = hasReportedSpeed(location)
          ? location.speed
          : travelled / interval
+
+      // A reported standstill is checked against the ground actually covered
+      // since the anchor last moved. Only a precise fix measured against a
+      // precise anchor gets a say; coarse geometry is noise. Once geometry has
+      // won it keeps carrying speed while the position keeps clearing the
+      // noise floor, so the readout does not saw-tooth every time the anchor
+      // advances.
+      if isPrecise, reported < configuration.movingSpeedThreshold {
+         if let geometric = standstillOverride(for: location) {
+            reported = geometric
+            isOverridingStandstill = true
+         } else if isOverridingStandstill, travelled >= noiseFloor(for: location) {
+            reported = travelled / interval
+         } else {
+            isOverridingStandstill = false
+         }
+      } else {
+         isOverridingStandstill = false
+      }
 
       let plausible = min(max(0, reported), configuration.maxPlausibleSpeed)
 
@@ -314,6 +311,37 @@ struct RideTelemetryEngine {
       }
    }
 
+   /// Speed from displacement for a loose fix with no satellite speed.
+   ///
+   /// The pace is already an average over tens of metres, so it is shown
+   /// as-is rather than smoothed; smoothing a reading that arrives every
+   /// ten seconds would only lag it. It is kept out of the ride maximum: a
+   /// jitter-stretched displacement can inflate one pace by half, and the
+   /// headline number must not be set by a Wi-Fi fix.
+   private mutating func updateGeometricSpeed(with location: CLLocation) {
+      isOverridingStandstill = false
+
+      switch coarseGeometry.ingest(location, configuration: configuration) {
+         case .moving(let pace, let displacement):
+            speed = min(pace, configuration.maxPlausibleSpeed)
+            isMoving = true
+            distance += displacement
+            appendGradePoint()
+
+         case .holding:
+            break
+
+         case .stopped:
+            speed = 0
+            isMoving = false
+      }
+
+      // The loose position becomes the anchor so a later precise fix
+      // re-anchors there; whatever was banked above is never billed twice.
+      distanceAnchor = location
+      anchorIsCoarse = true
+   }
+
    // MARK: - Time
 
    private mutating func updateTime(interval: TimeInterval) {
@@ -327,20 +355,37 @@ struct RideTelemetryEngine {
    // MARK: - Distance
 
    private mutating func updateDistance(with location: CLLocation) {
-      guard let anchor = distanceAnchor else {
+      guard let anchor = distanceAnchor, !anchorIsCoarse else {
+         // No trustworthy anchor yet: this precise fix becomes it. Whatever
+         // the bike covered between a loose anchor and here was already
+         // integrated from speed, so adding the displacement would bill it twice.
          distanceAnchor = location
+         anchorIsCoarse = false
          return
       }
 
       let travelled = location.distance(from: anchor)
-      let noiseFloor = min(6, max(1.5, location.horizontalAccuracy * 0.5))
 
       // The anchor only advances when real ground was covered, so slow riding
       // accumulates instead of being filtered away sample by sample.
-      guard isMoving, travelled >= noiseFloor else { return }
+      guard isMoving, travelled >= noiseFloor(for: location) else { return }
 
       distance += travelled
       distanceAnchor = location
+      appendGradePoint()
+   }
+
+   /// Distance from satellite speed while the position is too loose to
+   /// measure. The anchor follows the loose position so a later precise fix
+   /// re-anchors there rather than against where the ride was before the
+   /// signal softened.
+   private mutating func integrateDistance(over interval: TimeInterval, at location: CLLocation) {
+      distanceAnchor = location
+      anchorIsCoarse = true
+
+      guard isMoving else { return }
+
+      distance += speed * interval
       appendGradePoint()
    }
 

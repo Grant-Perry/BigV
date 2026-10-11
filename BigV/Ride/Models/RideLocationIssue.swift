@@ -14,6 +14,12 @@ enum RideLocationIssue: String, Sendable, Equatable {
    case failed
    case reducedAccuracy
 
+   /// GPS is delivering, but too loosely to trust position sample to sample.
+   /// Speed and distance still show from what the engine can measure;
+   /// climbing waits for the fix to tighten. Two words on purpose: it sits
+   /// under the accuracy chip in a column the sensor chips squeeze.
+   case weakSignal
+
    var message: String {
       switch self {
          case .authorizationDenied: "Location access denied. Enable it in Settings to record a ride."
@@ -21,6 +27,7 @@ enum RideLocationIssue: String, Sendable, Equatable {
          case .temporarilyUnavailable: "No GPS signal."
          case .failed: "Location updates stopped unexpectedly."
          case .reducedAccuracy: "Turn on Precise Location in Settings."
+         case .weakSignal: "Weak GPS"
       }
    }
 
@@ -32,6 +39,7 @@ enum RideLocationIssue: String, Sendable, Equatable {
          case .temporarilyUnavailable: "No phone GPS yet"
          case .failed: "Phone GPS stopped"
          case .reducedAccuracy: "Turn on Precise Location"
+         case .weakSignal: "Weak phone GPS"
       }
    }
 
@@ -39,7 +47,7 @@ enum RideLocationIssue: String, Sendable, Equatable {
    var requiresRiderAction: Bool {
       switch self {
          case .authorizationDenied, .servicesDisabled, .reducedAccuracy: true
-         case .temporarilyUnavailable, .failed: false
+         case .temporarilyUnavailable, .failed, .weakSignal: false
       }
    }
 }

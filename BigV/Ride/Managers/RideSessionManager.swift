@@ -645,6 +645,14 @@ final class RideSessionManager {
 
       let outcome = telemetryEngine.ingest(location)
       publishTelemetry()
+      noteSignalQuality(after: outcome)
+
+      // Built only when the channel is on; one line per fix is the field
+      // evidence for "0.0 mph with the clock running".
+      DebugPrint(
+         mode: .locationFiltering,
+         RideFixDiagnostics.line(for: location, outcome: outcome, speed: state.speed, distance: state.distance)
+      )
 
       if state.phase == .acquiringGPS {
          mirrorToWatch()
@@ -655,19 +663,29 @@ final class RideSessionManager {
             beginRecordingIfNeeded(at: location)
             appendRoutePoint(location)
 
-         case .accepted:
+         case .accepted, .acceptedCoarse:
             lastSampleAt = .now
             appendRoutePoint(location)
             routeGuidanceManager?.follow(location, state: state)
             cutAutoLapsIfNeeded()
             persist(location)
 
-         case .rejected(let reason):
-            DebugPrint(
-               mode: .locationFiltering,
-               limit: 50,
-               "Rejected sample (\(reason.rawValue)) accuracy \(location.horizontalAccuracy)"
-            )
+         case .rejected:
+            break
+      }
+   }
+
+   /// Tells the rider the fix is loose while it is — the one honest answer to
+   /// a speed that reads but a distance that lags. Precise Location off
+   /// outranks it; a precise sample clears it.
+   private func noteSignalQuality(after outcome: RideTelemetryEngine.Outcome) {
+      guard state.phase == .recording, state.locationIssue != .reducedAccuracy else { return }
+
+      switch outcome {
+         case .acceptedCoarse, .rejected(.poorAccuracy):
+            state.locationIssue = .weakSignal
+         case .accepted, .acquiredFix, .reseeded, .rejected:
+            state.locationIssue = nil
       }
    }
 

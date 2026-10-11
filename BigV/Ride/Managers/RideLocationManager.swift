@@ -8,11 +8,18 @@ import Foundation
 
 /// Delivers Core Location samples to the ride session as an async stream.
 ///
-/// Owns authorization, the live update sequence and the background activity
-/// session that keeps GPS alive while the phone is mounted and the screen is
-/// off. The session exists exactly as long as a ride's stream does, so the
-/// system's location indicator means one thing: a ride is recording. It
-/// performs no ride math; filtering lives in `RideTelemetryEngine`.
+/// Owns authorization, the `CLLocationManager` behind the ride, and the
+/// background activity session that keeps GPS alive while the phone is
+/// mounted and the screen is off. The session exists exactly as long as a
+/// ride's stream does, so the system's location indicator means one thing: a
+/// ride is recording. It performs no ride math; filtering lives in
+/// `RideTelemetryEngine`.
+///
+/// Deliberately not `CLLocationUpdate.liveUpdates`: that sequence pauses
+/// itself once the phone looks stationary and only resumes when the motion
+/// coprocessor notices movement, with no knob to turn it off. A bike computer
+/// started at a kerb cannot be on a stream that decides for itself when the
+/// ride began. `pausesLocationUpdatesAutomatically = false` is the whole point.
 @MainActor
 final class RideLocationManager {
 
@@ -25,31 +32,56 @@ final class RideLocationManager {
 
    // MARK: - Private Properties
 
-   private let authorizationManager = CLLocationManager()
-   private let authorizationObserver = AuthorizationObserver()
+   private let locationManager = CLLocationManager()
+   private let relay = LocationRelay()
+   private var relayTask: Task<Void, Never>?
+   private var retryTask: Task<Void, Never>?
+   private var stopDeliveryTask: Task<Void, Never>?
    private var backgroundSession: CLBackgroundActivitySession?
-   private var updatesTask: Task<Void, Never>?
    private var continuation: AsyncStream<Event>.Continuation?
 
-   /// Whether the live stream ended on a problem only the rider can fix, with
-   /// the consumer stream still open waiting for `restartIfStalled`.
+   /// Whether `startUpdatingLocation()` has been asked for and not stopped.
+   private var isDelivering = false
+
+   /// Whether delivery ended on a problem only the rider can fix, with the
+   /// consumer stream still open waiting for `restartIfStalled`.
    private var isStalled = false
 
-   /// Pause before re-opening a stream that failed, so a persistent error
+   /// Pause before re-opening delivery that failed, so a persistent error
    /// cannot spin.
    private static let retryBackoff: Duration = .seconds(3)
 
+   /// A fix older than this is Core Location replaying its cache, not where
+   /// the rider is. The first callback after `startUpdatingLocation()` is
+   /// routinely one of these.
+   private static let maxFixAge: TimeInterval = 10
+
+   /// How long GPS stays up after a ride's stream ends. END then START on the
+   /// same turn — a rider restarting mid-roll — must not power-cycle the
+   /// receiver and hand the new ride a minute of Wi-Fi fixes while it relocks.
+   private static let deliveryGrace: Duration = .seconds(3)
+
    init() {
-      authorizationObserver.onChange = { [weak self] in
-         self?.authorizationDidChange()
+      locationManager.delegate = relay
+      locationManager.activityType = .fitness
+      locationManager.desiredAccuracy = kCLLocationAccuracyBest
+      locationManager.distanceFilter = kCLDistanceFilterNone
+      locationManager.pausesLocationUpdatesAutomatically = false
+      locationManager.showsBackgroundLocationIndicator = true
+
+      let signals = relay.signals
+      relayTask = Task { [weak self] in
+         for await signal in signals {
+            guard let self else { return }
+            self.handle(signal)
+         }
       }
-      authorizationManager.delegate = authorizationObserver
    }
 
    // MARK: - Authorization
 
    var isAuthorized: Bool {
-      switch authorizationManager.authorizationStatus {
+      switch locationManager.authorizationStatus {
          case .authorizedAlways, .authorizedWhenInUse: true
          default: false
       }
@@ -61,20 +93,20 @@ final class RideLocationManager {
    /// stream out of the foreground. A START from the wrist with the phone
    /// locked in a pocket is neither, so it needs Always.
    var canBeginFromBackground: Bool {
-      authorizationManager.authorizationStatus == .authorizedAlways
+      locationManager.authorizationStatus == .authorizedAlways
    }
 
    func requestAuthorizationIfNeeded() {
-      guard authorizationManager.authorizationStatus == .notDetermined else { return }
-      authorizationManager.requestWhenInUseAuthorization()
+      guard locationManager.authorizationStatus == .notDetermined else { return }
+      locationManager.requestWhenInUseAuthorization()
    }
 
    /// Asks to step up from When In Use to Always. Foreground only; the system
    /// shows the upgrade once per install, so this is called when a paired
    /// Watch gives the rider a reason to say yes.
    func requestAlwaysAuthorizationIfNeeded() {
-      guard authorizationManager.authorizationStatus == .authorizedWhenInUse else { return }
-      authorizationManager.requestAlwaysAuthorization()
+      guard locationManager.authorizationStatus == .authorizedWhenInUse else { return }
+      locationManager.requestAlwaysAuthorization()
    }
 
    // MARK: - Updates
@@ -87,111 +119,189 @@ final class RideLocationManager {
    /// the app to end it, so a session with no ride behind it would sit in the
    /// Dynamic Island until the next launch.
    func startUpdates() -> AsyncStream<Event> {
-      stopStream()
+      stopDeliveryTask?.cancel()
+      stopDeliveryTask = nil
+      finishStream()
       requestAuthorizationIfNeeded()
-
-      if isAuthorized {
-         beginBackgroundSessionIfNeeded()
-      }
 
       let (stream, continuation) = AsyncStream<Event>.makeStream(
          bufferingPolicy: .bufferingNewest(16)
       )
       self.continuation = continuation
-      launchConsumer(yielding: continuation)
+
+      // Not yet authorized: delivery begins from the authorization callback.
+      // Already delivering from a ride that ended moments ago: keep it warm.
+      if isAuthorized {
+         beginBackgroundSessionIfNeeded()
+         if !isDelivering {
+            beginDelivery()
+         }
+      }
 
       DebugPrint(mode: .sessionLifecycle, "Location updates started")
       return stream
    }
 
    func stopUpdates() {
-      stopStream()
+      finishStream()
       endBackgroundSession()
+
+      // Fixes that land in the grace find no stream and are dropped.
+      stopDeliveryTask?.cancel()
+      stopDeliveryTask = Task { [weak self] in
+         do {
+            try await Task.sleep(for: Self.deliveryGrace)
+         } catch {
+            return
+         }
+         guard let self, self.continuation == nil else { return }
+         self.endDelivery()
+      }
+
       DebugPrint(mode: .sessionLifecycle, "Location updates stopped")
    }
 
-   /// Re-opens a stream that ended because the rider had to change something.
+   /// Re-opens delivery that ended because the rider had to change something.
    /// Called when the scene comes forward and when authorization changes. A
    /// no-op unless a ride's stream is open and stalled.
    func restartIfStalled() {
-      guard isStalled, let continuation, isAuthorized,
-            CLLocationManager.locationServicesEnabled()
-      else { return }
+      guard isStalled, continuation != nil, isAuthorized else { return }
 
       beginBackgroundSessionIfNeeded()
-      launchConsumer(yielding: continuation)
+      beginDelivery()
       DebugPrint(mode: .sessionLifecycle, "Location updates restarted after rider action")
    }
 
-   private func launchConsumer(yielding continuation: AsyncStream<Event>.Continuation) {
+   // MARK: - Delivery
+
+   private func beginDelivery() {
+      retryTask?.cancel()
+      retryTask = nil
       isStalled = false
-      updatesTask?.cancel()
-      updatesTask = Task { [weak self] in
-         await self?.consumeUpdates(yielding: continuation)
-      }
+
+      // Requires the `location` background mode, which Info.plist declares.
+      // With When In Use this carries a stream begun in front out of the
+      // foreground; with Always it lets a wrist START bring GPS up pocketed.
+      locationManager.allowsBackgroundLocationUpdates = true
+      locationManager.startUpdatingLocation()
+      isDelivering = true
    }
 
-   private func authorizationDidChange() {
-      restartIfStalled()
+   private func endDelivery() {
+      guard isDelivering else { return }
+      locationManager.stopUpdatingLocation()
+      isDelivering = false
    }
 
-   private func stopStream() {
-      updatesTask?.cancel()
-      updatesTask = nil
+   /// Closes the consumer's stream without touching delivery; `stopUpdates`
+   /// and `startUpdates` decide what happens to the receiver.
+   private func finishStream() {
+      retryTask?.cancel()
+      retryTask = nil
       isStalled = false
 
       continuation?.finish()
       continuation = nil
    }
 
-   // MARK: - Consumption
-
-   private func consumeUpdates(yielding continuation: AsyncStream<Event>.Continuation) async {
-      // A failed stream is re-opened after a short backoff; a stream stopped by
-      // a rider-fixable issue stays stalled until `restartIfStalled`. Neither
-      // finishes the consumer's stream — only `stopStream` does.
-      while !Task.isCancelled {
-         do {
-            for try await update in CLLocationUpdate.liveUpdates(.fitness) {
-               if Task.isCancelled { return }
-
-               if update.authorizationDeniedGlobally {
-                  continuation.yield(.issue(.servicesDisabled))
-                  isStalled = true
-                  return
-               }
-
-               if update.authorizationDenied {
-                  continuation.yield(.issue(.authorizationDenied))
-                  isStalled = true
-                  return
-               }
-
-               if update.locationUnavailable {
-                  if isAuthorized {
-                     beginBackgroundSessionIfNeeded()
-                  }
-                  continuation.yield(.issue(.temporarilyUnavailable))
-                  continue
-               }
-
-               guard let location = update.location else { continue }
-
-               beginBackgroundSessionIfNeeded()
-               continuation.yield(.location(location, accuracyLimited: update.accuracyLimited))
-            }
-         } catch {
-            DebugPrint(mode: .sessionLifecycle, "Location stream failed: \(error.localizedDescription)")
-            continuation.yield(.issue(.failed))
-         }
-
-         if Task.isCancelled { return }
-
+   /// Stops and restarts delivery after a backoff. Only for errors that are
+   /// not the rider's to fix; those stall instead.
+   private func scheduleRetry() {
+      endDelivery()
+      retryTask?.cancel()
+      retryTask = Task { [weak self] in
          do {
             try await Task.sleep(for: Self.retryBackoff)
          } catch {
             return
          }
+         guard let self, self.continuation != nil, self.isAuthorized else { return }
+         self.beginDelivery()
+      }
+   }
+
+   // MARK: - Signals
+
+   private func handle(_ signal: LocationRelay.Signal) {
+      switch signal {
+         case .locations(let locations):
+            deliver(locations)
+
+         case .failed(let error):
+            handleFailure(error)
+
+         case .authorizationChanged:
+            handleAuthorizationChange()
+
+         case .pausedBySystem:
+            // Cannot happen with automatic pausing off; if it ever does, say so
+            // loudly and get the stream back rather than sit at 0.0.
+            DebugPrint(mode: .sessionLifecycle, "Location delivery paused by the system; resuming")
+            if continuation != nil, isAuthorized {
+               beginDelivery()
+            }
+      }
+   }
+
+   private func deliver(_ locations: [CLLocation]) {
+      guard let continuation else { return }
+
+      let accuracyLimited = locationManager.accuracyAuthorization == .reducedAccuracy
+      let now = Date.now
+
+      for location in locations {
+         let age = now.timeIntervalSince(location.timestamp)
+         guard age <= Self.maxFixAge else {
+            DebugPrint(
+               mode: .locationFiltering,
+               "Dropped cached fix \(Int(age)) s old, accuracy \(Int(location.horizontalAccuracy)) m"
+            )
+            continue
+         }
+
+         beginBackgroundSessionIfNeeded()
+         continuation.yield(.location(location, accuracyLimited: accuracyLimited))
+      }
+   }
+
+   private func handleFailure(_ error: any Error) {
+      guard let continuation else { return }
+
+      switch (error as? CLError)?.code {
+         case .locationUnknown:
+            // Core Location keeps trying on its own; just say there is no fix.
+            continuation.yield(.issue(.temporarilyUnavailable))
+
+         case .denied:
+            // Delivery has already stopped. Both Location Services off and a
+            // denied app arrive as this code; the authorization status tells
+            // them apart only when the app itself was denied.
+            isDelivering = false
+            isStalled = true
+            let issue: RideLocationIssue = locationManager.authorizationStatus == .denied
+               ? .authorizationDenied
+               : .servicesDisabled
+            continuation.yield(.issue(issue))
+
+         default:
+            DebugPrint(mode: .sessionLifecycle, "Location stream failed: \(error.localizedDescription)")
+            continuation.yield(.issue(.failed))
+            scheduleRetry()
+      }
+   }
+
+   private func handleAuthorizationChange() {
+      guard continuation != nil else { return }
+
+      if isStalled {
+         restartIfStalled()
+         return
+      }
+
+      // A ride started before the first grant lands here with no delivery.
+      if isAuthorized, !isDelivering {
+         beginBackgroundSessionIfNeeded()
+         beginDelivery()
       }
    }
 
@@ -199,12 +309,12 @@ final class RideLocationManager {
 
    /// Keeps location running while mounted with the screen asleep.
    ///
-   /// `CLBackgroundActivitySession` is what keeps `liveUpdates` alive while
-   /// the phone is locked. Create it as soon as we already have when-in-use;
-   /// a first-launch prompt still waits for `isAuthorized` so we do not
-   /// race the grant.
+   /// `CLBackgroundActivitySession` is what keeps a When In Use stream alive
+   /// while the phone is locked. Create it as soon as we already have
+   /// when-in-use; a first-launch prompt still waits for `isAuthorized` so we
+   /// do not race the grant.
    private func beginBackgroundSessionIfNeeded() {
-      guard backgroundSession == nil else { return }
+      guard backgroundSession == nil, isAuthorized else { return }
 
       backgroundSession = CLBackgroundActivitySession()
       DebugPrint(mode: .sessionLifecycle, "Background activity session started")
@@ -219,16 +329,41 @@ final class RideLocationManager {
    }
 }
 
-// MARK: - Authorization Observer
+// MARK: - Location Relay
 
-/// Forwards authorization changes without making the manager an `NSObject`.
-private final class AuthorizationObserver: NSObject, CLLocationManagerDelegate, @unchecked Sendable {
+/// Turns delegate callbacks into an ordered stream the main actor consumes,
+/// without making the manager an `NSObject` or assuming which thread Core
+/// Location called back on.
+private final class LocationRelay: NSObject, CLLocationManagerDelegate, Sendable {
 
-   var onChange: (@MainActor () -> Void)?
+   enum Signal: Sendable {
+      case locations([CLLocation])
+      case failed(any Error)
+      case authorizationChanged
+      case pausedBySystem
+   }
+
+   let signals: AsyncStream<Signal>
+   private let continuation: AsyncStream<Signal>.Continuation
+
+   override init() {
+      (signals, continuation) = AsyncStream<Signal>.makeStream(bufferingPolicy: .unbounded)
+      super.init()
+   }
+
+   nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+      continuation.yield(.locations(locations))
+   }
+
+   nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: any Error) {
+      continuation.yield(.failed(error))
+   }
 
    nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-      Task { @MainActor [weak self] in
-         self?.onChange?()
-      }
+      continuation.yield(.authorizationChanged)
+   }
+
+   nonisolated func locationManagerDidPauseLocationUpdates(_ manager: CLLocationManager) {
+      continuation.yield(.pausedBySystem)
    }
 }

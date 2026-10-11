@@ -22,6 +22,7 @@ struct RideTelemetryEngineTests {
       horizontalAccuracy: Double = 5,
       verticalAccuracy: Double = 5,
       speed: Double = 10,
+      speedAccuracy: Double = 1,
       secondsFromStart: TimeInterval,
       reference: Date
    ) -> CLLocation {
@@ -35,8 +36,25 @@ struct RideTelemetryEngineTests {
          course: 0,
          courseAccuracy: 5,
          speed: speed,
-         speedAccuracy: 1,
+         speedAccuracy: speedAccuracy,
          timestamp: reference.addingTimeInterval(secondsFromStart)
+      )
+   }
+
+   /// A Wi-Fi or cell fix: the hallmark 65 m circle and no satellite speed.
+   private func wifiFix(
+      northing: Double,
+      secondsFromStart: TimeInterval,
+      reference: Date
+   ) -> CLLocation {
+      sample(
+         northing: northing,
+         horizontalAccuracy: 65,
+         verticalAccuracy: -1,
+         speed: -1,
+         speedAccuracy: -1,
+         secondsFromStart: secondsFromStart,
+         reference: reference
       )
    }
 
@@ -298,6 +316,356 @@ struct RideTelemetryEngineTests {
       engine.markSpeedStale()
 
       #expect(engine.verticalSpeed == 0)
+   }
+
+   // MARK: - Coarse Fixes
+
+   /// The field report: START on a Wi-Fi fix, then a minute of GPS at 30–50 m
+   /// while riding. Speed and distance must move during that minute.
+   @Test func coarseGPSWithSatelliteSpeedDrivesSpeedAndDistance() {
+      var engine = RideTelemetryEngine()
+      let reference = Date(timeIntervalSince1970: 1_000_000)
+
+      #expect(engine.ingest(wifiFix(northing: 0, secondsFromStart: 0, reference: reference)) == .acquiredFix)
+
+      // Sixty seconds at 4.5 m/s with the position still loose.
+      for step in 1...60 {
+         let fix = sample(
+            northing: Double(step) * 4.5,
+            horizontalAccuracy: 40,
+            verticalAccuracy: 30,
+            speed: 4.5,
+            secondsFromStart: Double(step),
+            reference: reference
+         )
+         #expect(engine.ingest(fix) == .acceptedCoarse)
+      }
+
+      #expect(engine.isMoving)
+      #expect(abs(engine.speed - 4.5) < 0.01)
+      #expect(abs(engine.distance - 270) < 10)
+      #expect(engine.movingTime == 60)
+      #expect(engine.altitude == nil)
+   }
+
+   @Test func aSingleWifiFixAfterAcquisitionReadsZero() {
+      var engine = RideTelemetryEngine()
+      let reference = Date(timeIntervalSince1970: 1_000_000)
+
+      _ = engine.ingest(wifiFix(northing: 0, secondsFromStart: 0, reference: reference))
+
+      // Accepted — it may become evidence later — but 30 m between two 65 m
+      // circles is nothing yet.
+      let outcome = engine.ingest(wifiFix(northing: 30, secondsFromStart: 1, reference: reference))
+
+      #expect(outcome == .acceptedCoarse)
+      #expect(engine.distance == 0)
+      #expect(engine.speed == 0)
+      #expect(engine.isMoving == false)
+   }
+
+   @Test func coarseJitterIsNotAnImplausibleJump() {
+      var engine = RideTelemetryEngine()
+      let reference = Date(timeIntervalSince1970: 1_000_000)
+
+      _ = engine.ingest(wifiFix(northing: 0, secondsFromStart: 0, reference: reference))
+      _ = engine.ingest(
+         sample(northing: 0, horizontalAccuracy: 50, speed: 4, secondsFromStart: 1, reference: reference)
+      )
+
+      // 60 m between two 50 m fixes a second apart is jitter, not 60 m/s.
+      let jittery = sample(northing: 60, horizontalAccuracy: 50, speed: 4, secondsFromStart: 2, reference: reference)
+      #expect(engine.ingest(jittery) == .acceptedCoarse)
+   }
+
+   @Test func coarseStandstillAddsNoDistance() {
+      var engine = RideTelemetryEngine()
+      let reference = Date(timeIntervalSince1970: 1_000_000)
+
+      _ = engine.ingest(wifiFix(northing: 0, secondsFromStart: 0, reference: reference))
+
+      // Parked at the kerb with the position wandering 20 m either way.
+      for step in 1...30 {
+         let wander = step.isMultiple(of: 2) ? 20.0 : -20.0
+         _ = engine.ingest(
+            sample(northing: wander, horizontalAccuracy: 45, speed: 0, secondsFromStart: Double(step), reference: reference)
+         )
+      }
+
+      #expect(engine.distance == 0)
+      #expect(engine.isMoving == false)
+      #expect(engine.stoppedTime == 30)
+   }
+
+   @Test func firstPreciseFixAfterCoarseOnesReanchorsWithoutDoubleBilling() {
+      var engine = RideTelemetryEngine()
+      let reference = Date(timeIntervalSince1970: 1_000_000)
+
+      _ = engine.ingest(wifiFix(northing: 0, secondsFromStart: 0, reference: reference))
+
+      for step in 1...20 {
+         _ = engine.ingest(
+            sample(northing: Double(step) * 5, horizontalAccuracy: 40, speed: 5, secondsFromStart: Double(step), reference: reference)
+         )
+      }
+      let integrated = engine.distance
+      #expect(abs(integrated - 100) < 10)
+
+      // The lock tightens. The 100 m already integrated must not be added again
+      // as displacement from the loose anchor.
+      let precise = sample(northing: 105, horizontalAccuracy: 6, speed: 5, secondsFromStart: 21, reference: reference)
+      #expect(engine.ingest(precise) == .accepted)
+      #expect(engine.distance == integrated)
+
+      // And precise riding accumulates from the new anchor as before.
+      for step in 22...30 {
+         _ = engine.ingest(
+            sample(northing: Double(step) * 5, horizontalAccuracy: 6, speed: 5, secondsFromStart: Double(step), reference: reference)
+         )
+      }
+      #expect(engine.distance > integrated + 30)
+      #expect(engine.distance < integrated + 60)
+   }
+
+   @Test func reseedWaitsForAPreciseFix() {
+      var engine = RideTelemetryEngine()
+      let reference = Date(timeIntervalSince1970: 1_000_000)
+      ride(into: &engine, steps: 5, reference: reference)
+
+      engine.invalidateAnchor()
+
+      let loose = sample(northing: 200, horizontalAccuracy: 40, speed: 5, secondsFromStart: 30, reference: reference)
+      #expect(engine.ingest(loose) == .rejected(.poorAccuracy))
+
+      let tight = sample(northing: 205, horizontalAccuracy: 5, speed: 5, secondsFromStart: 31, reference: reference)
+      #expect(engine.ingest(tight) == .reseeded)
+   }
+
+   // MARK: - Coarse Geometry
+
+   /// A 40 m fix with no satellite speed: Wi-Fi positioning on a residential
+   /// street, which is what the rider's video shows for 104 seconds.
+   private func wifiFix40(
+      northing: Double,
+      secondsFromStart: TimeInterval,
+      reference: Date
+   ) -> CLLocation {
+      sample(
+         northing: northing,
+         horizontalAccuracy: 40,
+         verticalAccuracy: -1,
+         speed: -1,
+         speedAccuracy: -1,
+         secondsFromStart: secondsFromStart,
+         reference: reference
+      )
+   }
+
+   /// The video: START on a Wi-Fi fix, then only 40 m speed-less fixes while
+   /// riding at 15 mph. Speed must read and distance must bank from position
+   /// alone, well inside the 104 s the rider waited.
+   @Test func fortyMetreFixesWithoutSatelliteSpeedStillDriveSpeedAndDistance() {
+      var engine = RideTelemetryEngine()
+      let reference = Date(timeIntervalSince1970: 1_000_000)
+      let metersPerSecond = 6.7
+
+      #expect(engine.ingest(wifiFix(northing: 0, secondsFromStart: 0, reference: reference)) == .acquiredFix)
+
+      var firstLiveSpeedAt: TimeInterval?
+
+      for step in 1...60 {
+         let outcome = engine.ingest(
+            wifiFix40(northing: Double(step) * metersPerSecond, secondsFromStart: Double(step), reference: reference)
+         )
+         #expect(outcome == .acceptedCoarse)
+
+         if firstLiveSpeedAt == nil, engine.speed > 0 {
+            firstLiveSpeedAt = Double(step)
+         }
+      }
+
+      // The seed is a 65 m circle and the fixes are 40 m, so the first clear
+      // needs 105 m of straight line: 16 s at 6.7 m/s. Every clear after it
+      // needs 80 m, 12 s.
+      #expect(firstLiveSpeedAt != nil)
+      #expect((firstLiveSpeedAt ?? .infinity) <= 20)
+
+      #expect(engine.isMoving)
+      #expect(abs(engine.speed - metersPerSecond) < 0.5)
+
+      // Only ground that cleared the bar is banked; the tail since the last
+      // clear (under 80 m) waits for the next one rather than being guessed.
+      #expect(engine.distance > 300)
+      #expect(engine.distance <= 60 * metersPerSecond + 1)
+      #expect(engine.movingTime >= 40)
+   }
+
+   @Test func fortyMetreFixesJitteringAtAStandstillReadZero() {
+      var engine = RideTelemetryEngine()
+      let reference = Date(timeIntervalSince1970: 1_000_000)
+
+      _ = engine.ingest(wifiFix40(northing: 0, secondsFromStart: 0, reference: reference))
+
+      // Parked. The Wi-Fi position wanders 10–20 m either way, every second.
+      let jitter: [Double] = [10, -15, 20, -10, 15, -20]
+      for step in 1...90 {
+         _ = engine.ingest(
+            wifiFix40(northing: jitter[step % jitter.count], secondsFromStart: Double(step), reference: reference)
+         )
+      }
+
+      #expect(engine.speed == 0)
+      #expect(engine.isMoving == false)
+      #expect(engine.distance == 0)
+      #expect(engine.stoppedTime == 90)
+   }
+
+   @Test func walkingPaceDriftUnderFortyMetreFixesReadsZero() {
+      var engine = RideTelemetryEngine()
+      let reference = Date(timeIntervalSince1970: 1_000_000)
+
+      _ = engine.ingest(wifiFix40(northing: 0, secondsFromStart: 0, reference: reference))
+
+      // 0.5 m/s is 60 m over two minutes — further than the bar, but the
+      // anchor slides every 30 s, so it is never more than 15 m behind.
+      for step in 1...120 {
+         _ = engine.ingest(
+            wifiFix40(northing: Double(step) * 0.5, secondsFromStart: Double(step), reference: reference)
+         )
+      }
+
+      #expect(engine.speed == 0)
+      #expect(engine.isMoving == false)
+      #expect(engine.distance == 0)
+   }
+
+   @Test func geometricSpeedReturnsToZeroAfterAStop() {
+      var engine = RideTelemetryEngine()
+      let reference = Date(timeIntervalSince1970: 1_000_000)
+
+      _ = engine.ingest(wifiFix40(northing: 0, secondsFromStart: 0, reference: reference))
+
+      for step in 1...30 {
+         _ = engine.ingest(
+            wifiFix40(northing: Double(step) * 6.7, secondsFromStart: Double(step), reference: reference)
+         )
+      }
+      #expect(engine.speed > 6)
+      let bankedWhileRolling = engine.distance
+
+      // Stopped dead at the light; the position holds.
+      for step in 31...70 {
+         _ = engine.ingest(
+            wifiFix40(northing: 30 * 6.7, secondsFromStart: Double(step), reference: reference)
+         )
+      }
+
+      #expect(engine.speed == 0)
+      #expect(engine.isMoving == false)
+      #expect(engine.distance == bankedWhileRolling)
+   }
+
+   @Test func precisionReturningAfterGeometricFixesDoesNotDoubleBill() {
+      var engine = RideTelemetryEngine()
+      let reference = Date(timeIntervalSince1970: 1_000_000)
+
+      _ = engine.ingest(wifiFix40(northing: 0, secondsFromStart: 0, reference: reference))
+
+      for step in 1...40 {
+         _ = engine.ingest(
+            wifiFix40(northing: Double(step) * 6.7, secondsFromStart: Double(step), reference: reference)
+         )
+      }
+      let banked = engine.distance
+      #expect(banked > 200)
+
+      // GPS locks. The 268 m already banked from displacement must not come
+      // back as one straight line from the loose anchor.
+      let locked = sample(northing: 41 * 6.7, horizontalAccuracy: 6, speed: 6.7, secondsFromStart: 41, reference: reference)
+      #expect(engine.ingest(locked) == .accepted)
+      #expect(engine.distance == banked)
+
+      for step in 42...60 {
+         _ = engine.ingest(
+            sample(northing: Double(step) * 6.7, horizontalAccuracy: 6, speed: 6.7, secondsFromStart: Double(step), reference: reference)
+         )
+      }
+
+      // Nineteen precise 6.7 m steps on top, and nothing else.
+      #expect(engine.distance > banked + 19 * 6.7 - 10)
+      #expect(engine.distance < banked + 19 * 6.7 + 10)
+   }
+
+   @Test func satelliteSpeedIsPreferredOverGeometryWhenPresent() {
+      var engine = RideTelemetryEngine()
+      let reference = Date(timeIntervalSince1970: 1_000_000)
+
+      _ = engine.ingest(wifiFix40(northing: 0, secondsFromStart: 0, reference: reference))
+
+      // Same loose accuracy, but Core Location measured the speed: the
+      // readout must not wait 12 s for displacement to clear a bar.
+      let doppler = sample(northing: 6.7, horizontalAccuracy: 40, speed: 6.7, secondsFromStart: 1, reference: reference)
+      #expect(engine.ingest(doppler) == .acceptedCoarse)
+      #expect(abs(engine.speed - 6.7) < 0.01)
+      #expect(engine.isMoving)
+   }
+
+   // MARK: - Standstill Override
+
+   /// Core Location reporting 0 m/s while the position advances 4.5 m every
+   /// second. Geometry has to win once the displacement is past jitter.
+   @Test func reportedZeroSpeedYieldsToClearDisplacement() {
+      var engine = RideTelemetryEngine()
+      let reference = Date(timeIntervalSince1970: 1_000_000)
+
+      _ = engine.ingest(sample(northing: 0, speed: 0, secondsFromStart: 0, reference: reference))
+
+      for step in 1...20 {
+         _ = engine.ingest(
+            sample(northing: Double(step) * 4.5, speed: 0, secondsFromStart: Double(step), reference: reference)
+         )
+      }
+
+      #expect(engine.isMoving)
+      #expect(engine.speed > 1)
+      #expect(engine.distance > 60)
+      #expect(engine.movingTime > 10)
+   }
+
+   @Test func reportedZeroSpeedIsTrustedWhenThePositionOnlyJitters() {
+      var engine = RideTelemetryEngine()
+      let reference = Date(timeIntervalSince1970: 1_000_000)
+
+      _ = engine.ingest(sample(northing: 0, speed: 0, secondsFromStart: 0, reference: reference))
+
+      // Standing still with the fix wobbling inside its 5 m circle.
+      for step in 1...30 {
+         let wobble = step.isMultiple(of: 2) ? 3.0 : -3.0
+         _ = engine.ingest(
+            sample(northing: wobble, speed: 0, secondsFromStart: Double(step), reference: reference)
+         )
+      }
+
+      #expect(engine.isMoving == false)
+      #expect(engine.speed == 0)
+      #expect(engine.distance == 0)
+   }
+
+   @Test func slowDriftOverMinutesIsNotMovement() {
+      var engine = RideTelemetryEngine()
+      let reference = Date(timeIntervalSince1970: 1_000_000)
+
+      _ = engine.ingest(sample(northing: 0, speed: 0, secondsFromStart: 0, reference: reference))
+
+      // 15 m of drift spread over two minutes is 0.125 m/s: parked.
+      for step in 1...120 {
+         _ = engine.ingest(
+            sample(northing: Double(step) * 0.125, speed: 0, secondsFromStart: Double(step), reference: reference)
+         )
+      }
+
+      #expect(engine.isMoving == false)
+      #expect(engine.distance == 0)
    }
 
    // MARK: - Reset
