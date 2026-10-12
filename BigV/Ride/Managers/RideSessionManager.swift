@@ -266,6 +266,8 @@ final class RideSessionManager {
          return
       }
 
+      RideFixLogStore.shared.endRide()
+
       state.phase = .finished
       mirrorToWatch()
 
@@ -314,6 +316,7 @@ final class RideSessionManager {
       persistedRadarPassCount = 0
       heartRateRingBuffer.clear()
       mirrorToWatch()
+      RideFixLogStore.shared.endRide()
    }
 
    // MARK: - Interruption Recovery

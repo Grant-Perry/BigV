@@ -45,5 +45,6 @@ struct RideSettingsGPSLogCard: View {
                .foregroundStyle(RideDashboardTheme.ink(0.55))
          }
       }
+      .task { await gpsLogStore.refreshForDisplay() }
    }
 }

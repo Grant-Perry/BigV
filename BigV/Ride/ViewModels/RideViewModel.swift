@@ -389,6 +389,7 @@ final class RideViewModel {
       } else {
          rideSessionManager.sceneDidResignActive()
          flushPendingWork()
+         RideFixLogStore.shared.flush()
       }
    }
 

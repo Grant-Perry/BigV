@@ -61,7 +61,8 @@ final class RideFixLogStore {
       #endif
    }
 
-   /// Log files on disk, newest first. Refreshed whenever a file opens or closes.
+   /// Log files on disk, newest first. Refreshed when a file opens, when a
+   /// batch lands, and when Settings asks to share.
    private(set) var logFileURLs: [URL] = []
 
    var latestLogURL: URL? { logFileURLs.first }
@@ -69,9 +70,14 @@ final class RideFixLogStore {
    // MARK: - Private State
 
    private let directory: URL
+   /// False after a ride file is sealed, so a later idle note cannot open a
+   /// second, empty file that crowds the real ride out of the last-five list.
+   @ObservationIgnored private var acceptsNotes = true
    @ObservationIgnored private var writer: RideFixLogWriter?
    @ObservationIgnored private var pending: [RideFixLogWriter.Entry] = []
    @ObservationIgnored private var flushTask: Task<Void, Never>?
+   /// Appends and closes, in order. Settings waits on this before sharing.
+   @ObservationIgnored private var writeTask: Task<Void, Never>?
 
    // MARK: - Initialization
 
@@ -95,6 +101,7 @@ final class RideFixLogStore {
    /// anything noted before the first START of a launch opens one lazily.
    func beginRide() {
       guard isActive else { return }
+      acceptsNotes = true
       closeFile()
       openFile()
       note("ride log opened")
@@ -104,6 +111,7 @@ final class RideFixLogStore {
    func endRide() {
       guard writer != nil else { return }
       note("ride log closed")
+      acceptsNotes = false
       closeFile()
    }
 
@@ -112,7 +120,7 @@ final class RideFixLogStore {
    /// Records one line. Cheap: the text is stored and stamped, nothing else
    /// happens on this actor.
    func note(_ line: String) {
-      guard isActive else { return }
+      guard isActive, acceptsNotes else { return }
       if writer == nil { openFile() }
       pending.append(RideFixLogWriter.Entry(date: .now, text: line))
    }
@@ -123,7 +131,15 @@ final class RideFixLogStore {
       guard let writer, !pending.isEmpty else { return }
       let batch = pending
       pending.removeAll(keepingCapacity: true)
-      Task { await writer.append(batch) }
+      enqueue(batch, to: writer, closeWhenDone: false)
+   }
+
+   /// Writes anything still buffered and re-reads the folder. Settings calls
+   /// this before offering Share, so the file on screen is the file on disk.
+   func refreshForDisplay() async {
+      flush()
+      await writeTask?.value
+      refreshFileList()
    }
 
    // MARK: - Files
@@ -141,6 +157,14 @@ final class RideFixLogStore {
             .time(includingFractionalSeconds: false)
       ).replacingOccurrences(of: ":", with: "")
       let url = directory.appending(path: "ride-\(stamp).log")
+      // The empty file has to exist before the list refreshes, or Settings
+      // still says "no log yet" for the whole ride.
+      let path = url.path(percentEncoded: false)
+      if !FileManager.default.fileExists(atPath: path),
+         !FileManager.default.createFile(atPath: path, contents: nil) {
+         DebugPrint(mode: .sessionLifecycle, "GPS log file failed")
+         return
+      }
 
       writer = RideFixLogWriter(fileURL: url, byteLimit: Self.maximumFileBytes)
       startFlushLoop()
@@ -156,12 +180,25 @@ final class RideFixLogStore {
       let batch = pending
       pending.removeAll(keepingCapacity: true)
       self.writer = nil
+      enqueue(batch, to: writer, closeWhenDone: true)
+   }
 
-      Task {
+   /// Serializes appends. A flush and a ride-end close can both be in flight;
+   /// the close has to land after the flush or it shuts the handle first.
+   private func enqueue(
+      _ batch: [RideFixLogWriter.Entry],
+      to writer: RideFixLogWriter,
+      closeWhenDone: Bool
+   ) {
+      let previous = writeTask
+      writeTask = Task { [weak self] in
+         await previous?.value
          await writer.append(batch)
-         await writer.close()
+         if closeWhenDone {
+            await writer.close()
+         }
+         self?.refreshFileList()
       }
-      refreshFileList()
    }
 
    private func startFlushLoop() {
@@ -184,9 +221,12 @@ final class RideFixLogStore {
          includingPropertiesForKeys: nil
       )) ?? []
 
-      logFileURLs = urls
+      let updated = urls
          .filter { $0.pathExtension == "log" }
          .sorted { $0.lastPathComponent > $1.lastPathComponent }
+      if updated != logFileURLs {
+         logFileURLs = updated
+      }
    }
 
    private func pruneOldFiles(keeping count: Int, besides current: URL) {
@@ -249,8 +289,11 @@ actor RideFixLogWriter {
    private func openHandleIfNeeded() -> FileHandle? {
       if let handle { return handle }
 
-      if !FileManager.default.fileExists(atPath: fileURL.path()) {
-         FileManager.default.createFile(atPath: fileURL.path(), contents: nil)
+      // `path()` percent-encodes spaces, so "Application Support" never
+      // matches the real folder and every line is thrown away.
+      let path = fileURL.path(percentEncoded: false)
+      if !FileManager.default.fileExists(atPath: path) {
+         guard FileManager.default.createFile(atPath: path, contents: nil) else { return nil }
       }
       handle = try? FileHandle(forWritingTo: fileURL)
       _ = try? handle?.seekToEnd()
