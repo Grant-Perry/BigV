@@ -108,6 +108,48 @@ struct RideStorageManagerTests {
       #expect(ordered.allSatisfy { $0.ride?.persistentModelID == ride.persistentModelID })
    }
 
+   @Test func updateActiveTotalsWritesTheRideWithoutASample() throws {
+      let (storage, context) = try makeStorage()
+      let reference = Date(timeIntervalSince1970: 1_000_000)
+
+      storage.beginRide(startDate: reference)
+
+      var state = RideState()
+      state.phase = .recording
+      state.elapsedTime = 40
+      state.movingTime = 30
+      state.distance = 180
+      state.averageSpeed = 6
+      state.maximumSpeed = 7
+      state.elevationGain = 4
+      state.elevationLoss = 1
+
+      storage.updateActiveTotals(state)
+      storage.flush()
+
+      #expect(try context.fetch(FetchDescriptor<RideSample>()).isEmpty)
+      let ride = try #require(try context.fetch(FetchDescriptor<Ride>()).first)
+      #expect(ride.duration == 40)
+      #expect(ride.movingTime == 30)
+      #expect(ride.distance == 180)
+      #expect(ride.averageSpeed == 6)
+      #expect(ride.maximumSpeed == 7)
+      #expect(ride.elevationGain == 4)
+      #expect(ride.elevationLoss == 1)
+      #expect(context.hasChanges == false)
+   }
+
+   @Test func updateActiveTotalsWithoutAnActiveRideIsIgnored() throws {
+      let (storage, context) = try makeStorage()
+
+      var state = RideState()
+      state.distance = 50
+      storage.updateActiveTotals(state)
+
+      #expect(try context.fetch(FetchDescriptor<Ride>()).isEmpty)
+      #expect(try context.fetch(FetchDescriptor<RideSample>()).isEmpty)
+   }
+
    @Test func appendWithoutAnActiveRideIsIgnored() throws {
       let (storage, context) = try makeStorage()
       let reference = Date(timeIntervalSince1970: 1_000_000)

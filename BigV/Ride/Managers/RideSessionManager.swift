@@ -673,17 +673,54 @@ final class RideSessionManager {
       switch outcome {
          case .acquiredFix, .reseeded:
             beginRecordingIfNeeded(at: location)
-            appendRoutePoint(location)
+            if Self.recordsTrackCoordinate(
+               outcome,
+               horizontalAccuracy: location.horizontalAccuracy,
+               preciseHorizontalAccuracy: telemetryEngine.configuration.maxHorizontalAccuracy
+            ) {
+               appendRoutePoint(location)
+            }
 
          case .accepted, .acceptedCoarse:
             lastSampleAt = .now
-            appendRoutePoint(location)
-            routeGuidanceManager?.follow(location, state: state)
+            let recordsCoordinate = Self.recordsTrackCoordinate(
+               outcome,
+               horizontalAccuracy: location.horizontalAccuracy,
+               preciseHorizontalAccuracy: telemetryEngine.configuration.maxHorizontalAccuracy
+            )
+            if recordsCoordinate {
+               appendRoutePoint(location)
+               routeGuidanceManager?.follow(location, state: state)
+            }
             cutAutoLapsIfNeeded()
-            persist(location)
+            if recordsCoordinate {
+               persist(location)
+            } else {
+               persistActiveTotals()
+            }
 
          case .rejected:
             break
+      }
+   }
+
+   /// Whether this fix's coordinate may be drawn, stored, or followed.
+   ///
+   /// Speed and distance have already moved. A loose fix must not become a
+   /// breadcrumb, a history point, or a turn prompt — including the fix that
+   /// starts the clock, and a coarse reseed after a dropout.
+   static func recordsTrackCoordinate(
+      _ outcome: RideTelemetryEngine.Outcome,
+      horizontalAccuracy: CLLocationAccuracy,
+      preciseHorizontalAccuracy: Double
+   ) -> Bool {
+      switch outcome {
+         case .accepted:
+            true
+         case .acceptedCoarse, .rejected:
+            false
+         case .acquiredFix, .reseeded:
+            horizontalAccuracy <= preciseHorizontalAccuracy
       }
    }
 
@@ -767,6 +804,15 @@ final class RideSessionManager {
       )
 
       rideStorageManager.append(draft, totals: state)
+      state.hasStorageFailure = rideStorageManager.hasFailure
+   }
+
+   /// Distance and speed still belong on the ride row during a weak stretch.
+   /// The loose coordinate does not.
+   private func persistActiveTotals() {
+      guard state.phase == .recording, let rideStorageManager else { return }
+
+      rideStorageManager.updateActiveTotals(state)
       state.hasStorageFailure = rideStorageManager.hasFailure
    }
 

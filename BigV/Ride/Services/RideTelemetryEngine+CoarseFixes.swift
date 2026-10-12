@@ -109,6 +109,8 @@ extension RideTelemetryEngine {
    /// moves up. Until then the last speed is held for as long as it would have
    /// taken to clear the threshold at that pace, and then it is zero — not
    /// stale, zero: the honest reading for a position that is not advancing.
+   /// Placing the anchor, and a first clear still waiting on a second, are
+   /// not that stop. They leave whatever speed is already on screen.
    ///
    /// Stationary jitter never clears: it would have to wander further than
    /// both error circles in a straight line. Slow drift never clears: a
@@ -127,7 +129,14 @@ extension RideTelemetryEngine {
          /// Not yet cleared, but the last pace is still credible.
          case holding
 
-         /// The position is not advancing.
+         /// No pace has been confirmed from this window. The anchor was just
+         /// placed, a first clear is waiting on a second, or the bar has not
+         /// been cleared and nothing is being held. Not a stop, and not
+         /// distance the engine may bank.
+         case unconfirmed
+
+         /// A held pace ran out because the position stopped advancing.
+         /// The displayed speed may fall to zero. No distance was banked.
          case stopped
       }
 
@@ -178,7 +187,7 @@ extension RideTelemetryEngine {
       mutating func ingest(_ location: CLLocation, configuration: Configuration) -> Verdict {
          guard let anchor else {
             self.anchor = location
-            return .stopped
+            return .unconfirmed
          }
 
          let displacement = location.distance(from: anchor)
@@ -203,12 +212,13 @@ extension RideTelemetryEngine {
                   location.timestamp.timeIntervalSince($0) <= configuration.coarseWindowDuration
                } ?? false
 
-               // The first clear of a run only sets the anchor.
+               // The first clear of a run only sets the anchor. It is not a
+               // stop and it is not a pace — one lurch must not publish.
                guard isContinuing || isConfirming else {
                   firstClearAt = location.timestamp
                   heldSpeed = 0
                   heldThreshold = 0
-                  return .stopped
+                  return .unconfirmed
                }
 
                firstClearAt = nil
@@ -230,10 +240,15 @@ extension RideTelemetryEngine {
             heldSpeed = 0
             heldThreshold = 0
             firstClearAt = nil
+            slideAnchorIfStale(at: location, configuration: configuration)
+            return .stopped
          }
 
+         // No pace in this window yet. Failing the bar is not a stop — a
+         // precise speed the rider already had stays up until a hold of a
+         // published pace actually runs out.
          slideAnchorIfStale(at: location, configuration: configuration)
-         return .stopped
+         return .unconfirmed
       }
 
       /// Keeps the anchor within the window so a rider who stops and rolls

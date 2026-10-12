@@ -601,6 +601,137 @@ struct RideTelemetryEngineTests {
       #expect(engine.distance < banked + 19 * 6.7 + 10)
    }
 
+   /// A precise ride, one speed-less 40 m fix, then precise again.
+   ///
+   /// That loose sample used to read 0 and steal the distance anchor, so the
+   /// metres across the gap never landed. It must keep the pace already on
+   /// screen and leave the precise anchor to collect the ground.
+   @Test func aWifiFixBetweenPreciseSamplesHoldsSpeedAndDistance() {
+      var engine = RideTelemetryEngine()
+      let reference = Date(timeIntervalSince1970: 1_000_000)
+      let metersPerSecond = 6.7
+
+      for step in 0...8 {
+         _ = engine.ingest(
+            sample(
+               northing: Double(step) * metersPerSecond,
+               horizontalAccuracy: 5,
+               speed: metersPerSecond,
+               secondsFromStart: Double(step),
+               reference: reference
+            )
+         )
+      }
+
+      let speedBeforeGap = engine.speed
+      let maximumBeforeGap = engine.maximumSpeed
+      let distanceBeforeGap = engine.distance
+      #expect(speedBeforeGap > 1)
+      #expect(engine.isMoving)
+      #expect(maximumBeforeGap > 0)
+
+      let coarse = wifiFix40(northing: 9 * metersPerSecond, secondsFromStart: 9, reference: reference)
+      #expect(engine.ingest(coarse) == .acceptedCoarse)
+      #expect(engine.speed == speedBeforeGap)
+      #expect(engine.isMoving)
+      #expect(engine.maximumSpeed == maximumBeforeGap)
+      #expect(engine.distance == distanceBeforeGap)
+
+      for step in 10...20 {
+         _ = engine.ingest(
+            sample(
+               northing: Double(step) * metersPerSecond,
+               horizontalAccuracy: 5,
+               speed: metersPerSecond,
+               secondsFromStart: Double(step),
+               reference: reference
+            )
+         )
+      }
+
+      // Twelve seconds of ground, the loose one included, from the precise
+      // anchor that the coarse sample was not allowed to replace.
+      let expectedGain = 12 * metersPerSecond
+      #expect(abs(engine.distance - distanceBeforeGap - expectedGain) < 2)
+      #expect(engine.speed > 1)
+      #expect(engine.maximumSpeed <= maximumBeforeGap + 0.01)
+   }
+
+   /// A light under Wi-Fi keeps delivering fixes, so the session's 4-second
+   /// stale timer never fires. The borrowed precise speed has to drop on its
+   /// own once the position stops covering it.
+   @Test func preciseSpeedZerosWhenWifiFixesStopAdvancing() {
+      var engine = RideTelemetryEngine()
+      let reference = Date(timeIntervalSince1970: 1_000_000)
+      let metersPerSecond = 6.7
+
+      for step in 0...8 {
+         _ = engine.ingest(
+            sample(
+               northing: Double(step) * metersPerSecond,
+               horizontalAccuracy: 5,
+               speed: metersPerSecond,
+               secondsFromStart: Double(step),
+               reference: reference
+            )
+         )
+      }
+
+      let parkedAt = 8 * metersPerSecond
+      let distanceAtStop = engine.distance
+      let maximumAtStop = engine.maximumSpeed
+      #expect(engine.speed > 1)
+
+      for step in 9...25 {
+         _ = engine.ingest(
+            wifiFix40(northing: parkedAt, secondsFromStart: Double(step), reference: reference)
+         )
+      }
+
+      #expect(engine.speed == 0)
+      #expect(engine.isMoving == false)
+      #expect(engine.distance == distanceAtStop)
+      #expect(engine.maximumSpeed == maximumAtStop)
+   }
+
+   /// The same borrowed speed stays up while the loose fixes keep rolling,
+   /// until the two-clear confirmation takes over.
+   @Test func preciseSpeedHoldsWhileWifiFixesKeepRolling() {
+      var engine = RideTelemetryEngine()
+      let reference = Date(timeIntervalSince1970: 1_000_000)
+      let metersPerSecond = 6.7
+
+      for step in 0...8 {
+         _ = engine.ingest(
+            sample(
+               northing: Double(step) * metersPerSecond,
+               horizontalAccuracy: 5,
+               speed: metersPerSecond,
+               secondsFromStart: Double(step),
+               reference: reference
+            )
+         )
+      }
+
+      let maximumBeforeWifi = engine.maximumSpeed
+      var sawZeroWhileRolling = false
+      for step in 9...50 {
+         _ = engine.ingest(
+            wifiFix40(
+               northing: Double(step) * metersPerSecond,
+               secondsFromStart: Double(step),
+               reference: reference
+            )
+         )
+         if engine.speed == 0 { sawZeroWhileRolling = true }
+      }
+
+      #expect(!sawZeroWhileRolling)
+      #expect(engine.speed > 1)
+      #expect(engine.distance > 8 * metersPerSecond)
+      #expect(engine.maximumSpeed == maximumBeforeWifi)
+   }
+
    /// Jitter stretches one clear and squeezes the next: raw paces of 9, 4,
    /// 11 m/s while riding 6.7. The hero must walk between them, never jump
    /// by more than half, and never read zero while the position advances.

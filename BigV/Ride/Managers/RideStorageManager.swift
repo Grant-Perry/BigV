@@ -195,6 +195,18 @@ final class RideStorageManager {
       saveIfDue()
    }
 
+   /// Writes live totals onto the ride being recorded without a track sample.
+   ///
+   /// A loose fix still moves distance, speed and moving time. Its coordinate
+   /// must not become a breadcrumb the history map will draw. Saves on the
+   /// same cadence as samples.
+   func updateActiveTotals(_ state: RideState) {
+      guard let ride = activeRide else { return }
+
+      apply(state, to: ride)
+      saveIfDue()
+   }
+
    // MARK: - Radar Passes
 
    /// Records one completed vehicle pass and folds it into the ride's totals.

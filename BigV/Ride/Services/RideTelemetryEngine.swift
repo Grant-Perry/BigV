@@ -57,6 +57,13 @@ struct RideTelemetryEngine {
    /// Speed from position alone while loose fixes carry no satellite speed.
    private var coarseGeometry = CoarseGeometry()
 
+   /// When a precise speed is being shown across speed-less fixes that have
+   /// not confirmed a pace yet, and how far the first of those fixes sat from
+   /// the precise anchor. Cleared as soon as geometry banks, a hold expires,
+   /// or a precise fix returns.
+   private var speedBridgeStartedAt: Date?
+   private var speedBridgeDisplacement: Double?
+
    /// Whether geometry has overruled a reported standstill and is still
    /// carrying speed sample to sample. Released the moment the reported speed
    /// comes back or the position itself stops advancing.
@@ -106,6 +113,7 @@ struct RideTelemetryEngine {
       anchorIsCoarse = false
       isOverridingStandstill = false
       coarseGeometry.reset()
+      clearSpeedBridge()
       elevationReference = nil
       needsReseed = false
       gradeWindow.removeAll()
@@ -148,6 +156,7 @@ struct RideTelemetryEngine {
       speed = 0
       isMoving = false
       isOverridingStandstill = false
+      clearSpeedBridge()
       grade = 0
       verticalSpeed = 0
       verticalWindow.removeAll()
@@ -216,12 +225,14 @@ struct RideTelemetryEngine {
 
       if isPrecise {
          coarseGeometry.reset()
+         clearSpeedBridge()
          updateSpeed(with: location, travelled: travelled, interval: interval, isPrecise: true)
          updateTime(interval: interval)
          updateElevation(with: location)
          updateDistance(with: location)
       } else if hasReportedSpeed(location) {
          coarseGeometry.reset()
+         clearSpeedBridge()
          updateSpeed(with: location, travelled: travelled, interval: interval, isPrecise: false)
          updateTime(interval: interval)
          integrateDistance(over: interval, at: location)
@@ -251,6 +262,7 @@ struct RideTelemetryEngine {
       // happened to land, often a cached or Wi-Fi position far from the bike.
       // The first loose fix after it is the first point geometry measures from.
       coarseGeometry.reset()
+      clearSpeedBridge()
 
       guard location.verticalAccuracy > 0,
             location.verticalAccuracy <= configuration.maxVerticalAccuracy else { return }
@@ -312,7 +324,12 @@ struct RideTelemetryEngine {
    /// Speed from displacement for a loose fix with no satellite speed.
    ///
    /// Nothing is published until the window has cleared twice (the first clear
-   /// only sets the anchor), and never against the seed. Each pace is capped
+   /// only sets the anchor), and never against the seed. A sample that has
+   /// not confirmed a pace leaves the last speed and the precise distance
+   /// anchor where they were. That borrowed speed drops once the position
+   /// stops doing it — a light under Wi-Fi must not hold the last pace
+   /// forever — and only a hold that runs out, or that drop, zeroes the
+   /// readout. Only banked ground moves the anchor. Each pace is capped
    /// at twice the last published reading and at `maxGeometricSpeed`, then
    /// damped against the last — jitter can stretch one clear and squeeze the
    /// next, and a hero that reads 9, then 4, then 11 is the "random numbers"
@@ -343,18 +360,66 @@ struct RideTelemetryEngine {
                movingTime += covered
             }
 
+            // Only banked ground moves the anchor. A later precise fix
+            // re-anchors here, so this leg is never billed twice. A sample
+            // that has not banked anything leaves the precise anchor alone.
+            distanceAnchor = location
+            anchorIsCoarse = true
+            clearSpeedBridge()
+
          case .holding:
             break
+
+         case .unconfirmed:
+            releaseStaleBridgedSpeed(at: location)
 
          case .stopped:
             speed = 0
             isMoving = false
+            clearSpeedBridge()
+      }
+   }
+
+   /// Drops a speed borrowed from the last precise fix when the loose
+   /// position is not actually covering that ground.
+   ///
+   /// One loose sample, and a rider who keeps rolling, leave the number up:
+   /// the position gains about what the displayed speed predicts, and the
+   /// two-clear confirmation replaces it. A stop does not. Samples keep
+   /// arriving, so the session's stale-speed timer never fires; this is the
+   /// timer for that case. Six seconds is long enough that a single bridged
+   /// fix cannot flash zero, and short enough that a light does not read
+   /// 15 mph for the whole red.
+   private mutating func releaseStaleBridgedSpeed(at location: CLLocation) {
+      guard speed > 0, let anchor = distanceAnchor, !anchorIsCoarse else {
+         clearSpeedBridge()
+         return
       }
 
-      // The loose position becomes the anchor so a later precise fix
-      // re-anchors there; whatever was banked above is never billed twice.
-      distanceAnchor = location
-      anchorIsCoarse = true
+      let displacement = location.distance(from: anchor)
+      if speedBridgeStartedAt == nil {
+         speedBridgeStartedAt = location.timestamp
+         speedBridgeDisplacement = displacement
+         return
+      }
+
+      guard let started = speedBridgeStartedAt else { return }
+
+      let elapsed = location.timestamp.timeIntervalSince(started)
+      guard elapsed >= 6 else { return }
+
+      let gained = displacement - (speedBridgeDisplacement ?? displacement)
+      let expected = speed * elapsed
+      guard gained < expected * 0.35 else { return }
+
+      speed = 0
+      isMoving = false
+      clearSpeedBridge()
+   }
+
+   private mutating func clearSpeedBridge() {
+      speedBridgeStartedAt = nil
+      speedBridgeDisplacement = nil
    }
 
    // MARK: - Time
