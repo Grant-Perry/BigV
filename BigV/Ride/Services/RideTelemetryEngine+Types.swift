@@ -62,6 +62,21 @@ extension RideTelemetryEngine {
       var speedSmoothingFactor: Double = 0.35
       var altitudeSmoothingFactor: Double = 0.2
 
+      /// How far a new geometric pace pulls the displayed speed toward it.
+      /// Each pace is already an average over one clear, so this is lighter
+      /// than `speedSmoothingFactor`'s per-second blend.
+      var geometricSpeedSmoothingFactor: Double = 0.5
+
+      /// Largest fraction the displayed speed may move between two geometric
+      /// paces. Jitter can stretch one clear and squeeze the next by half;
+      /// the hero must walk between them, not jump.
+      var maxGeometricSpeedStep: Double = 0.5
+
+      /// Hard ceiling on any speed read from position alone, about 27 mph.
+      /// A loose position can fake a faster pace than a rider sustains on
+      /// the flat; satellite speed is the only source trusted above this.
+      var maxGeometricSpeed: Double = 12
+
       /// Altitude must change by this much before it counts as gain or loss.
       var elevationHysteresis: Double = 1.5
 

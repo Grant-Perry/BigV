@@ -51,10 +51,17 @@ final class RideLocationManager {
    /// cannot spin.
    private static let retryBackoff: Duration = .seconds(3)
 
-   /// A fix older than this is Core Location replaying its cache, not where
-   /// the rider is. The first callback after `startUpdatingLocation()` is
-   /// routinely one of these.
-   private static let maxFixAge: TimeInterval = 10
+   /// When the receiver was last started. The first callback after
+   /// `startUpdatingLocation()` routinely replays Core Location's cache; a fix
+   /// stamped before this moment is that replay, not where the rider is.
+   ///
+   /// Judged against the start, not against the wall clock: a live fix that
+   /// waited out a busy main actor is still the newest position there is,
+   /// and dropping it for being old would leave the hero with nothing.
+   private var deliveryStartedAt: Date?
+
+   /// A fix computed a breath before `startUpdatingLocation()` is still now.
+   private nonisolated static let cacheTolerance: TimeInterval = 1
 
    /// How long GPS stays up after a ride's stream ends. END then START on the
    /// same turn — a rider restarting mid-roll — must not power-cycle the
@@ -131,11 +138,22 @@ final class RideLocationManager {
 
       // Not yet authorized: delivery begins from the authorization callback.
       // Already delivering from a ride that ended moments ago: keep it warm.
+      RideFixLogStore.shared.note(
+         "receiver auth=\(locationManager.authorizationStatus.rawValue) accuracyAuth=\(locationManager.accuracyAuthorization.rawValue) (0=full 1=reduced)"
+      )
       if isAuthorized {
          beginBackgroundSessionIfNeeded()
-         if !isDelivering {
+         let warmReuse = isDelivering
+         RideFixLogStore.shared.note(
+            "receiver startUpdates manager=\(ObjectIdentifier(self).hashValue) branch=\(warmReuse ? "warm-reuse(isDelivering)" : "cold-start")"
+         )
+         if !warmReuse {
             beginDelivery()
          }
+      } else {
+         RideFixLogStore.shared.note(
+            "receiver startUpdates manager=\(ObjectIdentifier(self).hashValue) branch=unauthorized-deferred"
+         )
       }
 
       DebugPrint(mode: .sessionLifecycle, "Location updates started")
@@ -183,14 +201,27 @@ final class RideLocationManager {
       // With When In Use this carries a stream begun in front out of the
       // foreground; with Always it lets a wrist START bring GPS up pocketed.
       locationManager.allowsBackgroundLocationUpdates = true
+      deliveryStartedAt = .now
       locationManager.startUpdatingLocation()
       isDelivering = true
+      RideFixLogStore.shared.note("CL startUpdatingLocation manager=\(ObjectIdentifier(self).hashValue)")
+   }
+
+   /// Whether a fix predates the current receiver start, meaning Core
+   /// Location replayed it from cache rather than measuring it.
+   nonisolated static func isReplayedFromCache(
+      _ timestamp: Date,
+      deliveryStartedAt: Date?
+   ) -> Bool {
+      guard let deliveryStartedAt else { return false }
+      return timestamp < deliveryStartedAt.addingTimeInterval(-cacheTolerance)
    }
 
    private func endDelivery() {
       guard isDelivering else { return }
       locationManager.stopUpdatingLocation()
       isDelivering = false
+      RideFixLogStore.shared.note("CL stopUpdatingLocation manager=\(ObjectIdentifier(self).hashValue)")
    }
 
    /// Closes the consumer's stream without touching delivery; `stopUpdates`
@@ -247,14 +278,12 @@ final class RideLocationManager {
       guard let continuation else { return }
 
       let accuracyLimited = locationManager.accuracyAuthorization == .reducedAccuracy
-      let now = Date.now
 
       for location in locations {
-         let age = now.timeIntervalSince(location.timestamp)
-         guard age <= Self.maxFixAge else {
+         guard !Self.isReplayedFromCache(location.timestamp, deliveryStartedAt: deliveryStartedAt) else {
             DebugPrint(
                mode: .locationFiltering,
-               "Dropped cached fix \(Int(age)) s old, accuracy \(Int(location.horizontalAccuracy)) m"
+               "Dropped cached fix \(Int(Date.now.timeIntervalSince(location.timestamp))) s old, accuracy \(Int(location.horizontalAccuracy)) m"
             )
             continue
          }

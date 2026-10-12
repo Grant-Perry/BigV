@@ -226,7 +226,7 @@ struct RideTelemetryEngine {
          updateTime(interval: interval)
          integrateDistance(over: interval, at: location)
       } else {
-         updateGeometricSpeed(with: location)
+         updateGeometricSpeed(with: location, interval: interval)
          updateTime(interval: interval)
       }
 
@@ -247,12 +247,10 @@ struct RideTelemetryEngine {
       anchorIsCoarse = isCoarse
       isOverridingStandstill = false
 
-      // A loose seed is the first point geometry can measure from.
-      if isCoarse {
-         coarseGeometry.anchor(at: location)
-      } else {
-         coarseGeometry.reset()
-      }
+      // Never a geometry anchor, loose or not: the seed is where acquisition
+      // happened to land, often a cached or Wi-Fi position far from the bike.
+      // The first loose fix after it is the first point geometry measures from.
+      coarseGeometry.reset()
 
       guard location.verticalAccuracy > 0,
             location.verticalAccuracy <= configuration.maxVerticalAccuracy else { return }
@@ -313,20 +311,37 @@ struct RideTelemetryEngine {
 
    /// Speed from displacement for a loose fix with no satellite speed.
    ///
-   /// The pace is already an average over tens of metres, so it is shown
-   /// as-is rather than smoothed; smoothing a reading that arrives every
-   /// ten seconds would only lag it. It is kept out of the ride maximum: a
-   /// jitter-stretched displacement can inflate one pace by half, and the
-   /// headline number must not be set by a Wi-Fi fix.
-   private mutating func updateGeometricSpeed(with location: CLLocation) {
+   /// Nothing is published until the window has cleared twice (the first clear
+   /// only sets the anchor), and never against the seed. Each pace is capped
+   /// at twice the last published reading and at `maxGeometricSpeed`, then
+   /// damped against the last — jitter can stretch one clear and squeeze the
+   /// next, and a hero that reads 9, then 4, then 11 is the "random numbers"
+   /// a rider reports. It is kept out of the ride maximum: the headline number
+   /// must not be set by a Wi-Fi fix.
+   private mutating func updateGeometricSpeed(with location: CLLocation, interval: TimeInterval) {
       isOverridingStandstill = false
+      let wasMoving = isMoving
 
       switch coarseGeometry.ingest(location, configuration: configuration) {
-         case .moving(let pace, let displacement):
-            speed = min(pace, configuration.maxPlausibleSpeed)
+         case .moving(let pace, let displacement, let elapsed):
+            let ceiling = speed > 0
+               ? min(speed * 2, configuration.maxGeometricSpeed)
+               : configuration.maxGeometricSpeed
+            speed = dampedGeometricSpeed(toward: min(pace, ceiling, configuration.maxPlausibleSpeed))
+            coarseGeometry.holdPace(speed)
             isMoving = true
             distance += displacement
             appendGradePoint()
+
+            // The ground just banked was covered while the first clear and
+            // this one were being waited out, which `updateTime` billed as
+            // stopped. Move that span across so distance / moving time is
+            // the pace actually ridden, not a number inflated by the wait.
+            if !wasMoving {
+               let covered = min(stoppedTime, max(0, elapsed - interval))
+               stoppedTime -= covered
+               movingTime += covered
+            }
 
          case .holding:
             break

@@ -63,6 +63,8 @@ struct RideSettingsView: View {
                if unitsSettings.hasCompletedSetup {
                   RideSettingsBackupCard(backupViewModel: backupViewModel)
 
+                  RideSettingsGPSLogCard(gpsLogStore: .shared)
+
                   onboardingResetCard
                }
             }

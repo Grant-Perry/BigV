@@ -186,6 +186,8 @@ final class RideSessionManager {
       heartRateRingBuffer.clear()
 
       ScreenAwakeService.setKeepAwake(true)
+      RideFixLogStore.shared.beginRide()
+      RideFixLogStore.shared.note("ride start phase=\(state.phase)")
       startLocationStream()
       startClock()
       requestHealthAuthorization()
@@ -227,6 +229,7 @@ final class RideSessionManager {
 
    func end() {
       guard state.phase.isActive else { return }
+      RideFixLogStore.shared.note("ride end phase=\(state.phase) distance=\(state.distance)")
 
       // Cleared first: from here on every path either files the ride or erases
       // it, so a crash between now and finalization must not look like an
@@ -291,6 +294,7 @@ final class RideSessionManager {
    }
 
    private func returnToIdle() {
+      RideFixLogStore.shared.note("returnToIdle phase=\(state.phase)")
       checkpointStore.clear()
       stopStreams()
       ScreenAwakeService.setKeepAwake(false)
@@ -653,6 +657,11 @@ final class RideSessionManager {
          mode: .locationFiltering,
          RideFixDiagnostics.line(for: location, outcome: outcome, speed: state.speed, distance: state.distance)
       )
+      if RideFixLogStore.shared.isActive {
+         RideFixLogStore.shared.note(
+            RideFixDiagnostics.line(for: location, outcome: outcome, speed: state.speed, distance: state.distance)
+         )
+      }
 
       if state.phase == .acquiringGPS {
          mirrorToWatch()
@@ -912,7 +921,8 @@ final class RideSessionManager {
          case .command(let request, let acknowledgement):
             apply(request, acknowledgement: acknowledgement)
 
-         case .linkStateChanged:
+         case .linkStateChanged(let linkState):
+            RideFixLogStore.shared.note("watch link state=\(linkState) phase=\(state.phase)")
             prepareRemoteStartIfNeeded()
       }
    }
@@ -1140,6 +1150,7 @@ final class RideSessionManager {
             // Rare, and the wrist pip must not show a live radar that is gone.
             mirrorToWatch()
             DebugPrint(mode: .radar, "Radar connection: \(connection.rawValue)")
+            RideFixLogStore.shared.note("radar connection=\(connection.rawValue) phase=\(state.phase)")
 
          case .battery(let percent):
             state.radar.batteryPercent = percent
@@ -1233,6 +1244,11 @@ final class RideSessionManager {
 
    /// Republishes tracker state into `RideState` at a 5 Hz cap so SwiftUI is
    /// not thrashed by the radar's ~7 Hz notify rate.
+   ///
+   /// Written only when the board actually changed. `state` is one observed
+   /// property, so every write to `state.radar` re-evaluates every view that
+   /// reads speed or distance — and a connected radar on an empty road
+   /// heartbeats at 7 Hz with nothing new to say.
    private func publishRadar(force: Bool) {
       let now = Date.now
       guard force || now.timeIntervalSince(lastRadarPublishAt) >= radarPublishInterval else {
@@ -1240,12 +1256,16 @@ final class RideSessionManager {
       }
       lastRadarPublishAt = now
 
-      state.radar.tracks = radarTracker.tracks
-      state.radar.aggregateTier = radarTracker.aggregateTier
-      state.radar.nearestDistanceMeters = radarTracker.nearestTrack?.distanceMeters
-      state.radar.nearestClosingSpeedMetersPerSecond =
+      var radar = state.radar
+      radar.tracks = radarTracker.tracks
+      radar.aggregateTier = radarTracker.aggregateTier
+      radar.nearestDistanceMeters = radarTracker.nearestTrack?.distanceMeters
+      radar.nearestClosingSpeedMetersPerSecond =
          radarTracker.nearestTrack?.closingSpeedMetersPerSecond
-      state.radar.vehiclePassCount = restoredRadarPassCount + persistedRadarPassCount
+      radar.vehiclePassCount = restoredRadarPassCount + persistedRadarPassCount
+
+      guard radar != state.radar else { return }
+      state.radar = radar
    }
 
    /// Clears phantom vehicles when the radar stops reporting. Runs from both

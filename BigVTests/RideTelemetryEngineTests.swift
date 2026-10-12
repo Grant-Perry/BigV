@@ -484,20 +484,25 @@ struct RideTelemetryEngineTests {
          }
       }
 
-      // The seed is a 65 m circle and the fixes are 40 m, so the first clear
-      // needs 105 m of straight line: 16 s at 6.7 m/s. Every clear after it
-      // needs 80 m, 12 s.
+      // The seed is never measured from: the first 40 m fix anchors, the
+      // next clear (80 m, 12 s at 6.7 m/s) only moves the anchor, and the
+      // clear after it publishes.
       #expect(firstLiveSpeedAt != nil)
-      #expect((firstLiveSpeedAt ?? .infinity) <= 20)
+      #expect((firstLiveSpeedAt ?? .infinity) <= 30)
+      #expect((firstLiveSpeedAt ?? 0) >= 24)
 
       #expect(engine.isMoving)
       #expect(abs(engine.speed - metersPerSecond) < 0.5)
 
       // Only ground that cleared the bar is banked; the tail since the last
       // clear (under 80 m) waits for the next one rather than being guessed.
-      #expect(engine.distance > 300)
+      #expect(engine.distance > 200)
       #expect(engine.distance <= 60 * metersPerSecond + 1)
       #expect(engine.movingTime >= 40)
+
+      // Time waited out before the confirming clear counts as moving, so
+      // distance over moving time reads the ridden pace, not an inflated one.
+      #expect(engine.averageSpeed <= metersPerSecond * 1.1)
    }
 
    @Test func fortyMetreFixesJitteringAtAStandstillReadZero() {
@@ -577,9 +582,9 @@ struct RideTelemetryEngineTests {
          )
       }
       let banked = engine.distance
-      #expect(banked > 200)
+      #expect(banked > 150)
 
-      // GPS locks. The 268 m already banked from displacement must not come
+      // GPS locks. The metres already banked from displacement must not come
       // back as one straight line from the loose anchor.
       let locked = sample(northing: 41 * 6.7, horizontalAccuracy: 6, speed: 6.7, secondsFromStart: 41, reference: reference)
       #expect(engine.ingest(locked) == .accepted)
@@ -594,6 +599,143 @@ struct RideTelemetryEngineTests {
       // Nineteen precise 6.7 m steps on top, and nothing else.
       #expect(engine.distance > banked + 19 * 6.7 - 10)
       #expect(engine.distance < banked + 19 * 6.7 + 10)
+   }
+
+   /// Jitter stretches one clear and squeezes the next: raw paces of 9, 4,
+   /// 11 m/s while riding 6.7. The hero must walk between them, never jump
+   /// by more than half, and never read zero while the position advances.
+   @Test func geometricSpeedNeverJumpsByMoreThanHalfBetweenPaces() {
+      var engine = RideTelemetryEngine()
+      let reference = Date(timeIntervalSince1970: 1_000_000)
+      let metersPerSecond = 6.7
+
+      _ = engine.ingest(wifiFix40(northing: 0, secondsFromStart: 0, reference: reference))
+
+      var previousSpeed = 0.0
+      var largestRatio = 1.0
+      var zeroWhileRolling = false
+      var rollingSpeeds: [Double] = []
+
+      // Up to ±25 m of along-track wobble on top of true progress, held for
+      // a few seconds at a time the way a Wi-Fi position lurches, with a
+      // period that does not line up with the clear interval.
+      let wobbles: [Double] = [12, -20, 5, 25, -8, -25, 18, -3, 22, -15, 0]
+
+      for step in 1...180 {
+         let wobble = wobbles[(step / 5) % wobbles.count]
+         _ = engine.ingest(
+            wifiFix40(
+               northing: Double(step) * metersPerSecond + wobble,
+               secondsFromStart: Double(step),
+               reference: reference
+            )
+         )
+
+         if previousSpeed > 0, engine.speed > 0 {
+            let ratio = max(engine.speed, previousSpeed) / min(engine.speed, previousSpeed)
+            largestRatio = max(largestRatio, ratio)
+         }
+         if step > 40 {
+            if engine.speed == 0 { zeroWhileRolling = true }
+            rollingSpeeds.append(engine.speed)
+         }
+         previousSpeed = engine.speed
+      }
+
+      #expect(largestRatio <= 1.5 + 0.001)
+      #expect(!zeroWhileRolling)
+      #expect(engine.isMoving)
+
+      // Individual paces are stretched and squeezed by design; the readout
+      // as a whole must still centre on the true speed.
+      let mean = rollingSpeeds.reduce(0, +) / Double(rollingSpeeds.count)
+      #expect(abs(mean - metersPerSecond) < 1.5)
+   }
+
+   @Test func dampedGeometricSpeedTakesTheFirstPaceWholeAndCapsLaterSteps() {
+      var engine = RideTelemetryEngine()
+      let reference = Date(timeIntervalSince1970: 1_000_000)
+
+      // No speed yet: the first pace is the reading.
+      #expect(engine.dampedGeometricSpeed(toward: 6.7) == 6.7)
+
+      // Establish a steady 6.7 m/s from geometry.
+      _ = engine.ingest(wifiFix40(northing: 0, secondsFromStart: 0, reference: reference))
+      for step in 1...40 {
+         _ = engine.ingest(
+            wifiFix40(northing: Double(step) * 6.7, secondsFromStart: Double(step), reference: reference)
+         )
+      }
+      let steady = engine.speed
+      #expect(steady > 6)
+
+      // A pace three times higher moves the reading by at most half.
+      #expect(engine.dampedGeometricSpeed(toward: steady * 3) <= steady * 1.5 + 0.001)
+
+      // A pace a tenth of it drops the reading by at most half.
+      #expect(engine.dampedGeometricSpeed(toward: steady * 0.1) >= steady * 0.5 - 0.001)
+
+      // A nearby pace is blended, not snapped.
+      let nudged = engine.dampedGeometricSpeed(toward: steady + 1)
+      #expect(nudged > steady && nudged < steady + 1)
+   }
+
+   // MARK: - Geometric Speed Guards
+
+   /// Field report: 31.9 mph at a standstill right after START. The seed was
+   /// a cached position 100 m from the bike, and the first loose fix "rode"
+   /// there in a second or two.
+   @Test func aFixFarFromTheSeedNeverPublishesGeometricSpeed() {
+      var engine = RideTelemetryEngine()
+      let reference = Date(timeIntervalSince1970: 1_000_000)
+
+      _ = engine.ingest(wifiFix(northing: 0, secondsFromStart: 0, reference: reference))
+      _ = engine.ingest(wifiFix40(northing: 100, secondsFromStart: 10, reference: reference))
+
+      #expect(engine.speed == 0)
+      #expect(engine.isMoving == false)
+      #expect(engine.distance == 0)
+   }
+
+   @Test func aSingleHundredMetreJumpMidRideReadsZero() {
+      var engine = RideTelemetryEngine()
+      let reference = Date(timeIntervalSince1970: 1_000_000)
+
+      _ = engine.ingest(wifiFix40(northing: 0, secondsFromStart: 0, reference: reference))
+      for step in 1...5 {
+         _ = engine.ingest(wifiFix40(northing: 0, secondsFromStart: Double(step), reference: reference))
+      }
+
+      // One lurch, then the position settles there. One clear only anchors.
+      for step in 6...12 {
+         _ = engine.ingest(wifiFix40(northing: 100, secondsFromStart: Double(step), reference: reference))
+         #expect(engine.speed == 0)
+      }
+
+      #expect(engine.isMoving == false)
+      #expect(engine.distance == 0)
+      #expect(engine.maximumSpeed == 0)
+   }
+
+   @Test func twoConsistentClearsPublishABoundedGeometricSpeed() {
+      var engine = RideTelemetryEngine()
+      let reference = Date(timeIntervalSince1970: 1_000_000)
+      let metersPerSecond = 6.7
+
+      _ = engine.ingest(wifiFix40(northing: 0, secondsFromStart: 0, reference: reference))
+
+      var published = false
+      for step in 1...45 {
+         _ = engine.ingest(
+            wifiFix40(northing: Double(step) * metersPerSecond, secondsFromStart: Double(step), reference: reference)
+         )
+         #expect(engine.speed <= 12)
+         if engine.speed > 0 { published = true }
+      }
+
+      #expect(published)
+      #expect(engine.speed > 0)
+      #expect(engine.maximumSpeed == 0)
    }
 
    @Test func satelliteSpeedIsPreferredOverGeometryWhenPresent() {

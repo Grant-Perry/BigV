@@ -54,6 +54,20 @@ extension RideTelemetryEngine {
       min(6, max(1.5, location.horizontalAccuracy * 0.5))
    }
 
+   /// The displayed speed after one more geometric pace lands.
+   ///
+   /// From a standstill the pace is taken whole; there is nothing to blend
+   /// with and the rider has waited long enough. Otherwise the pace pulls the
+   /// reading toward it by `geometricSpeedSmoothingFactor`, and the move is
+   /// capped at `maxGeometricSpeedStep` of the current reading either way.
+   func dampedGeometricSpeed(toward pace: Double) -> Double {
+      guard speed > 0 else { return pace }
+
+      let blended = speed + (pace - speed) * configuration.geometricSpeedSmoothingFactor
+      let step = speed * configuration.maxGeometricSpeedStep
+      return min(max(blended, speed - step), speed + step)
+   }
+
    // MARK: - Standstill Override
 
    /// Speed from displacement since the anchor, when that displacement is too
@@ -106,8 +120,9 @@ extension RideTelemetryEngine {
    struct CoarseGeometry: Sendable {
 
       enum Verdict: Sendable, Equatable {
-         /// Displacement cleared the bar. Speed is the average over it.
-         case moving(speed: Double, displacement: Double)
+         /// Displacement cleared the bar twice in a row. Speed is the average
+         /// over it, and `elapsed` is how long that ground took.
+         case moving(speed: Double, displacement: Double, elapsed: TimeInterval)
 
          /// Not yet cleared, but the last pace is still credible.
          case holding
@@ -125,21 +140,38 @@ extension RideTelemetryEngine {
       private var heldSpeed: Double = 0
       private var heldThreshold: Double = 0
 
+      /// When the window first cleared. One clear only moves the anchor — a
+      /// 100 m lurch of a Wi-Fi position looks exactly like a 22 mph burst —
+      /// and a second clear within the window confirms the bike is going
+      /// somewhere. Nil while nothing is pending.
+      private var firstClearAt: Date?
+
       /// Longest the hold may last regardless of pace, so a jitter-inflated
       /// pace cannot hold a speed on screen at a standstill for a minute.
       private static let maximumHold: TimeInterval = 30
+
+      /// How many nominal clear times the hold survives. Jitter can push the
+      /// position back by as much as both error circles, which doubles the
+      /// ground the bike has to cover before the next clear lands, and the
+      /// pace the hold is timed on may itself be half again too high. Short
+      /// of this the hero flashes zero between two honest clears.
+      private static let holdMargin: Double = 3
 
       mutating func reset() {
          anchor = nil
          window.removeAll()
          heldSpeed = 0
          heldThreshold = 0
+         firstClearAt = nil
       }
 
-      /// Starts measuring from a known loose position, such as the seed.
-      mutating func anchor(at location: CLLocation) {
-         reset()
-         anchor = location
+      /// The pace the hold is timed against. The engine calls this with the
+      /// damped reading after a clear: a single stretched pace must not
+      /// shorten the window so much that the next honest clear lands late and
+      /// the hero flashes zero in between.
+      mutating func holdPace(_ speed: Double) {
+         guard heldSpeed > 0 else { return }
+         heldSpeed = speed
       }
 
       /// Measures one loose, speed-less fix against the anchor.
@@ -156,14 +188,33 @@ extension RideTelemetryEngine {
             configuration.coarseDisplacementFloor
          )
 
+         let holdLimit = heldSpeed > 0
+            ? min(Self.maximumHold, Self.holdMargin * heldThreshold / heldSpeed)
+            : 0
+
          if elapsed > 0, displacement >= threshold {
             let pace = displacement / elapsed
             if pace >= configuration.movingSpeedThreshold, pace <= configuration.maxPlausibleSpeed {
                self.anchor = location
                window.removeAll()
+
+               let isContinuing = heldSpeed > 0 && elapsed <= holdLimit
+               let isConfirming = firstClearAt.map {
+                  location.timestamp.timeIntervalSince($0) <= configuration.coarseWindowDuration
+               } ?? false
+
+               // The first clear of a run only sets the anchor.
+               guard isContinuing || isConfirming else {
+                  firstClearAt = location.timestamp
+                  heldSpeed = 0
+                  heldThreshold = 0
+                  return .stopped
+               }
+
+               firstClearAt = nil
                heldSpeed = pace
                heldThreshold = threshold
-               return .moving(speed: pace, displacement: displacement)
+               return .moving(speed: pace, displacement: displacement, elapsed: elapsed)
             }
          }
 
@@ -171,14 +222,14 @@ extension RideTelemetryEngine {
 
          if heldSpeed > 0 {
             // At the held pace the bar would have been cleared in
-            // threshold / speed seconds; half again covers jitter eating
+            // threshold / speed seconds; the margin covers jitter eating
             // into the displacement. Past that, the bike has slowed or stopped.
-            let holdLimit = min(Self.maximumHold, 1.5 * heldThreshold / heldSpeed)
             if elapsed <= holdLimit {
                return .holding
             }
             heldSpeed = 0
             heldThreshold = 0
+            firstClearAt = nil
          }
 
          slideAnchorIfStale(at: location, configuration: configuration)
