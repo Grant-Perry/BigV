@@ -42,6 +42,37 @@ nonisolated struct RideBackupPayload: Codable, Sendable {
       /// before cards could move have no layout, and decode as-is.
       var cockpitDashboardTiles: [String]?
       var cockpitTrafficTiles: [String]?
+
+      /// Places and riding switches added without bumping the format.
+      ///
+      /// `nil` on files written before they were backed up — restore leaves
+      /// the destination's copies untouched. A present container is
+      /// authoritative, including an empty list or a cleared home. Fields
+      /// added inside later must stay optional so a file written today still
+      /// decodes.
+      var extended: ExtendedPreferences? = nil
+   }
+
+   struct ExtendedPreferences: Codable, Sendable {
+      var home: RouteDestinationRecord?
+      var favorites: [SavedRouteFavorite]
+      var recents: [RouteRecentDestination]
+      var weatherPin: WeatherPinRecord?
+      var appearanceMode: String
+      var autoLapUnits: Double
+      var climbAutoSwitchEnabled: Bool
+      var guidanceVoiceEnabled: Bool
+      var favoritesSectionExpanded: Bool
+      var recentsSectionExpanded: Bool
+   }
+
+   /// A city pinned in the weather sheet. `RideWeatherPlace` is not codable;
+   /// this is the stored pin and nothing else.
+   struct WeatherPinRecord: Codable, Sendable, Equatable {
+      var latitude: Double
+      var longitude: Double
+      var label: String
+      var timeZoneIdentifier: String?
    }
 
    // MARK: - Ride

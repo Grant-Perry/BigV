@@ -3,14 +3,18 @@
 //  BigV
 //
 
+import CoreLocation
 import Foundation
 import UniformTypeIdentifiers
 
 /// Builds and applies Settings backups: finished rides plus rider preferences.
 ///
-/// Restore merges rides that are not already present (matched by start, distance
-/// and duration). Preferences always overwrite. An active recording blocks restore
-/// so an in-progress row cannot collide with imported history.
+/// Restore inserts finished rides that are not already present (matched by
+/// start, distance and duration). A match missing children the file has is
+/// filled in place and counted as an update; a complete match is skipped.
+/// Preferences always overwrite. Extended preferences are absent on older
+/// files, and those files leave places and the newer switches untouched.
+/// An active recording blocks restore.
 @MainActor
 final class RideBackupManager {
 
@@ -23,6 +27,7 @@ final class RideBackupManager {
 
    struct ImportResult: Sendable {
       let addedRideCount: Int
+      let updatedRideCount: Int
       let skippedRideCount: Int
    }
 
@@ -53,6 +58,15 @@ final class RideBackupManager {
    private let radarSettings: RideRadarSettings
    private let onboardingSettings: RideOnboardingSettings
    private let cockpitLayoutSettings: RideCockpitLayoutSettings
+   private let appearanceSettings: RideAppearanceSettings
+   private let lapSettings: RideLapSettings
+   private let climbSettings: RideClimbSettings
+   private let routeHomeSettings: RouteHomeSettings
+   private let routeFavoriteStore: RouteFavoriteStore
+   private let routeRecentStore: RouteRecentStore
+   private let routeGuidanceManager: RouteGuidanceManager
+   private let weatherModel: RideWeatherModel
+   private let defaults: UserDefaults
 
    // MARK: - Initialization
 
@@ -61,13 +75,31 @@ final class RideBackupManager {
       unitsSettings: RideUnitsSettings,
       radarSettings: RideRadarSettings,
       onboardingSettings: RideOnboardingSettings,
-      cockpitLayoutSettings: RideCockpitLayoutSettings
+      cockpitLayoutSettings: RideCockpitLayoutSettings,
+      appearanceSettings: RideAppearanceSettings,
+      lapSettings: RideLapSettings,
+      climbSettings: RideClimbSettings,
+      routeHomeSettings: RouteHomeSettings,
+      routeFavoriteStore: RouteFavoriteStore,
+      routeRecentStore: RouteRecentStore,
+      routeGuidanceManager: RouteGuidanceManager,
+      weatherModel: RideWeatherModel,
+      defaults: UserDefaults = .standard
    ) {
       self.rideStorageManager = rideStorageManager
       self.unitsSettings = unitsSettings
       self.radarSettings = radarSettings
       self.onboardingSettings = onboardingSettings
       self.cockpitLayoutSettings = cockpitLayoutSettings
+      self.appearanceSettings = appearanceSettings
+      self.lapSettings = lapSettings
+      self.climbSettings = climbSettings
+      self.routeHomeSettings = routeHomeSettings
+      self.routeFavoriteStore = routeFavoriteStore
+      self.routeRecentStore = routeRecentStore
+      self.routeGuidanceManager = routeGuidanceManager
+      self.weatherModel = weatherModel
+      self.defaults = defaults
    }
 
    // MARK: - Export
@@ -128,9 +160,16 @@ final class RideBackupManager {
       apply(preferences: payload.preferences)
 
       let existing = rideStorageManager.savedRides()
-      let existingKeys = Set(existing.map(Self.identityKey(for:)))
+      var existingByKey: [String: Ride] = [:]
+      for ride in existing {
+         let key = Self.identityKey(for: ride)
+         if existingByKey[key] == nil {
+            existingByKey[key] = ride
+         }
+      }
 
       var added = 0
+      var updated = 0
       var skipped = 0
       var failed = 0
 
@@ -140,8 +179,15 @@ final class RideBackupManager {
             distance: record.distance,
             duration: record.duration
          )
-         if existingKeys.contains(key) {
-            skipped += 1
+         if let ride = existingByKey[key] {
+            switch rideStorageManager.fillMissingContent(on: ride, from: record) {
+               case .unchanged:
+                  skipped += 1
+               case .updated:
+                  updated += 1
+               case .failed:
+                  failed += 1
+            }
             continue
          }
 
@@ -154,9 +200,13 @@ final class RideBackupManager {
 
       DebugPrint(
          mode: .persistence,
-         "Backup restored +\(added) rides, skipped \(skipped), failed \(failed), prefs applied"
+         "Backup restored +\(added) rides, updated \(updated), skipped \(skipped), failed \(failed), prefs applied"
       )
-      return ImportResult(addedRideCount: added, skippedRideCount: skipped)
+      return ImportResult(
+         addedRideCount: added,
+         updatedRideCount: updated,
+         skippedRideCount: skipped
+      )
    }
 
    // MARK: - Preferences
@@ -176,7 +226,33 @@ final class RideBackupManager {
          radarOverlayEnabled: radarSettings.overlayEnabled,
          radarDisclaimerAcknowledged: radarSettings.hasAcknowledgedDisclaimer,
          cockpitDashboardTiles: cockpitLayoutSettings.dashboardTiles.map(\.rawValue),
-         cockpitTrafficTiles: cockpitLayoutSettings.trafficTiles.map(\.rawValue)
+         cockpitTrafficTiles: cockpitLayoutSettings.trafficTiles.map(\.rawValue),
+         extended: snapshotExtendedPreferences()
+      )
+   }
+
+   private func snapshotExtendedPreferences() -> RideBackupPayload.ExtendedPreferences {
+      RideBackupPayload.ExtendedPreferences(
+         home: routeHomeSettings.home.map(RouteDestinationRecord.init),
+         favorites: routeFavoriteStore.favorites,
+         recents: routeRecentStore.recents,
+         weatherPin: snapshotWeatherPin(),
+         appearanceMode: appearanceSettings.mode.rawValue,
+         autoLapUnits: lapSettings.autoLapUnits,
+         climbAutoSwitchEnabled: climbSettings.autoSwitchEnabled,
+         guidanceVoiceEnabled: routeGuidanceManager.isVoiceEnabled,
+         favoritesSectionExpanded: RouteFavoriteSectionPreferences.isExpanded(in: defaults),
+         recentsSectionExpanded: RouteRecentSectionPreferences.isExpanded(in: defaults)
+      )
+   }
+
+   private func snapshotWeatherPin() -> RideBackupPayload.WeatherPinRecord? {
+      guard let place = RideWeatherPlaceStore.pinnedPlace(in: defaults) else { return nil }
+      return RideBackupPayload.WeatherPinRecord(
+         latitude: place.latitude,
+         longitude: place.longitude,
+         label: place.label,
+         timeZoneIdentifier: place.timeZoneIdentifier
       )
    }
 
@@ -207,6 +283,36 @@ final class RideBackupManager {
          dashboard: preferences.cockpitDashboardTiles,
          traffic: preferences.cockpitTrafficTiles
       )
+
+      if let extended = preferences.extended {
+         apply(extended: extended)
+      }
+   }
+
+   private func apply(extended: RideBackupPayload.ExtendedPreferences) {
+      routeHomeSettings.home = extended.home?.routeDestination
+      routeFavoriteStore.replace(extended.favorites)
+      routeRecentStore.replace(extended.recents)
+
+      if let pin = extended.weatherPin {
+         let place = RideWeatherPlace.pinned(
+            coordinate: CLLocationCoordinate2D(latitude: pin.latitude, longitude: pin.longitude),
+            label: pin.label,
+            timeZone: pin.timeZoneIdentifier.flatMap(TimeZone.init(identifier:))
+         )
+         weatherModel.restorePinnedPlace(place, defaults: defaults)
+      } else {
+         weatherModel.restorePinnedPlace(nil, defaults: defaults)
+      }
+
+      if let mode = RideAppearanceMode(rawValue: extended.appearanceMode) {
+         appearanceSettings.mode = mode
+      }
+      lapSettings.autoLapUnits = extended.autoLapUnits
+      climbSettings.autoSwitchEnabled = extended.climbAutoSwitchEnabled
+      routeGuidanceManager.isVoiceEnabled = extended.guidanceVoiceEnabled
+      RouteFavoriteSectionPreferences.setExpanded(extended.favoritesSectionExpanded, in: defaults)
+      RouteRecentSectionPreferences.setExpanded(extended.recentsSectionExpanded, in: defaults)
    }
 
    // MARK: - Encoding

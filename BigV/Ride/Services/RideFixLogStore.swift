@@ -73,6 +73,11 @@ final class RideFixLogStore {
    /// False after a ride file is sealed, so a later idle note cannot open a
    /// second, empty file that crowds the real ride out of the last-five list.
    @ObservationIgnored private var acceptsNotes = true
+   /// True while Delete all logs is removing files, so a fix cannot open a
+   /// new one underneath the deletion.
+   @ObservationIgnored private var isClearing = false
+   /// A ride started during a clear. Opened once the files are gone.
+   @ObservationIgnored private var reopenAfterClear = false
    @ObservationIgnored private var writer: RideFixLogWriter?
    @ObservationIgnored private var pending: [RideFixLogWriter.Entry] = []
    @ObservationIgnored private var flushTask: Task<Void, Never>?
@@ -101,6 +106,11 @@ final class RideFixLogStore {
    /// anything noted before the first START of a launch opens one lazily.
    func beginRide() {
       guard isActive else { return }
+      if isClearing {
+         acceptsNotes = true
+         reopenAfterClear = true
+         return
+      }
       acceptsNotes = true
       closeFile()
       openFile()
@@ -109,6 +119,11 @@ final class RideFixLogStore {
 
    /// Flushes and closes the ride's file.
    func endRide() {
+      if isClearing {
+         acceptsNotes = false
+         reopenAfterClear = false
+         return
+      }
       guard writer != nil else { return }
       note("ride log closed")
       acceptsNotes = false
@@ -120,7 +135,7 @@ final class RideFixLogStore {
    /// Records one line. Cheap: the text is stored and stamped, nothing else
    /// happens on this actor.
    func note(_ line: String) {
-      guard isActive, acceptsNotes else { return }
+      guard isActive, acceptsNotes, !isClearing else { return }
       if writer == nil { openFile() }
       pending.append(RideFixLogWriter.Entry(date: .now, text: line))
    }
@@ -140,6 +155,35 @@ final class RideFixLogStore {
       flush()
       await writeTask?.value
       refreshFileList()
+   }
+
+   /// Deletes every log file on disk. Lines still buffered are dropped.
+   /// A ride that is recording starts a new file on its next fix.
+   func deleteAllLogs() async {
+      isClearing = true
+      flushTask?.cancel()
+      flushTask = nil
+      pending.removeAll()
+
+      let openWriter = writer
+      writer = nil
+      await writeTask?.value
+      await openWriter?.close()
+
+      let urls = (try? FileManager.default.contentsOfDirectory(
+         at: directory,
+         includingPropertiesForKeys: nil
+      )) ?? []
+      for url in urls where url.pathExtension == "log" {
+         try? FileManager.default.removeItem(at: url)
+      }
+      logFileURLs = []
+
+      isClearing = false
+      if reopenAfterClear {
+         reopenAfterClear = false
+         beginRide()
+      }
    }
 
    // MARK: - Files

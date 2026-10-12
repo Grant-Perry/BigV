@@ -136,16 +136,16 @@ struct BigVApp: App {
 
       // Weather is owned here, not by the status row: a ride runs for hours,
       // and the chip must survive every dashboard rebuild without refetching.
-      _rideWeatherModel = State(
-         initialValue: RideWeatherModel(
-            weatherService: RideWeatherService(),
-            locationProbe: currentLocationProbe,
-            unitsSettings: rideUnitsSettings
-         )
+      let rideWeatherModel = RideWeatherModel(
+         weatherService: RideWeatherService(),
+         locationProbe: currentLocationProbe,
+         unitsSettings: rideUnitsSettings
       )
+      _rideWeatherModel = State(initialValue: rideWeatherModel)
       _rideClimbSettings = State(initialValue: rideClimbSettings)
       _rideLapSettings = State(initialValue: rideLapSettings)
-      _rideAppearanceSettings = State(initialValue: RideAppearanceSettings())
+      let rideAppearanceSettings = RideAppearanceSettings()
+      _rideAppearanceSettings = State(initialValue: rideAppearanceSettings)
 
       // Climbs are owned here for the same reason weather is: the page, the
       // dashboard tile and the split recorder all read one model that outlives
@@ -220,7 +220,15 @@ struct BigVApp: App {
                unitsSettings: rideUnitsSettings,
                radarSettings: rideRadarSettings,
                onboardingSettings: rideOnboardingSettings,
-               cockpitLayoutSettings: rideCockpitLayoutSettings
+               cockpitLayoutSettings: rideCockpitLayoutSettings,
+               appearanceSettings: rideAppearanceSettings,
+               lapSettings: rideLapSettings,
+               climbSettings: rideClimbSettings,
+               routeHomeSettings: routeHomeSettings,
+               routeFavoriteStore: routeFavoriteStore,
+               routeRecentStore: routeRecentStore,
+               routeGuidanceManager: routeGuidanceManager,
+               weatherModel: rideWeatherModel
             ),
             isRideInProgress: {
                rideViewModel.isRecording

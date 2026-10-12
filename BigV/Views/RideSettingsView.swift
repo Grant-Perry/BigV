@@ -163,13 +163,30 @@ struct RideSettingsView: View {
    let units = RideUnitsSettings()
    let onboarding = RideOnboardingSettings()
    let radar = RideRadarSettings()
+   let climb = RideClimbSettings()
+   let laps = RideLapSettings()
+   let appearance = RideAppearanceSettings()
+   let cockpit = RideCockpitLayoutSettings()
+   let home = RouteHomeSettings()
    let backup = RideBackupViewModel(
       backupManager: RideBackupManager(
          rideStorageManager: storage,
          unitsSettings: units,
          radarSettings: radar,
          onboardingSettings: onboarding,
-         cockpitLayoutSettings: RideCockpitLayoutSettings()
+         cockpitLayoutSettings: cockpit,
+         appearanceSettings: appearance,
+         lapSettings: laps,
+         climbSettings: climb,
+         routeHomeSettings: home,
+         routeFavoriteStore: RouteFavoriteStore(),
+         routeRecentStore: RouteRecentStore(),
+         routeGuidanceManager: RouteGuidanceManager(),
+         weatherModel: RideWeatherModel(
+            weatherService: RideWeatherService(),
+            locationProbe: CurrentLocationProbe(),
+            unitsSettings: units
+         )
       ),
       isRideInProgress: { false },
       onHistoryChanged: {}
@@ -180,11 +197,11 @@ struct RideSettingsView: View {
       onboardingSettings: onboarding,
       plusStore: BigVeloPlusStore(),
       backupViewModel: backup,
-      climbSettings: RideClimbSettings(),
-      lapSettings: RideLapSettings(),
-      appearanceSettings: RideAppearanceSettings(),
-      cockpitLayoutSettings: RideCockpitLayoutSettings(),
-      routeHomeSettings: RouteHomeSettings(),
+      climbSettings: climb,
+      lapSettings: laps,
+      appearanceSettings: appearance,
+      cockpitLayoutSettings: cockpit,
+      routeHomeSettings: home,
       routeHomeAddressViewModel: RouteHomeAddressViewModel(),
       onShowRadar: {},
       onFinishSetup: {}

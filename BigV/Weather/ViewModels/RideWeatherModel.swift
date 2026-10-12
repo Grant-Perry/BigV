@@ -138,6 +138,19 @@ final class RideWeatherModel {
       await refresh()
    }
 
+   /// Puts a backup pin on screen and in the store. `nil` clears it.
+   /// Does not fetch.
+   func restorePinnedPlace(_ place: RideWeatherPlace?, defaults: UserDefaults = .standard) {
+      let pinned = place?.source == .pinned ? place : nil
+      if let pinned {
+         RideWeatherPlaceStore.save(pinned, in: defaults)
+      } else {
+         RideWeatherPlaceStore.clear(in: defaults)
+      }
+      self.place = pinned
+      resetReading()
+   }
+
    /// The chip is the rider's first contact with the feature, so the prompt is
    /// raised from a tap rather than silently at launch.
    func requestLocationAuthorization() {

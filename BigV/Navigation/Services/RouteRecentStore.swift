@@ -78,6 +78,12 @@ final class RouteRecentStore {
       persist()
    }
 
+   /// Writes the list as given, including an empty one.
+   func replace(_ recents: [RouteRecentDestination]) {
+      self.recents = recents
+      persist()
+   }
+
    // MARK: - Persistence
 
    private enum Key {

@@ -69,6 +69,12 @@ final class RouteFavoriteStore {
       persist()
    }
 
+   /// Writes the list as given, including an empty one.
+   func replace(_ favorites: [SavedRouteFavorite]) {
+      self.favorites = favorites
+      persist()
+   }
+
    // MARK: - Persistence
 
    private enum Key {

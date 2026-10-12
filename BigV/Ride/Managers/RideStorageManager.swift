@@ -351,6 +351,12 @@ final class RideStorageManager {
 
    // MARK: - Backup Import
 
+   enum BackupFillResult: Sendable {
+      case unchanged
+      case updated
+      case failed
+   }
+
    /// Inserts a finished ride from a Settings backup. Caller is responsible for
    /// duplicate checks; this path always inserts. Returns `false` — with the
    /// context rolled back so nothing half-imported lingers — when the save fails.
@@ -380,8 +386,69 @@ final class RideStorageManager {
       ride.endTemperatureCelsius = record.endTemperatureCelsius
 
       modelContext.insert(ride)
+      attachSamples(record.samples, to: ride)
+      attachRadarEvents(record.radarEvents, to: ride)
+      ride.lapCount += attachLaps(record.laps ?? [], to: ride)
+      ride.climbSplitCount += attachClimbSplits(record.climbSplits ?? [], to: ride)
 
-      for sampleRecord in record.samples {
+      guard saveReportingSuccess(reason: "backup import") else {
+         modelContext.rollback()
+         return false
+      }
+      return true
+   }
+
+   /// Fills only the children, weather, and name a matching ride is missing.
+   ///
+   /// Totals, dates, and a name the ride already has stay put, and a second
+   /// copy of a child list is never inserted. Returns `.failed` — context
+   /// rolled back — when the save fails.
+   func fillMissingContent(
+      on ride: Ride,
+      from record: RideBackupPayload.RideRecord
+   ) -> BackupFillResult {
+      var changed = false
+
+      if ride.samples.isEmpty, !record.samples.isEmpty {
+         attachSamples(record.samples, to: ride)
+         changed = true
+      }
+
+      if ride.radarEvents.isEmpty, !record.radarEvents.isEmpty {
+         attachRadarEvents(record.radarEvents, to: ride)
+         changed = true
+      }
+
+      if ride.laps.isEmpty, let laps = record.laps, !laps.isEmpty {
+         ride.lapCount = attachLaps(laps, to: ride)
+         changed = true
+      }
+
+      if ride.climbSplits.isEmpty, let splits = record.climbSplits, !splits.isEmpty {
+         ride.climbSplitCount = attachClimbSplits(splits, to: ride)
+         changed = true
+      }
+
+      if fillAbsentWeather(on: ride, from: record) {
+         changed = true
+      }
+
+      if ride.name.isEmpty, !record.name.isEmpty {
+         ride.name = record.name
+         changed = true
+      }
+
+      guard changed else { return .unchanged }
+
+      guard saveReportingSuccess(reason: "backup fill") else {
+         modelContext.rollback()
+         return .failed
+      }
+      return .updated
+   }
+
+   private func attachSamples(_ records: [RideBackupPayload.SampleRecord], to ride: Ride) {
+      for sampleRecord in records {
          let sample = RideSample(
             timestamp: sampleRecord.timestamp,
             latitude: sampleRecord.latitude,
@@ -398,8 +465,10 @@ final class RideStorageManager {
          sample.ride = ride
          modelContext.insert(sample)
       }
+   }
 
-      for eventRecord in record.radarEvents {
+   private func attachRadarEvents(_ records: [RideBackupPayload.RadarEventRecord], to ride: Ride) {
+      for eventRecord in records {
          let tier = RideRadarThreatTier(rawValue: eventRecord.peakTierRawValue) ?? .approaching
          let event = RideRadarEvent(
             timestamp: eventRecord.timestamp,
@@ -413,8 +482,11 @@ final class RideStorageManager {
          event.ride = ride
          modelContext.insert(event)
       }
+   }
 
-      for lapRecord in record.laps ?? [] {
+   @discardableResult
+   private func attachLaps(_ records: [RideBackupPayload.LapRecord], to ride: Ride) -> Int {
+      for lapRecord in records {
          let trigger = RideLapTracker.Trigger(rawValue: lapRecord.triggerRawValue) ?? .manual
          let lap = RideLap(lap: RideLapTracker.Lap(
             index: lapRecord.index,
@@ -432,10 +504,13 @@ final class RideStorageManager {
          lap.averageSpeed = lapRecord.averageSpeed
          lap.ride = ride
          modelContext.insert(lap)
-         ride.lapCount += 1
       }
+      return records.count
+   }
 
-      for splitRecord in record.climbSplits ?? [] {
+   @discardableResult
+   private func attachClimbSplits(_ records: [RideBackupPayload.ClimbSplitRecord], to ride: Ride) -> Int {
+      for splitRecord in records {
          let draft = RideClimbSplitDraft(
             startDate: splitRecord.startDate,
             endDate: splitRecord.endDate,
@@ -452,14 +527,39 @@ final class RideStorageManager {
          split.categoryRawValue = splitRecord.categoryRawValue
          split.ride = ride
          modelContext.insert(split)
-         ride.climbSplitCount += 1
+      }
+      return records.count
+   }
+
+   private func fillAbsentWeather(on ride: Ride, from record: RideBackupPayload.RideRecord) -> Bool {
+      var changed = false
+
+      if ride.weatherSymbolName == nil, let value = record.weatherSymbolName {
+         ride.weatherSymbolName = value
+         changed = true
+      }
+      if ride.weatherConditionLabel == nil, let value = record.weatherConditionLabel {
+         ride.weatherConditionLabel = value
+         changed = true
+      }
+      if ride.startTemperatureCelsius == nil, let value = record.startTemperatureCelsius {
+         ride.startTemperatureCelsius = value
+         changed = true
+      }
+      if ride.startApparentTemperatureCelsius == nil, let value = record.startApparentTemperatureCelsius {
+         ride.startApparentTemperatureCelsius = value
+         changed = true
+      }
+      if ride.windSpeedKilometersPerHour == nil, let value = record.windSpeedKilometersPerHour {
+         ride.windSpeedKilometersPerHour = value
+         changed = true
+      }
+      if ride.endTemperatureCelsius == nil, let value = record.endTemperatureCelsius {
+         ride.endTemperatureCelsius = value
+         changed = true
       }
 
-      guard saveReportingSuccess(reason: "backup import") else {
-         modelContext.rollback()
-         return false
-      }
-      return true
+      return changed
    }
 
    // MARK: - Export Links

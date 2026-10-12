@@ -68,16 +68,25 @@ final class RideBackupViewModel {
             rideInProgress: isRideInProgress()
          )
          onHistoryChanged()
-         statusMessage =
-            "Restored \(result.addedRideCount) ride\(result.addedRideCount == 1 ? "" : "s")"
-            + (result.skippedRideCount > 0
-               ? ", skipped \(result.skippedRideCount) already here."
-               : ".")
+         statusMessage = Self.restoreStatus(for: result)
       } catch {
          statusMessage = error.localizedDescription
       }
 
       isBusy = false
+   }
+
+   private static func restoreStatus(for result: RideBackupManager.ImportResult) -> String {
+      var message = "Restored \(result.addedRideCount) ride\(result.addedRideCount == 1 ? "" : "s")"
+      if result.updatedRideCount > 0 {
+         message += ", updated \(result.updatedRideCount)"
+      }
+      if result.skippedRideCount > 0 {
+         message += ", skipped \(result.skippedRideCount) already here."
+      } else {
+         message += "."
+      }
+      return message
    }
 
    func clearShareURL() {
