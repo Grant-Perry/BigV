@@ -19,21 +19,27 @@ struct RideWeatherChip: View {
    @State private var isShowingForecast = false
 
    var body: some View {
-      Button {
-         isShowingForecast = true
-      } label: {
-         if let snapshot = rideWeatherModel.displayedSnapshot {
-            reading(snapshot)
-         } else {
-            placeholder
+      VStack(spacing: 3) {
+         Button {
+            isShowingForecast = true
+         } label: {
+            if let snapshot = rideWeatherModel.displayedSnapshot {
+               reading(snapshot)
+            } else {
+               placeholder
+            }
+         }
+         .buttonStyle(.plain)
+         .accessibilityElement(children: .ignore)
+         .accessibilityLabel("Weather")
+         .accessibilityValue(accessibilityValue)
+         .accessibilityHint("Opens the forecast")
+         .accessibilityIdentifier("ride.chip.weather")
+
+         if rideWeatherModel.displayedSnapshot != nil {
+            RideWeatherAttributionLabel(style: .compact, url: rideWeatherModel.attributionURL)
          }
       }
-      .buttonStyle(.plain)
-      .accessibilityElement(children: .ignore)
-      .accessibilityLabel("Weather")
-      .accessibilityValue(accessibilityValue)
-      .accessibilityHint("Opens the forecast")
-      .accessibilityIdentifier("ride.chip.weather")
       .task { await rideWeatherModel.runRefreshLoop() }
       .onChange(of: scenePhase) { _, phase in
          guard phase == .active else { return }

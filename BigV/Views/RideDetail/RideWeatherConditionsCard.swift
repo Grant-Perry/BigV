@@ -58,6 +58,9 @@ struct RideWeatherConditionsCard: View {
          .accessibilityElement(children: .combine)
          .accessibilityLabel("Weather")
          .accessibilityValue("\(report.conditionLabel), \(report.temperatureText)")
+
+         RideWeatherAttributionLabel()
+            .frame(maxWidth: .infinity, alignment: .leading)
       }
       .padding(14)
       .rideGlassCard(density: .standard)

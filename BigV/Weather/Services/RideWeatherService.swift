@@ -51,6 +51,13 @@ actor RideWeatherClient {
 
    func currentAttributionURL() -> URL? { attributionLegalURL }
 
+   /// The legal page WeatherKit requires next to the  Weather mark.
+   /// Cached after the first successful read so every surface shares one fetch.
+   func legalPageURL() async -> URL? {
+      await refreshAttribution()
+      return attributionLegalURL
+   }
+
    // MARK: - Current
 
    func currentWeather(for location: CLLocation) async -> RideWeatherSnapshot? {

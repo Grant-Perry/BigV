@@ -60,6 +60,9 @@ struct RideWeatherDetailSheet: View {
                isShowingLocationSearch = true
             }
 
+            RideWeatherAttributionLabel(url: weatherDetailModel.attributionURL)
+               .frame(maxWidth: .infinity, alignment: .leading)
+
             RideWeatherForecastCard(
                hours: weatherDetailModel.precipOutlook.hours,
                daily: weatherDetailModel.daily,
@@ -75,11 +78,6 @@ struct RideWeatherDetailSheet: View {
             }
 
             RideWeatherSunCard(today: weatherDetailModel.today, timeZone: weatherDetailModel.timeZone)
-
-            RideWeatherAttributionLabel(url: weatherDetailModel.attributionURL)
-               .frame(maxWidth: .infinity, alignment: .center)
-               .padding(.top, 4)
-               .padding(.bottom, 12)
          }
          .padding(.horizontal, 16)
          .padding(.vertical, 12)
